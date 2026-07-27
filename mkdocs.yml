@@ -4,7 +4,7 @@ site_description: >-
   and Gnosis Chain EEZ network specifications.
 docs_dir: docs
 site_dir: site
-use_directory_urls: false
+use_directory_urls: true
 exclude_docs: |
   rollup0-spec-site/
 
