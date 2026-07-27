@@ -1,113 +1,63 @@
-# 14. Security & Threat Model
+# Implementation Threat Catalog
 
-## 14.1 Trust assumptions and the adversary model
+> **Informative companion material.** The normative model is
+> [Rollup0 §9 — Security and Trust](../docs/rollup0-network-spec/09-security-trust-model.md).
+> This catalog preserves implementation evidence. Earlier claims that the defenses are
+> independent, the operator affects liveness only, or no scenario can cause fund loss are
+> superseded. Manager and verifier authority, external bundle atomicity, the unsafe-head
+> boundary, and EEZ custody must be evaluated together.
 
-Rollup0 is a centralized system with a permissioned committee. Its claim is *not* "trust no
-one" but the narrower one from [§1.4](01-introduction.md): **a dishonest operator can stop the
-chain, but cannot corrupt it.** This chapter elaborates that — what "corrupt" is prevented
-(safety), what "stop" is conceded (liveness) — assuming a well-funded attacker at every layer,
-enumerates the three independent defenses protecting safety, then ranks the threats (each with
-scenario, preconditions, impact, current and recommended mitigation, code evidence).
-Implementation specifics and deviations live in [Appendix A](A1-implementation-deviations.md);
-pinned constants in [Appendix B](B1-reference.md). Severity is tagged
-**[CRITICAL] / [HIGH] / [MEDIUM] / [LOW]**.
+## 14.1 Audit scope and adversaries
 
-### 14.1.1 What each party is trusted for
+The inspected system is centralized and permissioned. Its controls are conditional:
 
-| Party | Trusted for | *Not* trusted for | If it misbehaves |
-|---|---|---|---|
-| **Operator / sequencer / composer** (single, centralized) | **Liveness only** — producing blocks, simulating compositions, posting batches, paying L1 DA cost. | Safety. It cannot make L1 accept an invalid state. | Chain stalls or censors; no theft; followers reject any invalid head it tries to settle. |
-| **Validator set** (permissioned, ECDSA *N*-of-*M*) | Attesting only batches that re-execute correctly. **Up to threshold − 1 may be malicious.** | Being the *sole* line of defense — it is one of three (§14.2). | A sub-threshold malicious subset cannot produce a valid attestation; a threshold-malicious set is still caught by on-chain invariants and re-derivation. |
-| **Relay / builder** (`eth_sendBundle`) | **Bundle atomicity** — all-or-nothing, in-order inclusion of `[postAndVerifyBatch, user_tx…]`. | Anything else; a relay lacking `eth_sendBundle` provides **no** atomicity ([§8.5.2](08-da-and-bundles.md)). | Partial inclusion or a dropped bundle desyncs L1↔L2; repaired by commit-then-repair ([§7.7](07-composer.md)) — never a safety loss. |
-| **L1 (Gnosis Chain)** | **Data availability + finality** — calldata/blobs are public; L1 ordering is the source of truth. | Nothing is delegated *away* from L1; it is the root of trust. | A deep L1 reorg halts derivation (§14.3.20); L1 itself failing is out of scope. |
-| **`SYSTEM_ADDRESS` key holder** (composer + cross-chain deriver) | Signing only genuine inbound deliveries that mint L1-backed value. | Holding more keys than necessary — key sprawl is itself a threat (§14.3.12). | Forged value-minting deliveries until a follower diverges (§14.3.12). |
+| Party or component | Relevant authority | Failure consequence |
+|---|---|---|
+| **Manager owner/governance** | Changes proof systems, vkeys, and threshold; can replace a registered root. | Can remove effective validity checking, install an arbitrary commitment, halt settlement, and affect custody policy. |
+| **Validators and verifier administrators** | Decide whether a digest is accepted; the ECDSA verifier administrator can replace its signer. | A malicious threshold or compromised verifier can authorize invalid state or value movement, subject only to limited contract checks. |
+| **Operator/composer** | Produces the unsafe head, calldata, batches, and transaction pair. | Can equivocate, censor, withhold data, and choose a non-atomic submission path. |
+| **Relay/builder** | Supplies all-or-none, ordered, same-block inclusion outside the EVM. | A successful transaction prefix remains on L1; follower repair cannot reverse it. |
+| **Settlement host** | Supplies canonical execution, receipts, DA, ordering, and finality. | Reorganizations move the safe head; host consensus failure is outside Rollup0. |
+| **`SYSTEM_ADDRESS` key holders** | Sign deterministic legacy system transactions from a prefunded EOA. | Can forge system operations and drain or reallocate that reserve. |
+| **Follower/deriver** | Reconstructs the local safe view and detects disagreement. | Can halt on ambiguity; cannot revert EEZ state or create an exit. |
 
-### 14.1.2 Safety vs liveness — the bright line
+Adversary labels:
 
-- **Safety (protected).** No invalid L2 state becomes canonical to an honest participant; no
-  funds correctly attributed on L1 are stolen. It does **not** depend on the operator or the
-  validator set alone — it rests on L1 being the source of truth, the on-chain invariants
-  enforced regardless of proof ([§6.7](06-execution-model.md)), and trustless re-derivation by
-  any follower ([§12](12-derivation-following.md)).
-- **Liveness (NOT protected in Rollup0).** The chain progresses **only** while the single
-  operator is available and willing. There is **no L1 force-inclusion, no escape hatch, no
-  trustless exit** (§14.3.2) — an *accepted* limitation, not an oversight; Rollup1 removes it
-  (§14.5, [§16](16-rollup1-roadmap.md)).
+- **A-OP**: malicious or compromised operator;
+- **A-VAL**: malicious validators or proof-system administrators;
+- **A-USER**: ordinary user or griefer;
+- **A-KEY**: system-transaction or proof-signer key holder; and
+- **A-NET**: malicious or faulty relay, builder, or network path.
 
-Adversary taxonomy:
+## 14.2 How the controls compose
 
-- **A-OP** — a malicious or compromised *operator* (controls the sequencer, composer,
-  timestamps, ordering, and what is posted to L1). Bounds the liveness worst case; bounded
-  *away* from safety by L1.
-- **A-VAL** — up to *threshold − 1* malicious *validators* (can withhold or, colluding,
-  attempt to attest a bad batch but cannot reach threshold honestly).
-- **A-USER** — an ordinary user or griefer with their own keys, able to submit to both the L2
-  RPC and L1. Cheap, repeatable; the seed threat (§14.3.1) is an A-USER attack.
-- **A-KEY** — an attacker holding the `SYSTEM_ADDRESS` private key or the single proof-signer
-  key (the devnet mock has only one; §14.3.10).
-- **A-NET** — control of the relay/builder or network path (partial bundle inclusion, dropped
-  bundles, RPC unreachability).
+1. **Proof-policy gate.** Structure validation and proof verification happen before entry
+   execution. Soundness depends on manager configuration, verifier behavior, administrator
+   authority, and an honest threshold.
+2. **Local entry checks.** EEZ checks live pre-roots, rolling call commitments, recorded-balance
+   underflow, and its implemented ETH-delta equation. It does not execute the L2 STF, validate
+   opaque DA, prove deposit correspondence, or prevent a self-consistent malicious root. The
+   nested-value defect also prevents treating its equation as a general solvency proof
+   (§14.3.22).
+3. **Non-atomic entry execution.** Immediate entries can be skipped in isolated self-calls and
+   deferred entries can remain unconsumed. `BatchPosted` does not mean the full table applied.
+4. **Follower replay.** A follower can reject an invalid endpoint or rebuild a unique applied v0
+   prefix. It cannot undo an accepted root, return pooled funds, or submit a fraud proof.
+5. **Bundle relay.** The transaction pair is synchronous only when an external relay includes
+   both transactions, in order, in one block, or neither. The proof digest does not commit to the
+   trigger hash or bundle membership.
 
-## 14.2 The three-layer defense
-
-The common misreading of Rollup0 is "it is only as safe as its committee." It is not. Safety is
-the product of three **independent** mechanisms catching overlapping but distinct failures; an
-attacker must defeat **all three** to corrupt state.
-
-**Layer 1 — the validator-set attestation ([§9](09-proving-settlement.md)).**
-Validators re-execute a batch and sign its public-inputs hash; the L1 contract verifies an
-*N*-of-*M* ECDSA threshold before advancing the stored state root. This is the *gate* that
-*advances* `rollups[id].stateRoot`: a batch no honest validator will sign (re-execution
-disagrees) never reaches threshold. It does **not** catch alone a threshold-malicious committee,
-or — critically — the **devnet mock**, which binds to nothing (§14.3.10). Layer 1 is thus
-*necessary for liveness of settlement* but **not** the safety guarantee.
-
-**Layer 2 — on-chain invariants enforced regardless of proof
-([§6.7](06-execution-model.md)).** Independently of *any* proof, `EEZ` enforces at
-consumption:
-
-- **Chained pre-state** — every `StateDelta.currentState` must equal the *live* stored
-  `rollups[rollupId].stateRoot`, else `StateRootMismatch`. The composer stitches
-  `entries[k].currentState == entries[k-1].newState` ([§7.6.2](07-composer.md)); a single
-  committee signature **cannot make an inconsistent state chain settle** because the contract
-  re-checks the chain entry-by-entry.
-- **Per-entry ether conservation** — `totalEtherDelta == etherIn − etherOut`, else
-  `EtherDeltaMismatch`; ETH cannot be conjured per entry.
-- **Rolling-hash integrity** — the three end-of-entry equalities ([§6.7.3](06-execution-model.md)):
-  any wrong return value, wrong success flag, or missing/extra/reordered call yields a
-  different `rollingHash` and reverts `RollingHashMismatch`.
-
-Layer 2 catches what Layer 1 does not: even a *fully malicious threshold* committee cannot land
-a transition that violates ether conservation, breaks the state chain, or fails the rolling hash
-— the contract reverts regardless of signature. It does **not** catch a *self-consistent but
-dishonest* state chain (internally chained roots that don't match an honest STF's output). That
-is Layer 3's job.
-
-**Layer 3 — full re-derivation by any honest follower
-([§12](12-derivation-following.md)).** Any party re-executes the L2 from L1 data and compares
-the resulting state roots against the on-chain claims (`check_claimed_state` validates **both**
-endpoints — the `fromBlock−1` `currentState` and the settled endpoint — against locally
-recomputed STF roots; a cursor-alignment guard refuses to replay if the claimed current root
-≠ local root). On divergence the deriver **halts loudly** (`LocalDiverged`); it does not follow
-the bad head. The attestation can advance the on-chain root, but re-derivation makes a
-Layer-1-and-Layer-2-passing-but-still-wrong advancement *non-canonical to honest participants*.
-
-**How they compose.** Layer 1 decides *what advances*; Layer 2 makes a large class of invalid
-advancements *impossible on-chain* (no signature overrides conservation or the state chain);
-Layer 3 makes the residual class — a self-consistent dishonest chain past Layers 1 and 2 —
-*detectable and rejected* by every honest re-deriver. An attacker needs threshold collusion
-**and** a state chain satisfying all on-chain invariants **and** no honest follower watching —
-and even then the result is a halt, not theft. **Caveat (terminality):** Layer 3 detection is
-*terminal* — divergence halts with no auto-repair, so a successful Layer-1+2 bypass advances the
-on-chain root until a follower diverges (the residual risk that makes the mock proof system
-[CRITICAL] beyond devnet, §14.3.10).
+The resulting evidence is graded: operator output is unsafe; EEZ execution establishes an
+L1-accepted root; matching reconstruction establishes a follower-safe view; and host finality
+protects that view from ordinary reorganization. None removes manager, validator, custody, or
+exit assumptions.
 
 ## 14.3 Ranked threat catalogue
 
 ### 14.3.1 [HIGH] Same-nonce L1 race bricks the settlement bundle — the SEED threat
 
 The canonical Rollup0 attack, specified at mechanism level because every robustness behavior in
-[§7.7](07-composer.md) and the coupling hazard in [§8.5.3](08-da-and-bundles.md) exist to
+[Rollup0 §3 — Composer](../docs/rollup0-network-spec/03-composer.md) and the coupling hazard in [Rollup0 §4 — DA & Bundles](../docs/rollup0-network-spec/04-da-batches-bundles.md) exist to
 survive it. Adversary: **A-USER** (one user with one key, or any party who can front-run that
 account).
 
@@ -115,23 +65,23 @@ account).
 
 1. A user submits a cross-chain intent as an **L1-bound** raw transaction to the *L2* RPC.
    Because its `chainId` is in `cross_chain_source_chain_ids`, the ingress classifier routes
-   it `CrossChain` ([§7.2](07-composer.md)), and ingress admits it after a **point-in-time**
+   it `CrossChain` ([Rollup0 §3 — Composer](../docs/rollup0-network-spec/03-composer.md)), and ingress admits it after a **point-in-time**
    nonce-contiguity check (`nonce == on_chain + held`) and balance check
-   ([§7.3](07-composer.md)), pushing `HeldTx{ sender, nonce, hash }` into the FIFO held pool.
+   ([Rollup0 §3 — Composer](../docs/rollup0-network-spec/03-composer.md)), pushing `HeldTx{ sender, nonce, hash }` into the FIFO held pool.
 2. The same user (or a colluder with the key) submits a **different** L1 transaction with the
    **same nonce** directly to L1, and it lands first. The held intent's nonce is now **burned**
    on L1.
 3. At the next sync slot the composer drains the held intent (`pop_n`, capped at
    `MAX_USER_TXS_PER_BUNDLE = 3`) and assembles the **all-or-nothing** bundle
    `[postAndVerifyBatch_raw, held_user_tx]` (`revertingTxHashes`/`droppingTxHashes` empty,
-   [§8.5.1](08-da-and-bundles.md)).
+   [Rollup0 §4 — DA & Bundles](../docs/rollup0-network-spec/04-da-batches-bundles.md)).
 4. The builder simulates the bundle. `held_user_tx` now has `nonce < account_nonce` (burned
    by the external tx) → it reverts in simulation → all-or-nothing → the **whole bundle never
    lands**, so `postAndVerifyBatch` never lands.
-5. The observer returns `Dropped` only once `head > target_block` ([§8.6](08-da-and-bundles.md));
+5. The observer returns `Dropped` only once `head > target_block` ([Rollup0 §4 — DA & Bundles](../docs/rollup0-network-spec/04-da-batches-bundles.md));
    the ledger entry is `mark_failed`.
 6. **Recovery is where the burn goes undetected.** `recover_failed_batch`
-   ([§7.7.4](07-composer.md)) re-pushes survivors but skips any whose nonce already burned by
+   ([Rollup0 §3 — Composer](../docs/rollup0-network-spec/03-composer.md)) re-pushes survivors but skips any whose nonce already burned by
    checking `receipt_exists(held_user_tx.hash)` — i.e. it checks for a receipt under the
    **held tx's own hash**. The *external* same-nonce tx has a **different hash**, so
    `receipt_exists` returns **false**: the burn is **not detected**, the held tx is re-queued
@@ -149,7 +99,7 @@ partially include instead (§14.3.16).
 `stateRoot` stops advancing (the leading immediate entry never settles), the one-in-flight gate
 churns Failed → recovery → retry, and L1↔L2 diverge in time. This is a **settlement/liveness
 DoS, not a full chain halt**: the empty Sync block is committed **unconditionally**
-([§7.6.5](07-composer.md), [§5.3.1](05-block-production.md)), so L2 cadence continues. It is
+([Rollup0 §3 — Composer](../docs/rollup0-network-spec/03-composer.md), [Rollup0 §2 — Block Production](../docs/rollup0-network-spec/02-block-production.md)), so L2 cadence continues. It is
 **cheap** (one L2 RPC submission + one L1 tx at L1 base fee) and **repeatable** — a griefer keeps
 one poison intent in flight to hold L1 settlement hostage indefinitely, self-healing only
 per-poison-tx after 3 slots.
@@ -179,8 +129,8 @@ held-pool drain (`composer.rs:589-605`); bundle assembly (`composer.rs:1224-1227
 all-or-nothing send (`submitter.rs:511-526`); `Dropped` verdict (`submitter.rs:413-418`);
 `mark_failed` (`optimistic.rs:172-176`); the recovery gap — `receipt_exists` on the **own** hash,
 cannot detect a different-hash external burn (`composer.rs:803-846`); `MAX_BUNDLE_ATTEMPTS=3`
-(`composer.rs:127,835`). Cross-refs: [§8.5.3](08-da-and-bundles.md), [§7.3](07-composer.md),
-[§7.7](07-composer.md). Fix tracked in [Appendix A](A1-implementation-deviations.md).
+(`composer.rs:127,835`). Cross-refs: [Rollup0 §4 — DA & Bundles](../docs/rollup0-network-spec/04-da-batches-bundles.md), [Rollup0 §3 — Composer](../docs/rollup0-network-spec/03-composer.md),
+[Rollup0 §3 — Composer](../docs/rollup0-network-spec/03-composer.md). Fix tracked in [Appendix A](IMPLEMENTATION_NOTES.md).
 
 ---
 
@@ -401,7 +351,7 @@ door; `MAX_BUNDLE_ATTEMPTS` + nonce-cascade as a downstream backstop.
 
 **Recommended mitigation.** Make `l1_provider` **mandatory** (fail-closed at startup) for any
 deployment that admits cross-chain txs; a provider-less composer that admits cross-chain
-classifications is **not** a conformant Rollup0 deployment ([§7.3](07-composer.md) normative
+classifications is **not** a conformant Rollup0 deployment ([Rollup0 §3 — Composer](../docs/rollup0-network-spec/03-composer.md) normative
 requirement).
 
 **Code-evidence.** Verified Rust: `ingress.rs:162-202` (validation gated on `Some(provider)`),
@@ -450,7 +400,8 @@ multi-prover threshold path is currently unimplemented in the wired composer).
 
 **Scenario.** The authoritative on-chain protocol (`EEZ.sol`, `L2/EEZL2.sol`, `base/EEZBase.sol`,
 `interfaces/IEEZ.sol`, `proofSystems/ECDSAProofSystem.sol`, `rollupContract/Rollup.sol`) lives in
-the `sync-rollups-protocol` submodule, **now checked out** at gitlink `fe7bf66`, so the on-chain
+the selected `sync-rollups-protocol` binding at
+`5c51e02b0f965ee8c94e9ed2c7e0e9f924d41fba`, so the on-chain
 threats analyzed elsewhere are verifiable against source and the contracts match the Rust
 expectations per audit. The one residual obligation is **continuous**, not analytical: the
 off-chain `publicInputsHash` fold (Rust `public_inputs.rs`) and the on-chain fold (`EEZ.sol`)
@@ -463,8 +414,8 @@ wrong public inputs. A build/CI-hygiene risk, not an unbounded attack surface: t
 present and the folds currently agree.
 
 **Current mitigation.** The Rust side mirrors the on-chain fold and is byte-locked against a
-Foundry oracle (`public_inputs_hash_vectors.rs`); the gitlink is pinned to the tested commit
-`fe7bf66` to prevent silent drift.
+Foundry oracle (`public_inputs_hash_vectors.rs`); the profile pins the tested revision to prevent
+silent drift.
 
 **Recommended mitigation.** Assert at CI that the deployed `EEZ.sol` fold matches the Rust
 `public_inputs.rs` fold **byte-for-byte**, and gate any submodule gitlink bump on re-running that
@@ -472,46 +423,32 @@ equality check. Pin which `EEZ.sol` fold shape is authoritative.
 
 **Code-evidence.** Verified present: `sync-rollups-protocol/src/EEZ.sol`, `src/L2/EEZL2.sol`,
 `src/base/EEZBase.sol`, `src/interfaces/IEEZ.sol`, `src/proofSystems/ECDSAProofSystem.sol`,
-`src/rollupContract/Rollup.sol` (submodule checked out at `fe7bf66`); Rust fold byte-locked
+`src/rollupContract/Rollup.sol` at the selected `5c51e02` revision; Rust fold byte-locked
 against the Foundry oracle (`public_inputs_hash_vectors.rs`).
 
-### 14.3.12 [HIGH] `SYSTEM_ADDRESS` key sprawl — key compromise forges value-minting L2 deliveries
+### 14.3.12 [HIGH] `SYSTEM_ADDRESS` key compromise forges signed system operations
 
-**Scenario.** Inbound cross-chain delivery is a signed **legacy** tx from `SYSTEM_ADDRESS`
-(type-`0x7E` deferred). Its `.value` is set to `outer.value`, and
-`EEZL2.executeIncomingCrossChainCall` is payable enforcing strict `msg.value == value` — **the
-system tx is the ETH-minting source on L2**. **Both** the composer **and** the
-cross-chain-following deriver must hold the `SYSTEM_ADDRESS` key to produce byte-identical txs.
-Anyone holding it (**A-KEY**) can sign an `executeIncomingCrossChainCall` delivering arbitrary
-value to an arbitrary L2 address — **minting L2 ETH not backed by any real L1
-deposit/StateDelta**.
+**Scenario.** Rollup0 v0 uses deterministic EIP-155-signed legacy transactions for both table
+loads and inbound calls. The inbound envelope value comes from the prefunded system EOA, and the
+contract requires `msg.value == value`. Composer and cross-chain derivers hold the same key so
+they can reproduce identical bytes. An **A-KEY** attacker can sign forged table loads, inbound
+calls, or ordinary transfers from that reserve.
 
-**Impact.** Forged minting of L2 ETH and arbitrary inbound cross-chain calls. The on-chain strict
-`msg.value == value` ties the minted amount to the entry but **not** to a genuine L1 lock. Layer
-3 is the backstop — a follower rebuilds entries from L1 `BatchPosted` and diverges — but
-cross-chain following requires the follower to **also** hold the key. The Rollup0 follower
-**defaults** to `system_tx_cfg = None` only when the SYSTEM key/CCM environment is absent
-(`EEZ_L2_SYSTEM_KEY` / `EEZ_CCM_L2_ADDRESS` / `EEZ_ROLLUP_ID`); `build_follower_system_tx_cfg`
-returns `Some(...)` when they are set (`eez-node/src/main.rs:762-793`). So a key-less follower
-cannot follow cross-chain batches (failing the per-block hash check loudly), but this is a
-**configuration default, not a hardwired property** — a follower configured *with* the key
-re-incurs the surface. **Key sprawl across composer + deriver widens the compromise surface.**
+**Impact.** A compromise can forge system behavior and drain or reallocate the prefunded balance.
+The value equality check binds envelope value to calldata, but does not prove a corresponding
+host-chain lock. A key-less follower cannot reproduce a cross-chain Sync block; a keyed follower
+re-incurs the shared-key compromise domain.
 
-**Current mitigation.** `onlySystemAddress` restricts the on-chain caller; L1 re-derivation is
-the safety net; the type-`0x7E` variant (removing the deriver's key dependency) is the planned
-end-state but deferred.
+**Current mitigation.** `onlySystemAddress` restricts callers, deterministic derivation detects
+unsupported history, and the reserve bounds direct value loss.
 
-**Recommended mitigation.** Prioritize the **type-`0x7E`** system-tx envelope so the deriver
-reconstructs system txs **without** the private key (a deterministic, un-signed envelope),
-removing key sprawl. Until then, keep `SYSTEM_ADDRESS` in an HSM/remote signer, **never on
-follower nodes**, and specify the funding/mint accounting as a normative conservation invariant
-cross-checked against `RollupConfig.etherBalance`.
+**Recommended mitigation.** Use strict key custody and monitor the reserve and backing invariant.
+Design and fully specify a key-free typed envelope before assigning any future transaction type.
 
-**Code-evidence.** Verified Rust: `eez-evm/src/system_tx.rs:39-43` (signer must equal
-`SYSTEM_ADDRESS`), `:104-165` (`value = outer.value`, `sign_legacy_system_tx`); deriver re-signs
-with the same key; follower default vs `Some(...)` (`eez-node/src/main.rs:762-793`). On-chain
-strict `msg.value == value` enforcement: `sync-rollups-protocol/src/L2/EEZL2.sol:194`
-(`if (msg.value != value) revert ValueMismatch()`).
+**Code evidence.** `eez-evm/src/system_tx.rs` contains the shared context, calldata builders, and
+legacy signer; `eez-node/src/main.rs:762-793` wires the follower context. The selected
+`EEZL2.sol` enforces `onlySystemAddress` and `msg.value == value`. See
+[Rollup0 Appendix C](../docs/rollup0-network-spec/C-system-transactions.md).
 
 ### 14.3.13 [HIGH] Stuck persistent queue blocks a rollup's deposits/withdrawals
 
@@ -529,7 +466,7 @@ than corrupt others, and per-rollup queues isolate the wedge.
 skippability for the system-driven prefix.
 
 **Recommended mitigation.** Specify a recovery procedure for a wedged persistent queue (e.g. an
-operator-driven re-post that replaces the rollup's entries via wipe-on-verify, [§6.8](06-execution-model.md)
+operator-driven re-post that replaces the rollup's entries via wipe-on-verify, [EEZ Framework §4 — Execution Model](../docs/eez-protocol-spec/04-execution-model.md)
 step 3); document that a persistent revert is non-skippable by design.
 
 **Code-evidence.** Verified: the immediate prefix is `try/catch`-skippable via
@@ -565,32 +502,33 @@ the exact signed digest (raw `publicInputsHash`, no EIP-191) as authoritative.
 
 ### Data availability
 
-### 14.3.15 [MEDIUM] Calldata public (no withholding), but the blob path is unimplemented
+### 14.3.15 [INFORMATIONAL] Calldata is selected; the blob proposal is unimplemented
 
-**Scenario.** The spec mandates **EIP-4844 blobs** as default DA (calldata when cheaper), but
-only `TAG_CALLDATA = 0x00` is implemented; the submitter **hard-rejects** any non-empty
+**Scenario.** The current Rollup0 profile mandates tag-`0x00` calldata and requires empty
+`blobIndices`. The implementation matches that choice and **hard-rejects** any non-empty
 `blobIndices` with `UnsupportedBlobIndices` (the off-chain fold would hash an empty
 `blob_hashes` slice and mismatch the on-chain `blobhash(blobIndices[i])` fold). There is no
-KZG/sidecar/4844-tx construction. The blob-vs-calldata cost comparator does not exist, and no
-L2 user is charged any L1 DA fee.
+KZG/sidecar/4844-tx construction. Blob support is an informative future proposal, not a missing
+requirement of `rollup0-chiado@0.1-draft`. No L2 user is currently charged any L1 DA fee.
 
 **Impact.** **No data-withholding attack exists on calldata** — it is on L1 and fully public, so
-there is nothing to withhold (a *positive* property). But the documented blob DA design is **not
-realized**: all DA rides L1 calldata, bearing the full L1 calldata cost on the operator EOA with
-**no L2-side reimbursement**. Under high L1 base fee the operator may stop posting (liveness —
-feeds §14.3.18). The reserved second tag is undefined, a forward-compat hole.
+there is nothing to withhold (a *positive* property). All DA rides L1 calldata, bearing the full
+calldata cost on the operator EOA with **no L2-side reimbursement**. Under high host base fee the
+operator may stop posting (liveness — feeds §14.3.18). That is an unresolved fee-policy risk, not
+a blob-conformance failure.
 
 **Current mitigation.** Calldata is fully available (no withholding possible); `blobIndices`
 forced empty and rejected if non-empty (loud fail).
 
-**Recommended mitigation.** Specify the EIP-4844 blob payload framing (tag byte, body reuse),
+**Future mitigation.** A later profile may specify EIP-4844 blob payload framing (tag byte, body reuse),
 the `blobIndices → blob` binding, the off-chain `blobhash` resolution mirroring the on-chain
-walk, and the cost comparator that picks the channel. Define who pays L1 DA cost in production.
+walk, and the cost comparator that picks the channel. Production fee policy must define who pays
+host DA cost independently of that future choice.
 
 **Code-evidence.** Verified: `eez-evm-inspector/src/post_batch_submitter.rs:154-168,354-363`
 (`UnsupportedBlobIndices` reject); `eez-payload-codec/src/lib.rs:48` (only tag `0x00`). DA-fee
-oracle absent (design-level). See [§8.4.2](08-da-and-bundles.md),
-[Appendix A](A1-implementation-deviations.md).
+oracle absent (design-level). See [Rollup0 §4 — DA & Bundles](../docs/rollup0-network-spec/04-da-batches-bundles.md),
+[Appendix A](IMPLEMENTATION_NOTES.md).
 
 ### 14.3.16 [HIGH] Partial bundle inclusion (relay honoring reverting whitelists)
 
@@ -608,7 +546,7 @@ stalls and recovery churns.
 **Current mitigation.** **Strict all-or-nothing** — empty `revertingTxHashes`/`droppingTxHashes`
 whitelists, so the builder must include the whole bundle in order or drop it — plus
 `MAX_USER_TXS_PER_BUNDLE = 3`. Settlement uses the last-applied root, not the claimed full-chain
-end ([§8.6](08-da-and-bundles.md), [§12](12-derivation-following.md)).
+end ([Rollup0 §4 — DA & Bundles](../docs/rollup0-network-spec/04-da-batches-bundles.md), [Rollup0 §6 — Derivation](../docs/rollup0-network-spec/06-derivation-following.md)).
 
 **Recommended mitigation.** Treat a relay lacking `eth_sendBundle` (or honoring reverting
 whitelists) as **not providing atomicity** — a deployment constraint, not a fallback. Combine
@@ -630,7 +568,7 @@ the parser filters strictly.
 **Current mitigation.** `decode_outcome` filters logs to `log.address() == eez_address` and
 requires exactly one `BatchPosted`; `settlement_in_block`/scan filter by the `EEZ` address **and**
 the `rollupId` topic — so a rogue contract's collision is ignored
-(`post_batch_submitter.rs:575-607`; `submitter.rs:471-476`). See [§8.6](08-da-and-bundles.md).
+(`post_batch_submitter.rs:575-607`; `submitter.rs:471-476`). See [Rollup0 §4 — DA & Bundles](../docs/rollup0-network-spec/04-da-batches-bundles.md).
 
 **Recommended mitigation.** Keep the address+topic filter as a normative requirement of any
 outcome parser; add a regression test asserting a colliding-selector log from a non-`EEZ` address
@@ -640,32 +578,27 @@ is ignored.
 
 ### Economic
 
-### 14.3.18 [MEDIUM] Fees burned to zero + `SYSTEM_ADDRESS` drain
+### 14.3.18 [MEDIUM] Zero beneficiary and system-account fee exhaustion
 
-**Scenario.** Block-building `suggested_fee_recipient` is hard-coded `Address::ZERO` on every
-production path (`with_fee_recipient` exists but is never wired), so all L2 priority/base-fee
-revenue accrues to `0x0` (lost). Separately, inbound cross-chain execution runs as legacy txs
-from `SYSTEM_ADDRESS` at `l2_gas_price` (1 gwei) × up to `l2_gas_limit` (2M) per tx, paying L2
-gas from `SYSTEM_ADDRESS`'s own native balance; if it is **drained**, inbound cross-chain
-delivery **halts**. Adversary: **A-USER** sustaining inbound volume to drain `SYSTEM_ADDRESS`,
-or simply a production deployment with the default zero recipient.
+**Scenario.** The v0 beneficiary is `Address::ZERO`: base fees burn and priority fees are
+economically inaccessible. There is no L1-data-fee reimbursement. System transactions pay a
+fixed 1 gwei gas price with a 2,000,000 gas limit from the prefunded `SYSTEM_ADDRESS`; delivery
+halts when the account cannot cover up-front gas or when the block base fee exceeds the fixed
+price.
 
-**Impact.** No sequencer revenue / no fee-market capture (economic sustainability unspecified).
-`SYSTEM_ADDRESS` balance exhaustion is a latent liveness DoS for inbound delivery (it mints
-value but pays gas). Combined with no L1 DA-cost recovery (§14.3.15), the operator has no
-on-chain income against real L1/L2 costs — long-run liveness pressure.
+**Impact.** The operator has no protocol income against host-chain posting costs, and system
+balance or fee-market drift can halt cross-chain delivery.
 
-**Current mitigation.** `with_fee_recipient()` override available (unused); near-zero dev base
-fee makes `SYSTEM_ADDRESS` gas negligible in devnet; genesis funds large balances.
+**Current mitigation.** Development genesis prefunds the account. Deployments can monitor its
+balance and base-fee headroom.
 
-**Recommended mitigation.** Decide and pin the L2 fee recipient (operator/treasury vs burn) and
-wire `with_fee_recipient`. Specify how `SYSTEM_ADDRESS` is funded (top-up policy / mint
-accounting) and bound worst-case inbound execution gas so the inbound path cannot be starved.
-Add a production fee-market policy for the inbound system-tx gas price/limit.
+**Recommended mitigation.** Specify provisioning, monitoring, and top-up operations for the
+system reserve. Any non-zero beneficiary, dynamic gas-price rule, or L1-cost recovery must be a
+versioned profile change
+([Rollup0 §7 — Gas & Economics](../docs/rollup0-network-spec/07-gas-economics.md)).
 
-**Code-evidence.** Verified Rust: `deriver.rs:479`, `composer.rs:522`, `sequencer.rs:118`
-(`suggested_fee_recipient` ZERO); `genesis.json:27` (coinbase `0x0`); `system_tx.rs:49-54`
-(`SYSTEM_ADDRESS` gas params).
+**Code evidence.** `deriver.rs:496`, `composer.rs:570`, `sequencer.rs:118`;
+`eez-node/src/main.rs:704-705,968-969`.
 
 ### Application-layer (informative)
 
@@ -728,7 +661,7 @@ before dropping; "never swallow a reorg" (old-tip canonicality verified before r
 `Dropped` is *provably-dead-only*; `resolve_below_cursor` overrides a false `Failed → Settled`;
 `recover_failed_batch` re-checks `cursor ≥ sync_height` under the reconcile lock and **drops
 recovery** (the stale-verdict guard) — the Deriver cursor is the stronger oracle
-([§7.7.1](07-composer.md), [§7.7.3](07-composer.md)).
+([Rollup0 §3 — Composer](../docs/rollup0-network-spec/03-composer.md), [Rollup0 §3 — Composer](../docs/rollup0-network-spec/03-composer.md)).
 
 **Recommended mitigation.** Define a **normative deep-reorg recovery procedure**: on
 `ReorgTooDeep`, quiesce production, drop all Pending/Settled optimistic entries above the new
@@ -740,42 +673,108 @@ on any per-block failure).
 `deriver.rs:901-966` (shallow-reorg retreat path); `deriver.rs:1032-1037` (non-transactional
 reconcile); `submitter.rs:413-418` (provably-dead-only `Dropped`); `optimistic.rs` /
 `composer.rs:803-846` (stale-verdict guard). Deep-reorg in-flight cleanup: no code path
-(design-level gap, [Appendix A](A1-implementation-deviations.md)).
+(design-level gap, [Appendix A](IMPLEMENTATION_NOTES.md)).
+
+### Replay, custody, and governance
+
+### 14.3.21 [HIGH] Zero block context removes the intended replay domain
+
+**Scenario.** Live builders initialize `blockNumber = 0`, and the posting path does not replace
+it. The reference manager accepts zero and returns `(timestamp, blockHash) = (0, 0)`. A posted
+batch is therefore not tied to a nonzero canonical host block.
+
+**Impact.** The intended recent-block replay bound and fork-context check are absent. A binding
+verifier would still authenticate a timeless digest unless construction is fixed.
+
+**Mitigation.** Reject both sentinels; select and validate a recent explicit host block before
+proof construction; and rebuild after a reorg or expiry.
+
+**Code evidence.** `crates/eez-evm/src/batch.rs:54`;
+`crates/eez-composer/src/composer.rs:1693-1930`;
+`sync-rollups-protocol/src/rollupContract/Rollup.sol:131-149`.
+
+### 14.3.22 [HIGH] Nested outbound ETH is omitted from entry accounting
+
+**Scenario.** `_applyAndExecute` receives the value total only from its outer `_processNCalls`.
+`_consumeNestedAction` invokes the function recursively and discards its returned outbound total.
+
+**Impact.** A nested successful outflow can reduce physical EEZ custody without an equal reduction
+in recorded liabilities. Individual underflow checks and the implemented entry equation can pass
+while aggregate custody is under-backed.
+
+**Mitigation.** Accumulate value across every nesting depth with revert-safe entry-scoped
+accounting. Reject nested value-bearing entries until that is implemented.
+
+**Code evidence.** `sync-rollups-protocol/src/EEZ.sol:769-785,890-942`.
+
+### 14.3.23 [CRITICAL] Manager and verifier administrators can replace validity policy
+
+**Scenario.** The manager owner can change proof systems, vkeys, threshold, and the registered
+root. The ECDSA verifier owner can replace its signer. There is no protocol delay or dispute
+window.
+
+**Impact.** These roles control validity, availability, and effective custody. A follower can
+detect and halt, but cannot stop the policy change, reverse an applied outflow, or exit.
+
+**Mitigation.** Publish the complete deployment, code, and admin tuple; separate compromise
+domains; use threshold governance and observable delays; and remove unneeded escape or signer
+rotation powers.
+
+**Code evidence.** `sync-rollups-protocol/src/rollupContract/Rollup.sol:173-216`;
+`sync-rollups-protocol/src/proofSystems/ECDSAProofSystem.sol:18-31`.
+
+### 14.3.24 [HIGH] Per-block root-set attribution can invent an applied prefix
+
+**Scenario.** The scanner groups all applied roots for a rollup into a per-block `HashSet`, then
+credits each batch in that block by set membership. It loses receipt order, duplicate
+multiplicity, and the association between a deferred trigger and its batch.
+
+**Impact.** A follower can reconstruct the wrong system-transaction or receipt prefix while
+selecting a root that appeared elsewhere in the block. Root replay does not authenticate exact
+history for root-preserving operations.
+
+**Mitigation.** Preserve transaction/log order and multiplicity, bind each applied entry to its
+batch or trigger, and halt on non-prefix or ambiguous patterns.
+
+**Code evidence.** `crates/eez-l1/src/scan.rs:136-205,236-260`;
+`crates/eez-deriver/src/deriver.rs:1092-1098,1151-1168`.
 
 ## 14.4 Residual-risk summary
 
 | # | Threat | Category | Severity | Status | Where addressed |
 |---|---|---|---|---|---|
-| 14.3.1 | Same-nonce L1 race bricks the bundle (SEED) | mempool/nonce | **HIGH** | open (mitigated partial) | Fix in [App. A](A1-implementation-deviations.md); §14.3.1 |
-| 14.3.2 | No force-inclusion / escape hatch | sequencer/operator | **HIGH** | **accepted** (Rollup0) | Rollup1 ([§16](16-rollup1-roadmap.md)) |
+| 14.3.1 | Same-nonce L1 race bricks the bundle (SEED) | mempool/nonce | **HIGH** | open (mitigated partial) | Fix in [App. A](IMPLEMENTATION_NOTES.md); §14.3.1 |
+| 14.3.2 | No force-inclusion / escape hatch | sequencer/operator | **HIGH** | **accepted** (Rollup0) | Rollup1 ([Rollup0 §10 — Future Design](../docs/rollup0-network-spec/10-future-design.md)) |
 | 14.3.3 | Sequencer↔follower equivocation (`Unverifiable>1024`) | sequencer/operator | LOW | mitigated | §14.3.3; harden cap |
 | 14.3.4 | Operator timestamp manipulation | sequencer/operator | MEDIUM | mitigated (safety) | §14.3.4 |
-| 14.3.5 | STATICCALL/DELEGATECALL-to-proxy dispatch | cross-chain | **HIGH** | open | Fix in [App. A](A1-implementation-deviations.md) |
-| 14.3.6 | Overlay drops code/nonce, hard-fails selfdestruct | cross-chain | MEDIUM | open | Fix/forbid in [App. A](A1-implementation-deviations.md) |
+| 14.3.5 | STATICCALL/DELEGATECALL-to-proxy dispatch | cross-chain | **HIGH** | open | Fix in [App. A](IMPLEMENTATION_NOTES.md) |
+| 14.3.6 | Overlay drops code/nonce, hard-fails selfdestruct | cross-chain | MEDIUM | open | Fix/forbid in [App. A](IMPLEMENTATION_NOTES.md) |
 | 14.3.7 | `authorizedProxies` live-state poisoning | cross-chain | MEDIUM | mitigated (on-chain gate) | §14.3.7 (on-chain registration gate) |
 | 14.3.8 | Cross-chain sub-call unmetered in sim | gas griefing | MEDIUM | open | §14.3.8 |
-| 14.3.9 | Admission skipped without `l1_provider` | mempool/nonce | MEDIUM | open (amplifies SEED) | [§7.3](07-composer.md) normative; [App. A](A1-implementation-deviations.md) |
+| 14.3.9 | Admission skipped without `l1_provider` | mempool/nonce | MEDIUM | open (amplifies SEED) | [Rollup0 §3 — Composer](../docs/rollup0-network-spec/03-composer.md) normative; [App. A](IMPLEMENTATION_NOTES.md) |
 | 14.3.10 | Mock PS does not bind to batch | proof-system | **CRITICAL** | **devnet-only / accepted** | Binding PS; Rollup1 ZK (§14.5) |
 | 14.3.11 | CI fold-equality (Rust ↔ `EEZ.sol`) | proof-system | MEDIUM | open (CI obligation) | CI fold-equality; gate gitlink bumps |
-| 14.3.12 | `SYSTEM_ADDRESS` key sprawl forges minting | cross-chain | **HIGH** | open (mitigated by Layer 3) | type-`0x7E`; Rollup1 (§14.5) |
+| 14.3.12 | `SYSTEM_ADDRESS` key sprawl forges system operations | cross-chain | **HIGH** | open | Appendix C; future key-free envelope |
 | 14.3.13 | Stuck persistent queue (deposit/withdrawal DoS) | proof-system | **HIGH** | mitigated (isolation) | §14.3.13 recovery proc |
 | 14.3.14 | Signature malleability / v-range | proof-system | LOW | **mitigated** | §14.3.14 |
-| 14.3.15 | Blob DA unimplemented; calldata public | DA | MEDIUM | open (design) | [§8.4.2](08-da-and-bundles.md); [App. A](A1-implementation-deviations.md) |
+| 14.3.15 | Calldata selected; blob proposal unimplemented | DA | INFORMATIONAL | conforms; future proposal | [Rollup0 §4 — DA & Bundles](../docs/rollup0-network-spec/04-da-batches-bundles.md); [App. A](IMPLEMENTATION_NOTES.md) |
 | 14.3.16 | Partial bundle inclusion | DA | **HIGH** | mitigated (strict bundle) | §14.3.16; SEED fix |
 | 14.3.17 | Event-selector / receipt spoofing | DA | LOW | **mitigated** | §14.3.17 |
-| 14.3.18 | Fees burned to zero + `SYSTEM_ADDRESS` drain | economic | MEDIUM | open | §14.3.18 |
+| 14.3.18 | Zero beneficiary + system reserve exhaustion | economic | MEDIUM | open | §14.3.18 |
 | 14.3.19 | Predictable `prev_randao` | application | MEDIUM | open (app-layer) | §14.3.19 |
-| 14.3.20 | Deep-reorg halt + recovery-vs-deriver war | derivation | **HIGH** | mitigated (b) / open (a) | Deep-reorg proc in [App. A](A1-implementation-deviations.md) |
+| 14.3.20 | Deep-reorg halt + recovery-vs-deriver war | derivation | **HIGH** | mitigated (b) / open (a) | Deep-reorg proc in [App. A](IMPLEMENTATION_NOTES.md) |
+| 14.3.21 | Zero L1 proof context | replay/domain | **HIGH** | open | §14.3.21; [App. A H-6](IMPLEMENTATION_NOTES.md#h-6-live-batches-retain-the-zero-l1-context-sentinel) |
+| 14.3.22 | Nested value omitted from accounting | custody | **HIGH** | open | §14.3.22; [App. A H-8](IMPLEMENTATION_NOTES.md#h-8-nested-outbound-eth-is-omitted-from-entry-accounting) |
+| 14.3.23 | Manager/verifier admin authority | governance | **CRITICAL** | accepted trust assumption | §14.3.23 |
+| 14.3.24 | Root-set settlement attribution | derivation | **HIGH** | open | §14.3.24; [App. A H-9](IMPLEMENTATION_NOTES.md#h-9-deriver-attributes-applied-roots-by-per-block-set-membership) |
 
-**Status legend.** *mitigated* — a code or design mechanism reduces the threat to acceptable in
-Rollup0; *accepted* — a deliberate Rollup0 limitation removed only by Rollup1; *open* — a known
-gap with a recommended fix tracked in [Appendix A](A1-implementation-deviations.md). No threat in
-this catalogue is a **fund-theft** threat: every entry is either liveness, an application-layer
-hazard, or a corruption attempt that Layers 2–3 (§14.2) reduce to a *halt* rather than a loss.
+**Status legend.** *mitigated* means a mechanism reduces the threat; *accepted* is an explicit
+trust assumption or limitation; *open* is a known gap. Detection by a follower can reduce the
+accepted view to a halt, but it cannot reverse host-chain effects or guarantee custody recovery.
 
 ## 14.5 What Rollup1 changes for security
 
-Rollup1 ([§16](16-rollup1-roadmap.md)) is not a feature release; it is the retirement of three
+Rollup1 ([Rollup0 §10 — Future Design](../docs/rollup0-network-spec/10-future-design.md)) is not a feature release; it is the retirement of three
 whole threat *classes* that Rollup0 accepts by construction.
 
 - **Force-inclusion + trustless exit kills the censorship / no-exit class.** An L1
@@ -789,17 +788,16 @@ whole threat *classes* that Rollup0 accepts by construction.
   malleability) become moot, and the committee-collusion residual behind §14.2 disappears — the
   proof *is* the binding, and Layer 3 re-derivation becomes a redundancy check rather than the
   load-bearing safety backstop.
-- **type-`0x7E` removes `SYSTEM_ADDRESS` key sprawl.** A deterministic, un-signed system-tx
-  envelope lets the deriver reconstruct inbound deliveries **without** the private key, removing
-  §14.3.12's key-sprawl surface (no key on follower nodes; no single key that forges minting) and
-  eliminating the follower's inability to follow cross-chain batches.
+- **A key-free envelope removes `SYSTEM_ADDRESS` key sprawl.** A future deterministic envelope
+  could let a deriver reconstruct system transactions without a private key. Type `0x7E` is an
+  unselected design option, not the active v0 envelope.
 
 The architecture is already shaped for these swaps: the proof-system interface is
-mechanism-agnostic ([§9](09-proving-settlement.md)), the deriver already reconstructs state
-trustlessly ([§12](12-derivation-following.md)), and the sequencing role is structurally
+mechanism-agnostic ([EEZ Framework §5 — Proving & Settlement](../docs/eez-protocol-spec/05-proving-settlement.md)), the deriver reconstructs state
+deterministically ([Rollup0 §6 — Derivation](../docs/rollup0-network-spec/06-derivation-following.md)), and the sequencing role is structurally
 separable from settlement. The Rollup0 compromises catalogued here are therefore **deliberate
 and temporary** — the threats marked *accepted* in §14.4 are exactly the ones §16 retires.
 
 ---
 
-*Next: [Chapter 15 — Related Work](15-related-work.md).*
+*Next: [Chapter 15 — Related Work](related-work.md).*

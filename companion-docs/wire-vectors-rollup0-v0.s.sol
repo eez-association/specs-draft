@@ -9,14 +9,17 @@ import {
     StateDelta,
     L2ToL1Call,
     ExpectedL1ToL2Call,
+    ExpectedLookup,
+    ExpectedStateRootPerRollup,
     LookupCall
 } from "../src/interfaces/IEEZ.sol";
 
 /// @title WireVectors
-/// @notice Computes byte-exact conformance vectors for Appendix D of the Rollup0 spec.
-/// @dev Every value here is computed by the SAME code paths the deployed `EEZ` /
-///      `EEZBase` / `CrossChainProxy` contracts use, so the vectors are authoritative.
-///      Run: forge script script/WireVectors.s.sol -vvv
+/// @notice Computes Rollup0-v0 compatibility vectors for the 5c51e02 binding.
+/// @dev Every value here is computed by the SAME code paths the selected v0 `EEZ` /
+///      `EEZBase` / `CrossChainProxy` sources use, so the vectors are authoritative.
+///      Copy as script/WireVectors.s.sol in the selected checkout, then run:
+///      forge script script/WireVectors.s.sol -vvv
 contract WireVectors is Script {
     // Mirror the EEZBase rolling-hash domain tags.
     uint8 constant CALL_BEGIN = 1;
@@ -143,13 +146,15 @@ contract WireVectors is Script {
         });
 
         ExpectedL1ToL2Call[] memory nested = new ExpectedL1ToL2Call[](0);
+        ExpectedLookup[] memory expectedLookups = new ExpectedLookup[](0);
 
         ExecutionEntry memory entry = ExecutionEntry({
             stateDeltas: deltas,
             proxyEntryHash: cchash,
             destinationRollupId: 1,
-            L2ToL1Calls: calls,
+            l2ToL1Calls: calls,
             expectedL1ToL2Calls: nested,
+            expectedLookups: expectedLookups,
             callCount: 1,
             returnData: hex"",
             rollingHash: afterEnd
@@ -309,15 +314,21 @@ contract WireVectors is Script {
     function _vector7_nonEmptyCallDataAndLookup(bytes32 entryHash) internal {
         // Build one concrete LookupCall and hash it exactly as the contract does.
         L2ToL1Call[] memory noCalls = new L2ToL1Call[](0);
+        ExpectedL1ToL2Call[] memory noNested = new ExpectedL1ToL2Call[](0);
+        ExpectedLookup[] memory noExpectedLookups = new ExpectedLookup[](0);
+        ExpectedStateRootPerRollup[] memory stateRoots = new ExpectedStateRootPerRollup[](1);
+        stateRoots[0] = ExpectedStateRootPerRollup({rollupId: 1, stateRoot: bytes32(uint256(0xaa))});
         LookupCall memory lc = LookupCall({
             crossChainCallHash: bytes32(uint256(0x1234)),
             destinationRollupId: 1,
             returnData: hex"abcd",
             failed: true,
-            callNumber: 0,
-            lastNestedActionConsumed: 0,
-            calls: noCalls,
-            rollingHash: bytes32(0)
+            l2ToL1Calls: noCalls,
+            expectedL1ToL2Calls: noNested,
+            expectedLookups: noExpectedLookups,
+            callCount: 0,
+            rollingHash: bytes32(0),
+            expectedStateRoots: stateRoots
         });
         bytes32 lookupCallHash = keccak256(abi.encode(lc));
 

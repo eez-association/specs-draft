@@ -1,5 +1,13 @@
 # Rollup0 Spec — Review Findings, Round 2
 
+> **Historical, informative review snapshot.** Findings describe a pre-correction draft and do
+> not state the active protocol. Current normative behavior is under `docs/`. A1, B1, B3, B5,
+> B6, B8, B10, B12, B13, the Sync-count/order minors, and the old wire-corpus conclusions are
+> superseded. Rollup0 v0 selects signed legacy system transactions, prefunded transfers, a
+> cursor-derived non-empty range, variable-cardinality ordered bundles, strict tag-`0x00`
+> calldata DA with empty `blobIndices`, canonical partial-settlement derivation, standard
+> EIP-1559 parameters, and a zero beneficiary. Type `0x7E` is future design material only.
+
 Synthesis of a six-lens review (two second-client core devs — node and L1-contracts —, an
 adversarial consistency checker, a security critic, a byte-level wire-format reviewer, and a
 spec editor), 91 raw findings de-duplicated to 41, each surviving finding adversarially verified
@@ -75,12 +83,11 @@ second client cannot get this right from the spec.
 specify the processor algorithm per side (execution context, fold inputs, `etherIn`/`etherOut`
 rules, proxy auto-deploy).
 
-### A5 — The spec contradicts itself on which L1 Rollup0 settles to
-*README vs §1.1 vs A — hand-verified (verbatim quotes).*
-README: "Settlement target: Ethereum L1 (12 s blocks); Rollup0 and GC deploy on Ethereum."
-§1: "Rollup0 (on **Gnosis Chain**, 'GC')"; A: "Rollup0 / GC — the first chain on EEZ (Gnosis
-Chain)." Gnosis Chain has 5 s blocks, so K, the slot model, and every timing parameter differ.
-One sentence fixes it; until then a reader cannot pin the deployment's basic parameters.
+### A5 — Resolved: network identity and settlement target were split
+*Former README/overview contradiction — hand-verified.*
+Rollup0 now pins `gnosis-chain-eez-chiado@0.1-draft` (`chainId = 10200`, nominal 5-second slots),
+while the Gnosis Chain EEZ Network Specification is a separate host profile. Production
+deployment values remain explicit release blockers.
 
 ---
 
@@ -117,10 +124,9 @@ One sentence fixes it; until then a reader cannot pin the deployment's basic par
   word + elements" omits the leading `0x20` offset word; the prose reading yields a *different*
   `sharedPublicInput` (checked numerically; the with-offset reading reproduces Vector 5). One
   sentence, consensus-critical.
-- **B8 — Blob DA status inconsistent, format a placeholder** *(hand-verified)*: §7.1 "v0 uses the
-  calldata format" vs §11.4/B.2/D.7 presenting blob-vs-calldata as a live per-batch choice, while
-  `blob-da-spec.md` is an explicit placeholder. Either blobs are out of v0 (say so everywhere) or
-  the format is a v0 blocker.
+- **B8 — Resolved: blob DA is outside this profile** *(hand-verified)*:
+  `rollup0-chiado@0.1-draft` fixes the tag-`0x00` calldata codec and empty `blobIndices`;
+  `blob-da-spec.md` is explicitly informative. Selecting blobs requires a later profile version.
 - **B9 — The EEZ/manager ABI surface is incomplete** *(hand-verified)*: D.9 pins only
   `postAndVerifyBatch`; `executeCrossChainCall`, `executeL2TX`, `staticCallLookup`,
   `registerRollup`, and the manager functions the registry calls at settlement
@@ -188,7 +194,7 @@ once the empty-calls L1-shape entry is understood — but see A4: the spec doesn
 The spec is *not* bloated; duplication is confined and specific:
 - the DA grammar + invariants are stated three times (§7.1, A.4, D.7) with wording drift — state
   once in D.7, summarize elsewhere;
-- the "safety does not depend on the operator / only liveness" refrain and the "Rollup0/GC choice,
+- the "safety does not depend on the operator / only liveness" refrain and the former combined-profile
   not an EEZ requirement" disclaimer each appear ~5–6 times — one canonical statement + cross-refs
   (round-1 §H asked the same);
 - §8.4 re-narrates the §5.5 lifecycle at a different granularity — have it defer.

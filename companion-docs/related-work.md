@@ -1,11 +1,15 @@
 # 15. Related Work
 
-This chapter situates Rollup0 — and its successor Rollup1 ([§16](16-rollup1-roadmap.md)) —
+> **Informative.** Comparisons and future-system descriptions in this companion chapter have no
+> conformance effect.
+
+This chapter situates Rollup0 — and its successor Rollup1 ([Rollup0 §10 — Future Design](../docs/rollup0-network-spec/10-future-design.md)) —
 within the contemporary rollup landscape. It states plainly where Rollup0 is *ahead* of deployed
 systems (its synchronous, single-L1-block atomic composability is more ambitious than any
 production leader), *behind* them (its committee attestation is a weaker settlement guarantee
 than either fraud proofs or validity proofs), and where it *matches* the state of the art
-(its centralized-sequencer and blob-default DA postures match Arbitrum Nitro today). It is
+(its centralized-sequencer posture resembles deployed optimistic rollups). Its current calldata
+DA profile differs from blob-default leaders. It is
 organized around four axes (§15.1), applied system-by-system, closing (§15.9) with a summary table.
 
 External claims are cited inline to primary sources. Where a system's published design and its
@@ -26,16 +30,17 @@ centralized sequencer* (one operator orders and produces blocks), through *based
 (L1-sequenced) designs (the L1 proposer schedule drives ordering, so the rollup inherits
 L1 liveness), to *shared / decentralized sequencer networks* (an external BFT validator set
 orders transactions for many rollups at once). Rollup0 sits firmly at the centralized end:
-a single operator runs the composer and produces every L2 block ([§1.3.1](01-introduction.md),
-[§7](07-composer.md)). Rollup1 moves to the based end ([§16](16-rollup1-roadmap.md)).
+a single operator runs the composer and produces every L2 block ([Rollup0 Network overview](../docs/rollup0-network-spec/index.md),
+[Rollup0 §3 — Composer](../docs/rollup0-network-spec/03-composer.md)). Rollup1 moves to the based end ([Rollup0 §10 — Future Design](../docs/rollup0-network-spec/10-future-design.md)).
 
 **(b) Data availability — where the data to reconstruct L2 state is published.** The
 choices are *L1 calldata*, *EIP-4844 blobs*, or an *external DA layer* (Celestia, EigenDA,
 Avail). Post-Cancun, the live question for an L1-DA rollup is calldata-versus-blob
-*selection*, since the two are priced in independent fee markets ([§2.3](02-background.md)).
-Rollup0 publishes everything to its L1 (Gnosis Chain), blobs by default and calldata when
-cheaper ([§8](08-da-and-bundles.md)); it does not target an external DA layer
-([§1.3.1](01-introduction.md)).
+*selection*, since the two are priced in independent fee markets. Rollup0's current profile
+publishes a tag-`0x00` RLP payload as calldata on Chiado; a blob codec is future design, not a
+fallback selected by this edition
+([Rollup0 §4 — DA & Bundles](../docs/rollup0-network-spec/04-da-batches-bundles.md)). It does not target an external DA layer
+([Rollup0 Network overview](../docs/rollup0-network-spec/index.md)).
 
 **(c) Proving / settlement — how L1 is convinced the posted state root is correct.** The
 three established models are *optimistic fraud proofs* (post the root unproven, allow a
@@ -43,17 +48,18 @@ challenge window), *validity (ZK) proofs* (post a SNARK/STARK that L1 verifies
 immediately), and *permissioned committee / multisig attestation* (a trusted set
 re-executes and signs). Rollup0 occupies the third, weakest category — an ECDSA *N*-of-*M*
 validator-set attestation, backstopped by full re-derivation
-([§2.1](02-background.md), [§9](09-proving-settlement.md)). Rollup1 replaces it with a ZK
+([EEZ Framework overview](../docs/eez-protocol-spec/index.md), [EEZ Framework §5 — Proving & Settlement](../docs/eez-protocol-spec/05-proving-settlement.md)). Rollup1 replaces it with a ZK
 validity proof.
 
 **(d) Cross-chain / cross-rollup atomic composability — whether two chains can commit
 a single interaction all-or-nothing.** Rollup0 is most distinctive here. The deployed norm is
 *asynchronous message passing*: a message emitted on one chain is consumed by a *separate, later*
 transaction on the other, and the initiating call cannot use the remote result
-([§2.5](02-background.md)). Rollup0 instead provides *synchronous* composability: an L1↔L2
-interaction commits atomically within a *single L1 block*, with the remote return value available
+([EEZ Framework overview](../docs/eez-protocol-spec/index.md)). Rollup0 instead selects a
+*synchronous L1→L2* interaction: it commits atomically within a *single Chiado block*, with the
+remote return value available
 to local control flow because it was precomputed and proven before settlement
-([§1.2](01-introduction.md)). The only published design targeting the same guarantee class is
+([Rollup0 Network overview](../docs/rollup0-network-spec/index.md)). The only published design targeting the same guarantee class is
 Taiko's Gwyneth (§15.3).
 
 These axes are not fully orthogonal — synchronous composability (d) is far easier under based
@@ -87,10 +93,10 @@ L1-derived settlement security.
 
 This is Rollup1's sequencing model. Rollup0 makes the opposite bootstrap choice — a single
 trusted operator with no preconfirmation machinery — accepting the corresponding liveness
-weakness (operator-dependent, no escape hatch; [§1.3.1](01-introduction.md),
-[§14](14-security-threat-model.md)) for a simpler, shippable system. The based design retires
+weakness (operator-dependent, no escape hatch; [Rollup0 Network overview](../docs/rollup0-network-spec/index.md),
+[§14](threat-model.md)) for a simpler, shippable system. The based design retires
 that weakness, and the proof and settlement interfaces are already shaped so the sequencing role
-can be lifted out and handed to L1 proposers without redesign ([§16](16-rollup1-roadmap.md)).
+can be lifted out and handed to L1 proposers without redesign ([Rollup0 §10 — Future Design](../docs/rollup0-network-spec/10-future-design.md)).
 
 ## 15.3 Taiko and Gwyneth
 
@@ -116,7 +122,7 @@ This staged decentralization — *permissioned now, permissionless target* — i
 as Rollup0→Rollup1's narrative; even the field's flagship based rollup is mid-transition.
 
 **Gwyneth** is the Taiko research that matters most here: the **closest published analog to
-Rollup0's synchronous L1↔L2 atomic composability**. Gwyneth describes a network of identical
+Rollup0's synchronous atomic composability mechanism**. Gwyneth describes a network of identical
 Ethereum-equivalent L2s combining based sequencing, *real-time proving*, and a "booster"
 mechanism so that — in the project's words — "all L2s can not only access each other
 synchronously but also interact with L1 synchronously when supported by the L1 proposer," that
@@ -128,12 +134,13 @@ committing to L2 states)
 L1 slot, possible because the cross-chain results are determined ahead of settlement
 and a cooperating L1 proposer places the settlement transaction in the right block.
 
-Rollup0 and Gwyneth target the *same guarantee* — synchronous, single-L1-block L1↔L2 atomicity —
-by the *same structural route* (precompute, then settle atomically in one L1 block with proposer
-cooperation). They differ on **two** deliberate axes. *Trust model*: Gwyneth's route to "the
+Rollup0 and Gwyneth occupy the same broad mechanism class — precompute, then settle atomically in
+one host block with proposer cooperation — but the current Rollup0 profile is narrower: one
+state-mutating L1→L2 call and one return, not general bidirectional or cross-rollup composition.
+They also differ on **two** deliberate axes. *Trust model*: Gwyneth's route to "the
 answer is correct before settlement" is real-time ZK proving under based sequencing; Rollup0's is
 a permissioned validator-set attestation under a centralized sequencer (the precompute-and-prove
-thesis is identical, the *prover* is not; [§1.2](01-introduction.md)). *Maturity*: Gwyneth is a
+thesis is identical, the *prover* is not; [Rollup0 Network overview](../docs/rollup0-network-spec/index.md)). *Maturity*: Gwyneth is a
 published / research-stage design, not a deployed system, just as Rollup0's synchronous
 composability is specified-and-shippable rather than long-battle-tested. Rollup0's contribution
 relative to Gwyneth is to make this mechanism class *concrete and shippable today* by substituting
@@ -153,7 +160,7 @@ contract, block number, log index, and timestamp
 [specs.optimism.io](https://specs.optimism.io/interop/overview.html)). Because the
 interaction is structurally two transactions across two chains, the initiating call *cannot
 use* the result of the remote call — there is no result yet when the source transaction
-finishes. This is the asynchronous two-transaction pattern of [§2.5](02-background.md).
+finishes. This is the asynchronous two-transaction pattern of [EEZ Framework overview](../docs/eez-protocol-spec/index.md).
 
 Superchain interop reduces *latency* — not the transaction count — by letting a sequencer
 optionally accept executing messages that reference still-"unsafe" (pre-L1) initiating messages,
@@ -173,39 +180,38 @@ The contrast is clean. Superchain interop is *asynchronous, latency-optimized, a
 low-latency messaging that still cannot express "act on the remote return value within this
 transaction." Rollup0 is *synchronous and atomic*: the entire cross-chain interaction, including
 the L1 control flow that branches on an L2 return value, either commits in one L1 block or not at
-all ([§1.1](01-introduction.md)). The two answer different questions — Superchain interop scales
+all ([Rollup0 Network overview](../docs/rollup0-network-spec/index.md)). The two answer different questions — Superchain interop scales
 messaging across many chains; Rollup0 scales *composition* between one L2 and its L1.
 
 ### 15.4.1 Mechanical comparison: block headers & sequencer (Rollup0 vs OP Stack)
 
-Because Rollup0 adopts **OP-Stack defaults** for its under-pinned parameters
-([Appendix B §B.7](B1-reference.md)), a field-level comparison is useful. The striking
-convergence: Rollup0's *planned* type-`0x7E` system transaction ([§4.4](04-evm-and-proxies.md))
-is exactly OP's deposit-transaction type, and OP's L1-origin-derived `prev_randao` is exactly
-Rollup0's §5.5 end-state — so adopting OP defaults aligns the header/fee/DA mechanics with a
-deployed L2 while keeping the synchronous-composability core OP lacks.
+Rollup0 v0 deliberately uses stock Ethereum execution behavior instead of OP Stack deviations.
+Its signed legacy system envelope, fee parameters, zero beneficiary, and calldata-only DA channel
+are selected profile rules. A key-free envelope or OP-style fee/DA mechanism requires a future
+profile version.
 
 | Aspect | OP Stack | Rollup0 |
 |---|---|---|
-| **`prev_randao`** | Copied from the **L1 origin block's `prev_randao`** (EIP-4399, since Bedrock). | End-state identical: the anchored L1 block's RANDAO ([§5.5](05-block-production.md)); currently `0` ([App A](A1-implementation-deviations.md)). |
-| **L1 context into L2** | **L1-attributes deposited tx** (type `0x7E`), the first tx of every L2 block, → `L1Block` predeploy `0x42…0015`. | No `L1Block` predeploy; the composer/deriver reconstruct L1 context, and the Sync-block system tx delivers *cross-chain calls* (not generic L1 attributes) ([§4.4](04-evm-and-proxies.md), [§12](12-derivation-following.md)). |
-| **`parentBeaconBlockRoot`** | The L1 origin's beacon root (Ecotone+). | `Some(0x0)` when Cancun-active — the L2 has no beacon chain ([§5.1](05-block-production.md)). |
-| **Inbound / system tx** | **Unsigned** deposit tx, type `0x7E`, fields `(sourceHash, from, to, mint, value, gas, isSystemTx, data)`; mints via `mint`, backed by L1 `OptimismPortal` escrow. | **Signed legacy** tx from `SYSTEM_ADDRESS` today (mints via `msg.value`); the **type-`0x7E` unsigned envelope is the planned end-state** that removes the deriver's key dependency ([§4.4](04-evm-and-proxies.md), [§16](16-rollup1-roadmap.md), [App A](A1-implementation-deviations.md)) — i.e. Rollup0 is *converging on OP's exact mechanism*. |
-| **EIP-1559** | Elasticity `6`, denominator `250` (Holocene: operator-configurable via `eip1559Params` in `extraData`). | Adopt OP's `6`/`250` as fixed constants ([§B.7](B1-reference.md)); `extraData` stays empty for deterministic re-derivation ([§5.1](05-block-production.md)). |
-| **Gas limit** | Set via `SystemConfig`. | `BUILDER_GAS_LIMIT = 30_000_000`, a shared compile-time constant ([§5.1](05-block-production.md)). |
-| **Sequencer architecture** | **op-node** (derivation + Engine API) + **op-geth** (execution) + **op-batcher** (posts DA batches to L1) + **op-proposer** (posts output roots). | A **single composer** drives stock reth via the Engine API; the **submitter** is the op-batcher analog ([§8.5](08-da-and-bundles.md)); there is **no separate proposer** — the state root advances inside `postAndVerifyBatch`, not via a periodic output-root tx ([§9.4](09-proving-settlement.md)). |
-| **DA framing** | Channels / frames / **span batches**; **version-0 blob encoding** (4096 field elements, high byte dropped). | RLP payload (tag `0x00`) today; **adopt OP's version-0 blob encoding** for the blob path ([§B.7](B1-reference.md), [§8.4](08-da-and-bundles.md)). |
-| **Fees** | `BaseFeeVault` / `SequencerFeeVault` / `L1FeeVault` predeploys + an L1-data-fee oracle (`GasPriceOracle`). | Fees burn to `0x0` today; **adopt OP-style fee vaults** ([§B.7](B1-reference.md)); no L1-data-fee oracle yet ([App A](A1-implementation-deviations.md)). |
-| **Settlement** | **Fraud proofs** (Cannon fault-proof; permissionless via the dispute game). | **Permissioned ECDSA *N*-of-*M* attestation** ([§9](09-proving-settlement.md)); Rollup1 → ZK validity proof ([§16](16-rollup1-roadmap.md)). |
-| **Cross-chain composability** | **Asynchronous** two-tx interop (§15.4). | **Synchronous, single-L1-block atomic** ([§1.1](01-introduction.md)) — the differentiator. |
+| **`prev_randao`** | Copied from the **L1 origin block's `prev_randao`** (EIP-4399, since Bedrock). | Fixed zero in v0; host-derived randomness requires a versioned change ([Rollup0 §2 — Block Production](../docs/rollup0-network-spec/02-block-production.md)). |
+| **L1 context into L2** | **L1-attributes deposited tx** (type `0x7E`), the first tx of every L2 block, → `L1Block` predeploy `0x42…0015`. | No `L1Block` predeploy; the composer/deriver reconstruct L1 context, and the Sync-block system tx delivers *cross-chain calls* (not generic L1 attributes) ([EEZ Framework §3 — EVM Binding](../docs/eez-protocol-spec/03-evm-binding.md), [Rollup0 §6 — Derivation](../docs/rollup0-network-spec/06-derivation-following.md)). |
+| **`parentBeaconBlockRoot`** | The L1 origin's beacon root (Ecotone+). | `Some(0x0)` when Cancun-active — the L2 has no beacon chain ([Rollup0 §2 — Block Production](../docs/rollup0-network-spec/02-block-production.md)). |
+| **Inbound / system tx** | **Unsigned** deposit tx, type `0x7E`, fields `(sourceHash, from, to, mint, value, gas, isSystemTx, data)`; mints via `mint`, backed by L1 `OptimismPortal` escrow. | EIP-155-signed legacy tx from a prefunded `SYSTEM_ADDRESS`; `msg.value` transfers existing L2 value. No key-free typed format is assigned ([Rollup0 Appendix C](../docs/rollup0-network-spec/C-system-transactions.md)). |
+| **EIP-1559** | Elasticity `6`, denominator `250` (Holocene: operator-configurable via `eip1559Params` in `extraData`). | Standard Ethereum elasticity `2`, denominator `8`, and initial base fee `1 gwei` ([Rollup0 §7 — Gas & Economics](../docs/rollup0-network-spec/07-gas-economics.md)). |
+| **Gas limit** | Set via `SystemConfig`. | `BUILDER_GAS_LIMIT = 30_000_000`, a shared compile-time constant ([Rollup0 §2 — Block Production](../docs/rollup0-network-spec/02-block-production.md)). |
+| **Sequencer architecture** | **op-node** (derivation + Engine API) + **op-geth** (execution) + **op-batcher** (posts DA batches to L1) + **op-proposer** (posts output roots). | A **single composer** drives stock reth via the Engine API; the **submitter** is the op-batcher analog ([Rollup0 §4 — DA & Bundles](../docs/rollup0-network-spec/04-da-batches-bundles.md)); there is **no separate proposer** — the state root advances inside `postAndVerifyBatch`, not via a periodic output-root tx ([EEZ Framework §5 — Proving & Settlement](../docs/eez-protocol-spec/05-proving-settlement.md)). |
+| **DA framing** | Channels / frames / **span batches**; **version-0 blob encoding** (4096 field elements, high byte dropped). | Normative tag-`0x00` RLP calldata payload. A blob path and its codec require a later profile version ([Rollup0 §4 — DA & Bundles](../docs/rollup0-network-spec/04-da-batches-bundles.md)). |
+| **Fees** | `BaseFeeVault` / `SequencerFeeVault` / `L1FeeVault` predeploys + an L1-data-fee oracle (`GasPriceOracle`). | Standard base-fee burn; priority fees credited to the zero beneficiary; no fee vaults or L1-data-fee oracle ([Rollup0 §7 — Gas & Economics](../docs/rollup0-network-spec/07-gas-economics.md)). |
+| **Settlement** | **Fraud proofs** (Cannon fault-proof; permissionless via the dispute game). | **Permissioned ECDSA *N*-of-*M* attestation** ([EEZ Framework §5 — Proving & Settlement](../docs/eez-protocol-spec/05-proving-settlement.md)); Rollup1 → ZK validity proof ([Rollup0 §10 — Future Design](../docs/rollup0-network-spec/10-future-design.md)). |
+| **Cross-chain composability** | **Asynchronous** two-tx interop (§15.4). | **Synchronous, single-L1-block atomic** ([Rollup0 Network overview](../docs/rollup0-network-spec/index.md)) — the differentiator. |
 
 Sources: [specs.optimism.io — deposits](https://specs.optimism.io/protocol/deposits.html),
 [exec-engine](https://specs.optimism.io/protocol/exec-engine.html),
 [predeploys](https://specs.optimism.io/protocol/predeploys.html),
 [holocene/exec-engine](https://specs.optimism.io/protocol/holocene/exec-engine.html).
-The net picture: at the **header, fee-vault, DA-encoding, and inbound-tx** levels Rollup0 can be
-a faithful OP-Stack-shaped L2; it *diverges* deliberately on **settlement** (committee attestation
-→ ZK, not fraud proofs) and on **composability** (synchronous, not asynchronous).
+The net picture is a comparison, not a dependency: Rollup0 shares some EVM/header mechanisms with
+OP, but its fee, DA, and inbound-transaction rules are separately owned. It diverges deliberately
+on **settlement** (committee attestation → prospective ZK, not fraud proofs) and on
+**composability** (synchronous L1→L2, not asynchronous messaging).
 
 ## 15.5 Arbitrum Nitro
 
@@ -230,9 +236,8 @@ blob fees rise or EIP-4844 blobs are unavailable," after Brotli compression whos
 dynamically adjusted (0–11) with congestion
 ([docs.arbitrum.io](https://docs.arbitrum.io/how-arbitrum-works/inside-arbitrum-nitro);
 [research.arbitrum.io — compression](https://research.arbitrum.io/t/compression-in-nitro/20)).
-This blob-default / calldata-fallback economics is *essentially identical* to Rollup0's
-"blobs by default, calldata when cheaper" rule ([§2.3](02-background.md),
-[§8](08-da-and-bundles.md)) — Rollup0 simply targets Gnosis Chain rather than Ethereum.
+This differs from `rollup0-chiado@0.1-draft`, which fixes tag-`0x00` calldata and leaves blobs to a
+future version ([Rollup0 §4 — DA & Bundles](../docs/rollup0-network-spec/04-da-batches-bundles.md)).
 
 Nitro and Rollup0 **diverge** on the proving axis. Nitro is an optimistic rollup whose
 settlement uses interactive fraud proofs: validators post assertions about L2 state, and
@@ -324,28 +329,30 @@ committee.
 > confidence tier than the cross-checked Taiko/OP/Arbitrum claims, which were each verified
 > across three independent sources.
 
-## 15.8 Gnosis Chain as the settlement layer
+## 15.8 Gnosis Chiado as the selected settlement host
 
-Rollup0 settles to **Gnosis Chain**, not Ethereum mainnet, so a word on the L1's own trust
-model is in order — it is the chain whose security Rollup0 inherits, and its validator model is a
-useful framing device for Rollup0's own committee.
+The development profile selects **Gnosis Chiado** (`10200`), not Gnosis Chain mainnet (`100`) and
+not Ethereum mainnet. The distinction and shared EEZ deployment blockers are normative in the
+[Gnosis Chain EEZ host profile](../docs/gnosis-chain-eez-spec/index.md). Chiado is the chain whose
+consensus and finality this Rollup0 profile inherits.
 
 Gnosis Chain "runs the same client software as Ethereum, with minor parameter tweaks. As
 such, Gnosis is a Proof-of-Stake network that uses Ethereum's Beacon Chain consensus"
 ([docs.gnosischain.com](https://docs.gnosischain.com/node/)). It is an EVM L1 with its own
 PoS validator set, tracking Ethereum's forks (post-Merge, post-Shanghai, Cancun-class), with
-~5 s block times and xDAI as native gas token ([§2.6](02-background.md)). Two consequences.
-First, Rollup0's *settlement security is Gnosis Chain's security* — its validator set, finality,
-liveness — the standard rollup relationship to its L1, not weakened by Rollup0's own committee.
+~5 s block times and Chiado xDAI as native gas token. Two consequences.
+First, this profile's *host security is Chiado's security* — its validator set, finality, and
+liveness — the standard rollup relationship to its selected host, distinct from Rollup0's own
+committee.
 Second, more framing observation than security claim: Gnosis Chain is itself secured by a
 validator set rather than by Ethereum's economic weight, so a reader comfortable with "an EVM
 chain whose safety rests on an honest threshold of a defined validator set" has most of the
-mental model for Rollup0's *N*-of-*M* attestation committee ([§9](09-proving-settlement.md)).
+mental model for Rollup0's *N*-of-*M* attestation committee ([EEZ Framework §5 — Proving & Settlement](../docs/eez-protocol-spec/05-proving-settlement.md)).
 The difference in kind still matters — Gnosis Chain's validators are permissionlessly staked PoS
 validators running full consensus, whereas Rollup0's committee is a small, *permissioned* ECDSA
 attester set — but the framing locates Rollup0's added trust assumption relative to the chain it
 settles on, and Rollup1's permissionless, BLS-aggregated set narrows that gap toward an L1-like
-model ([§16](16-rollup1-roadmap.md)).
+model ([Rollup0 §10 — Future Design](../docs/rollup0-network-spec/10-future-design.md)).
 
 > *Confidence note.* The Gnosis Chain claims in this subsection rest on **single-source
 > extraction** from Gnosis's own documentation, a lower confidence tier than the
@@ -362,36 +369,36 @@ fraud-proof system (Arbitrum/BoLD) lets a *single* honest party overturn an inva
 through an on-chain dispute; a validity-proof system (Taiko, the Rollup1 target) makes an invalid
 root mathematically impossible to settle. Rollup0's committee *advances* the on-chain root on the
 strength of a threshold of attesters being honest and correct, and an invalid advance is
-*detectable* (any honest follower re-derives and halts; [§2.4](02-background.md),
-[§12](12-derivation-following.md)) but not *prevented* or *automatically recovered*. The
+*detectable* (any honest follower re-derives and halts; [EEZ Framework overview](../docs/eez-protocol-spec/index.md),
+[Rollup0 §6 — Derivation](../docs/rollup0-network-spec/06-derivation-following.md)) but not *prevented* or *automatically recovered*. The
 re-derivation backstop keeps this from collapsing to "trust the multisig" — it converts the
 guarantee into "trust the committee *or* any honest re-deriver," making corruption publicly
 evident — but the spec is explicit that this buys *detection, not prevention*, and that closing
-the gap is the entire point of Rollup1's ZK proof ([§1.3.1](01-introduction.md),
-[§9](09-proving-settlement.md), [§14](14-security-threat-model.md)). On liveness Rollup0 is
+the gap is the entire point of Rollup1's ZK proof ([Rollup0 Network overview](../docs/rollup0-network-spec/index.md),
+[EEZ Framework §5 — Proving & Settlement](../docs/eez-protocol-spec/05-proving-settlement.md), [§14](threat-model.md)). On liveness Rollup0 is
 weaker still: unlike a based rollup, a single operator and no escape hatch.
 
-**Rollup0 is more ambitious than any deployed leader on composability.** Its synchronous,
-single-L1-block, return-value-carrying atomic L1↔L2 composition is *not* offered by any
+**Rollup0 is more ambitious than any deployed leader on composability.** Its selected synchronous,
+single-host-block, return-value-carrying atomic L1→L2 composition is *not* offered by any
 production system surveyed here. Arbitrum and the OP Stack provide asynchronous, two-transaction
 messaging; AggLayer provides bounded-risk aggregated settlement; shared sequencers provide
 trusted atomic co-inclusion. None lets an L1 contract call an L2 contract, receive its result,
 and branch on it within one block. The **closest peer is Taiko's Gwyneth** — same guarantee by
 the same precompute-and-settle route — and Gwyneth is a *published design*, not a shipped
-product. Rollup0's distinctive contribution is to make this mechanism class *concrete and
-deployable today*, by trading the SNARK for a committee, while building every interface so the
+product. Rollup0's distinctive contribution is to make this mechanism class concrete in a
+development implementation, by trading the SNARK for a committee, while building every interface so the
 committee can later be swapped for the proof and the centralized sequencer for based sequencing.
 
-The net picture: on sequencing and DA, Rollup0 *matches* the mainstream (the same choices as
-Arbitrum Nitro); on settlement it sits *below* the field and is candid about it; on composability
+The net picture: on sequencing Rollup0 resembles centralized production rollups, while its
+calldata-only DA profile differs from blob-default leaders; on settlement it sits *below* the field and is candid about it; on composability
 it sits *above* the deployed field and level with the most ambitious published research. The
 table below summarizes the four axes; rows reflect the *published designs* compared in this
 chapter, with maturity caveats noted in the surrounding text.
 
 | System | Sequencing | Data availability | Proving / settlement | Cross-chain composability |
 |---|---|---|---|---|
-| **Rollup0** (this spec) | Single centralized sequencer/composer; no escape hatch | L1 (Gnosis): EIP-4844 blobs by default, calldata when cheaper | Permissioned ECDSA *N*-of-*M* committee attestation + full re-derivation backstop | **Synchronous, single-L1-block atomic L1↔L2** (precompute-and-prove) |
-| **Rollup1** (target, [§16](16-rollup1-roadmap.md)) | Based (L1-proposer-driven) + preconfirmations | L1 (Gnosis): blobs / calldata (PeerDAS-class as L1 evolves) | ZK validity proof; permissionless, BLS-aggregated set | Synchronous atomic, generalized to many based rollups |
+| **Rollup0** (this spec) | Single centralized sequencer/composer; no escape hatch | Chiado calldata: tag-`0x00` canonical RLP | Permissioned ECDSA *N*-of-*M* committee attestation + full re-derivation backstop | **Synchronous, single-host-block atomic L1→L2** (precompute-and-prove) |
+| **Rollup1** (target, [Rollup0 §10 — Future Design](../docs/rollup0-network-spec/10-future-design.md)) | Based (L1-proposer-driven) + preconfirmations | L1 (Gnosis): blobs / calldata (PeerDAS-class as L1 evolves) | ZK validity proof; permissionless, BLS-aggregated set | Synchronous atomic, generalized to many based rollups |
 | **Taiko / Gwyneth** | Based; preconfers (whitelisted today → permissionless target) | L1 (Ethereum); blobs | ZK validity proof (Type-1 zkEVM; multi-prover) | Gwyneth: **synchronous L1↔L2 + L2↔L2** (based preconfs + real-time proving) — published design |
 | **OP Stack / Superchain interop** | Per-chain sequencer; shared-sequencing roadmap | L1 blobs / external DA (configurable) | Optimistic fraud proofs | **Asynchronous** two-tx message passing (initiating log + `CrossL2Inbox` claim) |
 | **Arbitrum Nitro** | Single centralized sequencer (FCFS default; Timeboost live) | L1 (Ethereum): blobs by default, calldata fallback (Brotli) | Optimistic interactive fraud proofs; permissionless via BoLD | Asynchronous cross-chain messaging |
@@ -400,4 +407,4 @@ chapter, with maturity caveats noted in the surrounding text.
 
 ---
 
-*Next: [Chapter 16 — Rollup1: The Roadmap](16-rollup1-roadmap.md).*
+*Next: [Rollup0 §10 — Future Design](../docs/rollup0-network-spec/10-future-design.md).*

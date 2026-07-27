@@ -1,7 +1,7 @@
 # Appendix A. Implementation Deviations
 
-> **How to read this appendix.** Chapters 1–16 (the **body**) are 100% normative — the
-> intended-correct Rollup0 design. **This appendix is not normative.** It ranks every place
+> **How to read this appendix.** The EEZ and network specifications under `docs/` identify their
+> normative requirements. **This companion appendix is not normative.** It ranks every place
 > the *current code, at the pinned commit,* does **not** meet that target — for auditors (what
 > is guaranteed today vs on paper) and implementers (the punch-list). Each entry names the
 > deviated spec requirement, what the code does instead, the `file:line` evidence, the impact,
@@ -12,35 +12,42 @@
 > soundness/liveness gap reachable by an adversary or likely operator error; **Medium** = a
 > divergence-, griefing-, or sustainability-class gap not breaking safety by itself; **Low** =
 > a placeholder, scaffolding stub, or mostly-mitigated residual. Body chapters link by section;
-> threat model is [§14](14-security-threat-model.md), with the code-verified threat catalog
-> underlying the Critical/High tier at [§14.3](14-security-threat-model.md).
+> threat model is [§14](threat-model.md), with the code-verified threat catalog
+> underlying the Critical/High tier at [§14.3](threat-model.md).
 
 ## A.0 Summary table
 
 | # | Deviation | Severity | Body § | Status |
 |---|---|---|---|---|
-| C-1 | Mock proof system does not bind to the batch | **Critical** | [§9](09-proving-settlement.md) | devnet-only; forbid off-devnet |
-| H-1 | Cross-chain inspector dispatches on any call scheme | **High** | [§4.6](04-evm-and-proxies.md) | unmitigated; needs scheme gate |
-| H-2 | `SYSTEM_ADDRESS` key sprawl (signed legacy inbound tx) | **High** | [§4.4](04-evm-and-proxies.md), §16.6 | interim; 0x7E envelope is the fix |
-| H-3 | Same-nonce bundle DoS / burned-nonce undetected | **High** | [§8.5.3](08-da-and-bundles.md), §14.3.1 | bounded, self-heals after 3 slots |
-| H-4 | L1 deep-reorg (>62) halt, no automated recovery | **High** | [§8.7](08-da-and-bundles.md) | operator-intervention halt |
-| H-5 | `getTimestampAndBlockHash` ABI/selector mismatch (no-arg vs `uint64`) breaks real-PS verify | **High** | [§9.6](09-proving-settlement.md) | fold matches Rust; resolver ABI must add `blockNumber` |
-| M-1 | EIP-4844 blob DA unimplemented (calldata-only) | Medium | [§8.4](08-da-and-bundles.md) | reserved; `blobIndices` must be `[]` |
-| M-2 | Ingress admission skipped when no `l1_provider` | Medium | [§8.5.3](08-da-and-bundles.md) | fail-open; needs fail-closed |
-| M-3 | Fee recipient `Address::ZERO` (fees burned) | Medium | [§13](13-gas-economics.md) | placeholder; no operator revenue |
-| M-4 | Cross-chain sub-call gas unmetered in simulation | Medium | [§6.6](06-execution-model.md), [§13](13-gas-economics.md) | sim-vs-on-chain divergence |
-| M-5 | Overlay diff-apply drops code/nonce, fails on `SELFDESTRUCT` | Medium | [§6.7](06-execution-model.md) | partial; needs forbid-or-extend |
-| M-6 | Mempool-fallback path loses bundle atomicity | Medium | [§8.5.2](08-da-and-bundles.md) | deployment constraint |
-| M-7 | `observe()` has no timeout (stuck-Pending DoS) | Medium | [§8.6](08-da-and-bundles.md) | needs a ceiling verdict |
-| M-8 | `reconcile_batch_blocks` non-transactional | Medium | [§12](12-derivation-following.md) | half-state on mid-loop failure |
-| M-9 | `drain_matching` (external-composer case) not wired to `BatchPosted` | Medium | [§7.4](07-composer.md) | dormant in single-sequencer Rollup0 |
-| M-10 | Genesis `chainId = 1` placeholder | Medium | [§5](05-block-production.md) | L2 chainId unpinned |
-| L-1 | `prev_randao` hardcoded zero (PREVRANDAO predictable) | Low | [§5.5](05-block-production.md) | stage-1 placeholder |
-| L-2 | Signature malleability (mitigated, residual) | Low | [§9](09-proving-settlement.md) | mitigated both sides |
-| L-3 | `slot_number` always `None` | Low | [§5](05-block-production.md) | inactive on stage-1 chains |
-| L-4 | Aggregator is scaffolding only | Low | [§8](08-da-and-bundles.md) | single-rollup today |
-| L-5 | `build_batch` purity not runtime-asserted | Low | [§7](07-composer.md) | relies on `ChainProtocol` contract |
-| L-6 | Witness path stubbed (Phase-2 zk) | Low | [§9](09-proving-settlement.md) | dead capacity, future |
+| C-1 | Mock proof system does not bind to the batch | **Critical** | [EEZ Framework §5 — Proving & Settlement](../docs/eez-protocol-spec/05-proving-settlement.md) | devnet-only; forbid off-devnet |
+| H-1 | Cross-chain inspector dispatches on any call scheme | **High** | [EEZ Framework §3 — EVM Binding](../docs/eez-protocol-spec/03-evm-binding.md) | unmitigated; needs scheme gate |
+| H-2 | `SYSTEM_ADDRESS` key sprawl (signed legacy system txs) | **High** | [Rollup0 Appendix C — System Transactions](../docs/rollup0-network-spec/C-system-transactions.md) | active v0; shared-key custody risk |
+| H-3 | Same-nonce bundle DoS / burned-nonce undetected | **High** | [Rollup0 §4 — DA & Bundles](../docs/rollup0-network-spec/04-da-batches-bundles.md), §14.3.1 | bounded, self-heals after 3 slots |
+| H-4 | L1 deep-reorg (>62) halt, no automated recovery | **High** | [Rollup0 §4 — DA & Bundles](../docs/rollup0-network-spec/04-da-batches-bundles.md) | operator-intervention halt |
+| H-5 | `getTimestampAndBlockHash` ABI/selector mismatch (no-arg vs `uint64`) breaks real-PS verify | **High** | [EEZ Framework §5 — Proving & Settlement](../docs/eez-protocol-spec/05-proving-settlement.md) | fold matches Rust; resolver ABI must add `blockNumber` |
+| H-6 | Live batches retain the zero L1-context sentinel | **High** | [Rollup0 §9 — Security](../docs/rollup0-network-spec/09-security-trust-model.md) | release blocker; bind a recent host block |
+| H-7 | Deriver fast path does not validate full reconstructed headers | **High** | [Rollup0 §2 — Block Production](../docs/rollup0-network-spec/02-block-production.md) | release blocker; compare sealed header and body |
+| H-8 | Nested outbound ETH is omitted from entry accounting | **High** | [Rollup0 §9 — Security](../docs/rollup0-network-spec/09-security-trust-model.md) | reject reachable nested value flow until fixed |
+| H-9 | Deriver attributes applied roots by per-block set membership | **High** | [Rollup0 §9 — Security](../docs/rollup0-network-spec/09-security-trust-model.md) | preserve exact receipt and log order |
+| M-1 | Calldata-only v0 DA; follower omits the empty-`blobIndices` guard | Medium | [Rollup0 §4 — DA & Bundles](../docs/rollup0-network-spec/04-da-batches-bundles.md) | producer enforced; follower guard required |
+| M-2 | Ingress admission skipped when no `l1_provider` | Medium | [Rollup0 §4 — DA & Bundles](../docs/rollup0-network-spec/04-da-batches-bundles.md) | fail-open; needs fail-closed |
+| M-3 | Zero beneficiary; operator/system-account funded fees | Medium | [Rollup0 §7 — Gas & Economics](../docs/rollup0-network-spec/07-gas-economics.md) | accepted v0 economics; no operator revenue |
+| M-4 | Cross-chain sub-call gas unmetered in simulation | Medium | [EEZ Framework §4 — Execution Model](../docs/eez-protocol-spec/04-execution-model.md), [Rollup0 §7 — Gas & Economics](../docs/rollup0-network-spec/07-gas-economics.md) | sim-vs-on-chain divergence |
+| M-5 | Overlay diff-apply drops code/nonce, fails on `SELFDESTRUCT` | Medium | [EEZ Framework §4 — Execution Model](../docs/eez-protocol-spec/04-execution-model.md) | partial; needs forbid-or-extend |
+| M-6 | Mempool-fallback path loses bundle atomicity | Medium | [Rollup0 §4 — DA & Bundles](../docs/rollup0-network-spec/04-da-batches-bundles.md) | deployment constraint |
+| M-7 | `observe()` has no timeout (stuck-Pending DoS) | Medium | [Rollup0 §4 — DA & Bundles](../docs/rollup0-network-spec/04-da-batches-bundles.md) | needs a ceiling verdict |
+| M-8 | `reconcile_batch_blocks` non-transactional | Medium | [Rollup0 §6 — Derivation](../docs/rollup0-network-spec/06-derivation-following.md) | half-state on mid-loop failure |
+| M-9 | `drain_matching` (external-composer case) not wired to `BatchPosted` | Medium | [Rollup0 §3 — Composer](../docs/rollup0-network-spec/03-composer.md) | dormant in single-sequencer Rollup0 |
+| M-10 | Genesis `chainId = 1` placeholder | Medium | [Rollup0 §2 — Block Production](../docs/rollup0-network-spec/02-block-production.md) | L2 chainId unpinned |
+| M-11 | Exact bundle target is not post-validated from canonical inclusion | Medium | [Rollup0 §4 — DA & Bundles](../docs/rollup0-network-spec/04-da-batches-bundles.md) | request pins; observer does not verify |
+| M-12 | Empty DA block range is accepted as a no-op | Medium | [Rollup0 Appendix B — DA Codec](../docs/rollup0-network-spec/B-da-codec.md) | reject non-positive range |
+| L-1 | `prev_randao` hardcoded zero (PREVRANDAO predictable) | Low | [Rollup0 §2 — Block Production](../docs/rollup0-network-spec/02-block-production.md) | stage-1 placeholder |
+| L-2 | Signature malleability (mitigated, residual) | Low | [EEZ Framework §5 — Proving & Settlement](../docs/eez-protocol-spec/05-proving-settlement.md) | mitigated both sides |
+| L-3 | `slot_number` always `None` | Low | [Rollup0 §2 — Block Production](../docs/rollup0-network-spec/02-block-production.md) | inactive on stage-1 chains |
+| L-4 | Aggregator is scaffolding only | Low | [Rollup0 §4 — DA & Bundles](../docs/rollup0-network-spec/04-da-batches-bundles.md) | single-rollup today |
+| L-5 | `build_batch` purity not runtime-asserted | Low | [Rollup0 §3 — Composer](../docs/rollup0-network-spec/03-composer.md) | relies on `ChainProtocol` contract |
+| L-6 | Witness path stubbed (Phase-2 zk) | Low | [EEZ Framework §5 — Proving & Settlement](../docs/eez-protocol-spec/05-proving-settlement.md) | dead capacity, future |
+| L-7 | Scheduler/header timestamp arithmetic is not checked | Low | [Rollup0 §2 — Block Production](../docs/rollup0-network-spec/02-block-production.md) | boundary conformance hardening |
 
 ---
 
@@ -51,7 +58,7 @@
 - **Spec requirement.** A batch's proof must cryptographically attest *that exact batch* —
   the `publicInputsHash` fold binds every entry hash, lookup hash, the `callData` hash, and
   the per-PS `(rollupId, vkey, blockHash, timestamp)` accumulator, and the verifier recovers a
-  signature **over that hash** ([§9.1](09-proving-settlement.md), [§9.2](09-proving-settlement.md)).
+  signature **over that hash** ([EEZ Framework §5 — Proving & Settlement](../docs/eez-protocol-spec/05-proving-settlement.md), [EEZ Framework §5 — Proving & Settlement](../docs/eez-protocol-spec/05-proving-settlement.md)).
 - **Current behavior.** `MockECDSAProofSystem.verify` **ignores** `publicInputsHash` and
   recovers an ECDSA signature over the fixed constant `MOCK_PROVER_DIGEST =
   keccak256("eez-mock-prover")`; the Rust `MockEcdsaProver` signs exactly that constant. So
@@ -80,7 +87,7 @@
   forbidden on any non-devnet `chainId` (fail-closed at startup). Mark mock proofs **non-normative**;
   require the binding `ECDSAProofSystem` (raw `publicInputsHash` recovery, no EIP-191 prefix) for
   any value-bearing deployment. Pin the Rollup0 validator set to the binding PS with the manager's
-  `threshold = 1` single signer ([§9.1.2](09-proving-settlement.md)) — threshold is enforced
+  `threshold = 1` single signer ([EEZ Framework §5 — Proving & Settlement](../docs/eez-protocol-spec/05-proving-settlement.md)) — threshold is enforced
   on-chain by `Rollup.sol`, not in the composer's batch shape.
 
 ---
@@ -92,8 +99,8 @@
 - **Spec requirement.** Only `CALL` may trigger a state-mutating cross-chain dispatch; a
   cross-chain `STATICCALL` must resolve as a read-only **lookup** (no mutation), and
   `DELEGATECALL`/`CALLCODE` to a proxy are forbidden — the 6-field source/target attribution is
-  undefined under a borrowed storage context ([§4.6](04-evm-and-proxies.md),
-  [§6.5](06-execution-model.md)).
+  undefined under a borrowed storage context ([EEZ Framework §3 — EVM Binding](../docs/eez-protocol-spec/03-evm-binding.md),
+  [EEZ Framework §4 — Execution Model](../docs/eez-protocol-spec/04-execution-model.md)).
 - **Current behavior.** `SessionInspector::call` computes `inputs.scheme` but uses it **only**
   in a tracing log. On *every* `CALL` frame whose target is a registered `authorizedProxy` it
   builds an `ExecutionRequest` and dispatches via `Dispatcher::dispatch_call`, regardless of
@@ -113,42 +120,37 @@
   reject `DelegateCall`/`CallCode` to a proxy. Specify that **only** `CallScheme::Call` may
   dispatch.
 
-### H-2. `SYSTEM_ADDRESS` key sprawl — forge-able value-minting inbound delivery
+### H-2. `SYSTEM_ADDRESS` key sprawl permits forged signed system operations
 
-- **Spec requirement.** Inbound cross-chain delivery should be a **deterministic, un-signed**
-  type-`0x7E` envelope that any follower can reconstruct from L1 *without a private key*
-  ([§4.4](04-evm-and-proxies.md), §16.6). On-chain, `executeIncomingCrossChainCall` mints
-  exactly `value` (`msg.value == value`) — it is the L2 ETH-minting source
-  ([§6.10](06-execution-model.md)).
-- **Current behavior.** Inbound delivery is a **signed legacy** transaction from
-  `SYSTEM_ADDRESS` (type-`0x7E` deferred), with `.value = outer.value`, so it mints L2 ETH.
-  Both composer **and** deriver must hold the `SYSTEM_ADDRESS` private key to produce
-  byte-identical txs (the deriver re-signs on replay). Anyone holding the key can sign an
-  `executeIncomingCrossChainCall` delivering arbitrary value to an arbitrary L2 address,
-  minting L2 ETH unbacked by any real L1 deposit/`StateDelta`.
-- **Evidence.** `crates/eez-evm/src/system_tx.rs:14-18` (0x7E deferred), `:39-43` (signer must
-  equal `SYSTEM_ADDRESS`), `:104-165` (`value = outer.value`, `sign_legacy_system_tx`);
-  follower wires `system_tx_cfg = None` so it cannot even follow cross-chain batches
-  (`crates/eez-follower/src/main.rs:91-110`). On-chain `msg.value == value` enforcement **is
-  present** in the checked-out submodule at `sync-rollups-protocol/src/L2/EEZL2.sol:194`
-  (`executeIncomingCrossChainCall` reverts `ValueMismatch` on any drift).
-- **Impact.** Key compromise forges minting of L2 ETH and arbitrary inbound calls. The strict
-  `msg.value == value` ties the minted amount to the entry but **not** to a genuine L1 lock.
-  Key sprawl across composer + deriver widens the compromise surface; the safety backstop (L1
-  re-derivation) itself requires the follower to hold the key, which the Rollup0 follower does
-  not — so it fails the per-block hash check loudly instead of following.
-- **Recommended fix.** Prioritize the type-`0x7E` system-tx envelope so the deriver reconstructs
-  system txs without the key (removing key sprawl). Until then, keep `SYSTEM_ADDRESS` in an
-  HSM/remote signer, never on follower nodes, and specify mint accounting (how `SYSTEM_ADDRESS`'s
-  value is backed) as a normative conservation invariant cross-checked against
-  `RollupConfig.etherBalance` / `StateDelta.etherDelta`.
+- **Normative v0 rule.** The outbound `loadExecutionTable` and inbound
+  `executeIncomingCrossChainCall` operations are deterministic EIP-155-signed legacy
+  transactions. The load has zero envelope value. Inbound value is debited from the prefunded
+  `SYSTEM_ADDRESS`; `msg.value == value` does not mint value
+  ([Rollup0 Appendix C](../docs/rollup0-network-spec/C-system-transactions.md)).
+- **Current behavior.** The composer and every cross-chain deriver must hold the same private key
+  to produce byte-identical transaction bytes. Anyone holding the key can authorize forged table
+  loads or inbound calls. Because the key controls an ordinary prefunded EOA, it can also sign
+  arbitrary transfers of that account's existing balance.
+- **Evidence.** `crates/eez-evm/src/system_tx.rs` defines the shared `SystemTxContext`,
+  `build_cross_chain_sync_pairs`, both calldata builders, and `sign_legacy_system_tx`; the deriver
+  calls the same canonical pair builder. `EEZL2` at
+  `sync-rollups-protocol@5c51e02b0f965ee8c94e9ed2c7e0e9f924d41fba` restricts both functions to
+  `SYSTEM_ADDRESS` and enforces inbound `msg.value == value`.
+- **Impact.** Key compromise forges arbitrary system operations and drains or reallocates the
+  prefunded reserve. The inbound equality check ties the transferred amount to calldata but not to
+  a genuine L1 lock. A node without the configured key cannot reproduce a cross-chain Sync block
+  and must halt instead of substituting bytes.
+- **Recommended fix.** Design and fully specify a key-free envelope before assigning any new
+  transaction type. Under signed-legacy v0, tightly control the necessarily shared key and enforce
+  prefunded-reserve backing against `RollupConfig.etherBalance` and
+  `StateDelta.etherDelta`.
 
 ### H-3. Same-nonce bundle DoS — a burned nonce on a different-hash tx goes undetected
 
 - **Spec requirement.** A user L1 transaction that becomes invalid must not be able to stall
   *settlement*: burned nonces should be detected by **account state**, and the `postAndVerifyBatch` must
   be able to land **independently** of any user transaction that fails simulation
-  ([§8.5.3](08-da-and-bundles.md); seed threat [§14.3.1](14-security-threat-model.md)).
+  ([Rollup0 §4 — DA & Bundles](../docs/rollup0-network-spec/04-da-batches-bundles.md); seed threat [§14.3.1](threat-model.md)).
 - **Current behavior.** A held-pool cross-chain intent rides the same all-or-nothing bundle as
   `postAndVerifyBatch`. If the user (or colluder) lands a **same-nonce** L1 tx first, the held
   tx's nonce is burned and the bundle fails simulation forever. Recovery checks `receipt_exists`
@@ -177,7 +179,7 @@
 
 - **Spec requirement.** A reorg deeper than the ring halts with `ReorgTooDeep` and requires
   operator intervention; the body acknowledges *no automated deep-reorg recovery* and defers the
-  in-flight-batch cleanup procedure to this appendix ([§8.7](08-da-and-bundles.md)).
+  in-flight-batch cleanup procedure to this appendix ([Rollup0 §4 — DA & Bundles](../docs/rollup0-network-spec/04-da-batches-bundles.md)).
 - **Current behavior.** The `L1Watcher` keeps a `(number, hash)` ring bounded by
   `reorg_max_depth` (default **62**). A reorg deeper than the ring — or across a catch-up gap
   with no in-bounds common ancestor — **halts** with `L1Error::ReorgTooDeep`. Shallow reorgs are
@@ -204,7 +206,7 @@
   `getTimestampAndBlockHash(uint64 blockNumber)`; the shared input is `H(entryHashes,
   lookupCallHashes, blobHashes, H(callData), crossProofSystemInteractions)` with
   `crossProofSystemInteractions = bytes32(0)` in single-PS Rollup0
-  ([§9.2.4](09-proving-settlement.md), [§9.6](09-proving-settlement.md)).
+  ([EEZ Framework §5 — Proving & Settlement](../docs/eez-protocol-spec/05-proving-settlement.md), [EEZ Framework §5 — Proving & Settlement](../docs/eez-protocol-spec/05-proving-settlement.md)).
 - **Current behavior.** The deployed fold **matches** the Rust: the checked-out
   `sync-rollups-protocol/src/EEZ.sol` per-PS fold of `(acc, rollupId, vkey, blockHash,
   timestamp)` (with the shared input above) is mirrored byte-for-byte by Rollup0's
@@ -239,37 +241,103 @@
   divergent `customDataAcc` shape (`eez-core-protocol` sibling) out of Rollup0 until finalized
   as a versioned upgrade.
 
+### H-6. Live batches retain the zero L1-context sentinel
+
+- **Spec requirement.** A production batch binds a recent canonical host block N with
+  `0 < N < type(uint64).max`. The manager and posting paths reject sentinel values so a reorg or
+  expired block hash fails closed
+  ([Rollup0 §9 — Security](../docs/rollup0-network-spec/09-security-trust-model.md)).
+- **Current behavior.** The explicit resolver path can fold `(blockNumber, l1BlockHash)`, but the
+  live builder does not supply that pair. Builders initialize `blockNumber = 0`,
+  `prepare_post_batch_raw` does not replace it, and the reference manager maps zero to
+  `(timestamp, blockHash) = (0, 0)`.
+- **Evidence.** Defaults and entry constructors:
+  `crates/eez-evm/src/batch.rs:54` and
+  `crates/eez-evm/src/entries/mod.rs:235,354,630,747,793,884`; live preparation:
+  `crates/eez-composer/src/composer.rs:1693-1930`; manager sentinel behavior:
+  `sync-rollups-protocol/src/rollupContract/Rollup.sol:131-149`.
+- **Impact.** The signed digest is not bound to the observed host-chain context that schedules
+  settlement. A binding proof system would authenticate this timeless digest rather than repair
+  the missing domain.
+- **Recommended fix.** Reject zero and `type(uint64).max`; choose and validate N before proof
+  construction; assign it to the exact posted batch; and rebuild after a reorg or expiry.
+
+### H-7. Deriver fast path does not validate full reconstructed headers
+
+- **Spec requirement.** A deriver reconstructs every execution-header field and the body. It may
+  reuse a local block only when the complete sealed header and body match
+  ([Rollup0 §2 — Block Production](../docs/rollup0-network-spec/02-block-production.md),
+  [Rollup0 §6 — Derivation](../docs/rollup0-network-spec/06-derivation-following.md)).
+- **Current behavior.** `local_block_matches` compares only EIP-2718 transaction bytes, and
+  `local_batch_boundary_matches` checks only the first parent hash. Matching transactions skip
+  replay, while the final state-root check does not authenticate intermediate header fields.
+- **Evidence.** `crates/eez-deriver/src/deriver.rs:1242-1288,1439-1496`.
+- **Impact.** Clients can agree on transactions and final state while retaining different
+  intermediate headers and hashes.
+- **Recommended fix.** Build and compare the complete expected sealed block for every range
+  element, or replay unconditionally. Combine this with transactional range rollback (M-8).
+
+### H-8. Nested outbound ETH is omitted from entry accounting
+
+- **Spec requirement.** Entry accounting includes every successful value transfer at every
+  nesting depth and preserves `address(EEZ).balance >= sum(rollups[r].etherBalance)`
+  ([Rollup0 §9 — Security](../docs/rollup0-network-spec/09-security-trust-model.md)).
+- **Current behavior.** `_applyAndExecute` records the value returned by its outer
+  `_processNCalls`, but `_consumeNestedAction` discards the recursive return. A nested successful
+  value transfer can reduce physical custody without entering the total checked against
+  `StateDelta.etherDelta`.
+- **Evidence.** Nested return discarded at
+  `sync-rollups-protocol/src/EEZ.sol:769-785`; outer-only comparison at `:890-908`;
+  local accumulator at `:914-942`.
+- **Impact.** The implemented equation can pass while aggregate custody is under-backed. The
+  current deposit-only shape may narrow reachability, but the selected contract exposes nested
+  value-bearing entries.
+- **Recommended fix.** Add entry-scoped, revert-safe value accounting across nested frames.
+  Until fixed, validators and posting paths must reject all nested value-bearing entries.
+
+### H-9. Deriver attributes applied roots by per-block set membership
+
+- **Spec requirement.** Partial-settlement repair preserves receipt and log order, associates
+  each delta with its exact batch and entry, and retains duplicate-root multiplicity
+  ([Rollup0 §9 — Security](../docs/rollup0-network-spec/09-security-trust-model.md)).
+- **Current behavior.** The scanner stores `L2ExecutionPerformed.newState` values in per-block
+  `HashSet`s. Each batch in the block reuses that set, and `attribute_settlement` selects the
+  deepest claimed root by membership. This discards order, multiplicity, and batch identity.
+- **Evidence.** `crates/eez-l1/src/scan.rs:136-205,236-260`;
+  `crates/eez-deriver/src/deriver.rs:1092-1098,1151-1168`.
+- **Impact.** Multiple batches, duplicate roots, or non-prefix skips can be misattributed as an
+  applied prefix, even when later state-root replay cannot authenticate the exact system
+  transaction and receipt history.
+- **Recommended fix.** Preserve ordered logs with transaction and log indices, count events
+  rather than unique roots, and reject ambiguous or non-prefix patterns. If current events cannot
+  identify batches exactly, constrain the profile to one batch per rollup per host block.
+
 ---
 
 ## A.3 Medium
 
-### M-1. EIP-4844 blob DA entirely unimplemented (calldata-only)
+### M-1. Calldata-only v0 DA; follower still needs the empty-`blobIndices` guard
 
-- **Spec requirement.** Blobs are the default DA channel, calldata used when cheaper, with the
-  chosen channel bound into the proof's public inputs via `blobHashes[i] =
-  blobhash(blobIndices[i])` ([§8.4](08-da-and-bundles.md)).
-- **Current behavior.** Only `TAG_CALLDATA = 0x00` exists. The submitter **hard-rejects** any
-  non-empty `blobIndices` with `UnsupportedBlobIndices` (the off-chain fold would hash an empty
-  `blob_hashes` slice and mismatch the on-chain `blobhash` fold). No KZG/sidecar/4844-tx
-  construction and no blob-vs-calldata cost comparator.
-- **Evidence.** `crates/eez-evm-inspector/src/post_batch_submitter.rs:154-168,354-363`
-  (`UnsupportedBlobIndices` reject); `crates/eez-payload-codec/src/lib.rs:44-48` (only tag
-  `0x00`). DA-fee oracle: absent (design-level).
-- **Impact.** All DA rides L1 calldata, bearing full calldata cost on the operator EOA with no
-  L2-side reimbursement (see M-3); under high L1 base fee the operator may stop posting
-  (liveness). The reserved second tag is undefined — a forward-compat hole. No data-withholding
-  risk on calldata (fully public on L1).
-- **Recommended fix.** Specify the blob payload framing (tag-byte assignment, RLP-body reuse vs
-  field-element packing), the `blobIndices → blob` binding (one blob per batch / per block /
-  fold), the off-chain `blobhash` resolution mirroring the on-chain walk, and the cost
-  comparator (`blob_gas × blob_bytes` vs `calldata_gas × 16/byte`). `blobIndices` **must remain
-  `[]`** until shipped.
+- **Spec profile.** Tag `0x00` calldata is the only v0 DA channel and `blobIndices` must be empty
+  ([Rollup0 §4 — DA & Bundles](../docs/rollup0-network-spec/04-da-batches-bundles.md)).
+- **Current behavior.** The producer rejects non-empty `blobIndices`, but the scanner forwards
+  only `callData` and raw transaction input. Live and catch-up derivers decode `callData` without
+  checking the omitted field.
+- **Evidence.** Producer guard:
+  `crates/eez-evm-inspector/src/post_batch_submitter.rs:154-168,354-363`; scanner:
+  `crates/eez-l1/src/scan.rs:185-203`; deriver:
+  `crates/eez-deriver/src/deriver.rs:297,688-752`.
+- **Impact.** A landed generic-contract batch with valid tag `0x00` calldata and non-empty
+  `blobIndices` can be followed even though the selected profile requires rejection. The active
+  calldata payload itself remains fully available on L1.
+- **Disposition.** Add the guard to live and catch-up derivation before payload decoding.
+  `blobIndices` must remain empty until a versioned blob extension ships end to end.
 
 ### M-2. Ingress admission skipped when no `l1_provider` is wired
 
 - **Spec requirement.** Cross-chain intents must pass nonce-contiguity and L1-balance admission
   before entering the held pool, so poison cannot ride the all-or-nothing bundle
-  ([§8.5.3](08-da-and-bundles.md), [§14.3.1](14-security-threat-model.md)).
+  ([Rollup0 §4 — DA & Bundles](../docs/rollup0-network-spec/04-da-batches-bundles.md), [§14.3.1](threat-model.md)).
 - **Current behavior.** The nonce/balance checks run only inside `if let Some(provider) =
   l1_provider.as_ref()`. If `l1_provider` is `None`, a cross-chain tx is pushed to the held pool
   with **no** validation (the push runs unconditionally). The deployment condition under which
@@ -285,30 +353,29 @@
   classifications when no provider is available. An `l1_provider`-less composer is not a valid
   Rollup0 cross-chain deployment.
 
-### M-3. L2 fee recipient is `Address::ZERO` — fees burned, no DA-cost recovery
+### M-3. Zero beneficiary; no priority-fee or DA-cost recovery
 
-- **Spec requirement.** The body pins a fee recipient and an economic model that recovers L1 DA
-  cost ([§13](13-gas-economics.md)).
-- **Current behavior.** `suggested_fee_recipient` is hard-coded `Address::ZERO` on every
-  production path; `with_fee_recipient` exists but is never wired. All L2 priority and base-fee
-  revenue accrue to `0x0` (lost). No OP-stack-style L1 fee oracle / L1-data-fee component, so no
-  L2 user is charged L1 DA cost and the operator absorbs the full posting cost.
-- **Evidence.** `crates/eez-deriver/src/deriver.rs:479`,
-  `crates/eez-composer/src/composer.rs:522`, `crates/eez-driver/src/sequencer.rs:118`; genesis
-  coinbase `0x0` (`genesis.json:27`); operator-absorbed posting cost
-  `crates/eez-composer/src/composer.rs:1801-1809`.
-- **Impact.** No sequencer revenue / fee-market capture and no income against real L1/L2 costs —
-  the centralized operator's economic sustainability is unspecified. Under sustained L1 base fee
-  the operator may stop posting (liveness, not safety).
-- **Recommended fix.** Decide and pin the L2 fee recipient (operator/treasury vs deliberate
-  burn) and wire `with_fee_recipient`. Specify who pays L1 DA cost in production (an L2 user-
-  facing L1-data-fee vs operator-absorbed liveness cost).
+- **Spec profile.** Standard EIP-1559 burns the base fee, priority fees accrue to the zero
+  beneficiary, and no L1-data-fee mechanism reimburses the operator
+  ([Rollup0 §7 — Gas & Economics](../docs/rollup0-network-spec/07-gas-economics.md)).
+- **Current behavior.** `suggested_fee_recipient` is hard-coded `Address::ZERO`. No L1 fee oracle
+  or L1-data-fee component exists, so the operator absorbs posting cost. Signed legacy system
+  transactions use `gasLimit = 2_000_000` and fixed `gasPrice = 1_000_000_000` wei, paid from
+  the prefunded `SYSTEM_ADDRESS`.
+- **Evidence.** `crates/eez-deriver/src/deriver.rs:496`,
+  `crates/eez-composer/src/composer.rs:570`, `crates/eez-driver/src/sequencer.rs:118`;
+  `crates/eez-node/src/main.rs:704-705,968-969`.
+- **Impact.** The operator has no protocol revenue against posting costs. If the L2 base fee
+  exceeds the fixed system gas price or the system account lacks its up-front balance, system
+  delivery stops.
+- **Disposition.** This is an explicit v0 limitation. Deployments must provision and monitor the
+  system reserve. Operator revenue or L1-cost recovery requires a versioned profile change.
 
 ### M-4. Cross-chain sub-call gas unmetered in off-chain simulation
 
 - **Spec requirement.** Off-chain simulation must match on-chain `postAndVerifyBatch` replay; cross-chain
   sub-calls have a defined gas budget so simulated and on-chain costs agree
-  ([§6.6](06-execution-model.md), [§13](13-gas-economics.md)).
+  ([EEZ Framework §4 — Execution Model](../docs/eez-protocol-spec/04-execution-model.md), [Rollup0 §7 — Gas & Economics](../docs/rollup0-network-spec/07-gas-economics.md)).
 - **Current behavior.** The synthesized cross-chain `CallOutcome` always passes
   `Gas::new(inputs.gas_limit)`; the target's `gas_used` is **logged but not deducted** from the
   caller frame. The composer's CCM-verify session further disables the block gas limit and sets
@@ -338,7 +405,7 @@
 
 - **Spec requirement.** A nested cross-chain call's state effects must be applied identically
   off-chain and on-chain, including code installation, nonce bumps, and (where supported)
-  `SELFDESTRUCT` ([§6.7](06-execution-model.md)).
+  `SELFDESTRUCT` ([EEZ Framework §4 — Execution Model](../docs/eez-protocol-spec/04-execution-model.md)).
 - **Current behavior.** The overlay diff-apply for nested cross-chain dispatch applies **only**
   storage writes and balance changes; code installation and nonce changes are silently
   *deferred*/skipped, transient storage is ignored, and `SELFDESTRUCT` raises a loud
@@ -360,7 +427,7 @@
 
 - **Spec requirement.** The L1 bundle is strictly all-or-nothing; a deployment whose relay lacks
   `eth_sendBundle` has **no** atomic-bundle guarantee — a deployment constraint, not a fallback
-  to rely on ([§8.5.2](08-da-and-bundles.md)).
+  to rely on ([Rollup0 §4 — DA & Bundles](../docs/rollup0-network-spec/04-da-batches-bundles.md)).
 - **Current behavior.** If the relay returns `-32601` (no `eth_sendBundle`), the submitter
   degrades to ordered `eth_sendRawTransaction` mempool submission (`postAndVerifyBatch` first),
   which **loses atomicity**: the `postAndVerifyBatch` can land without a user tx or vice versa,
@@ -376,7 +443,7 @@
 
 - **Spec requirement.** A settlement verdict is `Dropped` only when `head > target_block`
   ("provably dead"), never a wall-clock timeout — but the body flags the residual that a
-  permanently-unreachable target-tip RPC loops without a verdict ([§8.6](08-da-and-bundles.md)).
+  permanently-unreachable target-tip RPC loops without a verdict ([Rollup0 §4 — DA & Bundles](../docs/rollup0-network-spec/04-da-batches-bundles.md)).
 - **Current behavior.** `observe()` loops indefinitely on transient RPC errors; only
   `head > target` ends it. A permanently-unreachable target-tip provider leaves the bundle
   observation — and the composer's optimistic gate — stuck `Pending` with no escape.
@@ -390,7 +457,7 @@
 ### M-8. `reconcile_batch_blocks` is non-transactional
 
 - **Spec requirement.** Re-derivation of a batch's L2 blocks must be all-or-nothing: a replay
-  failure must not leave local L2 in a half-applied state ([§12](12-derivation-following.md)).
+  failure must not leave local L2 in a half-applied state ([Rollup0 §6 — Derivation](../docs/rollup0-network-spec/06-derivation-following.md)).
 - **Current behavior.** `reconcile_batch_blocks` is explicitly **not** transactional — a replay
   failing partway leaves earlier blocks committed to reth's canonical chain (a half-state).
   Rollback-to-pre-loop-snapshot is an open item.
@@ -403,7 +470,7 @@
 ### M-9. `drain_matching` (external-composer case) not wired to `BatchPosted`
 
 - **Spec requirement.** When an external composer's batch consumes our held txs, the held pool
-  must `drain_matching` the consumed tx-hash set (the external-composer case; [§7.4](07-composer.md), [§7.8](07-composer.md)).
+  must `drain_matching` the consumed tx-hash set (the external-composer case; [Rollup0 §3 — Composer](../docs/rollup0-network-spec/03-composer.md), [Rollup0 §3 — Composer](../docs/rollup0-network-spec/03-composer.md)).
 - **Current behavior.** `HeldPool::drain_matching` exists, but `on_l1_event` only **logs** an
   external `BatchPosted`; the `consumed` tx-hash set is never computed or plumbed. `BatchPosted`
   lacks a `rollup_id` field and carries no consumed-tx list.
@@ -418,7 +485,7 @@
 ### M-10. Genesis `chainId = 1` placeholder
 
 - **Spec requirement.** The authoritative L2 `chainId` for the Chiado-anchored deployment must
-  be pinned, with a defined EIP-155 replay-protection story across L1/L2 ([§5](05-block-production.md)).
+  be pinned, with a defined EIP-155 replay-protection story across L1/L2 ([Rollup0 §2 — Block Production](../docs/rollup0-network-spec/02-block-production.md)).
 - **Current behavior.** `genesis.json` sets `chainId = 1` (Ethereum mainnet id); runtime uses
   `chain_spec.chain().id()`. How `chainId = 1` is overridden at deploy time, and the
   authoritative Rollup0 L2 chainId, are unpinned — a replay/EIP-155 ambiguity.
@@ -428,14 +495,43 @@
 - **Recommended fix.** Pin the authoritative L2 chainId in genesis (not `1`) and document the
   EIP-155 domain for L1↔L2 transactions.
 
+### M-11. Exact bundle target is requested but not post-validated
+
+- **Spec requirement.** A rich batch settles only when its receipt is canonically included at
+  the requested host block and endpoint Sync timestamp
+  ([Rollup0 §4 — DA & Bundles](../docs/rollup0-network-spec/04-da-batches-bundles.md)).
+- **Current behavior.** `eth_sendBundle` pins `blockNumber` and equal minimum/maximum timestamps.
+  `observe` later accepts a receipt from any block number and does not validate the canonical
+  inclusion block hash or timestamp.
+- **Evidence.** Request: `crates/eez-l1/src/submitter.rs:507-551`; observation:
+  `crates/eez-l1/src/submitter.rs:390-432`.
+- **Impact.** Relay, RPC, or fallback deviations can be marked settled outside the temporal
+  anchor that supports the synchronous claim.
+- **Recommended fix.** Require the receipt block to equal the target, fetch its canonical header,
+  and validate its hash and timestamp before accepting the settlement event.
+
+### M-12. Empty DA block range is treated as a successful no-op
+
+- **Spec requirement.** `blockTxCounts.length = toBlock - fromBlock` is positive; an empty list
+  is invalid ([Rollup0 Appendix B — DA Codec](../docs/rollup0-network-spec/B-da-codec.md)).
+- **Current behavior.** The source codec accepts empty `blockTxCounts`, and the live
+  `on_batch_posted` path returns success when `block_count == 0`.
+- **Evidence.** `crates/eez-payload-codec/src/lib.rs:91-93`;
+  `crates/eez-deriver/src/deriver.rs:753-756`.
+- **Impact.** A malformed settled event can be silently ignored, obscuring cursor or L1-state
+  divergence.
+- **Recommended fix.** Reject empty counts in the codec and every live/historical derivation path
+  before state or cursor handling.
+
 ---
 
 ## A.4 Low
 
-### L-1. `prev_randao` hardcoded zero — PREVRANDAO predictable
+### L-1. `prev_randao` is normative zero — PREVRANDAO predictable
 
-- **Spec requirement.** `prev_randao` (mixHash) is L1-derived; this is the stage-1 placeholder,
-  with L1-derivation deferred ([§5.5](05-block-production.md)).
+- **Spec requirement.** Rollup0 v0 fixes `prev_randao = bytes32(0)`. Any host-derived value
+  requires a versioned change
+  ([Rollup0 §2 — Block Production](../docs/rollup0-network-spec/02-block-production.md)).
 - **Current behavior.** `prev_randao` is hardcoded `B256::ZERO` in all three STF paths
   (Sequencer, Deriver, Sync-block composer). Any L2 contract reading `block.prevrandao`/
   `DIFFICULTY` observes constant zero, so any PREVRANDAO-seeded RNG/lottery/commit-reveal is
@@ -445,15 +541,13 @@
 - **Impact.** Application-layer randomness is gameable. Not a protocol-state-safety issue (state
   still re-derives deterministically), but a divergence risk if the value ever becomes non-zero
   without all three paths agreeing.
-- **Recommended fix.** Either fix `prev_randao = 0` as a **permanent** normative Rollup0 choice
-  and warn app developers that PREVRANDAO is unusable for randomness, or implement the §5.5
-  L1-derivation (which L1 field, at which L1 block, constant-per-sync-slot vs per-block) bound
-  identically across all three paths.
+- **Disposition.** The implementation conforms to v0. Applications must not use PREVRANDAO for
+  randomness. A future derivation rule must change all three paths under a new profile version.
 
 ### L-2. Signature malleability (mitigated, residual)
 
 - **Spec requirement.** Low-`s` + `v ∈ {27,28}` should be a normative requirement for every
-  `IProofSystem` verifier ([§9](09-proving-settlement.md)).
+  `IProofSystem` verifier ([EEZ Framework §5 — Proving & Settlement](../docs/eez-protocol-spec/05-proving-settlement.md)).
 - **Current behavior.** Proof signatures are 65-byte `(r, s, v)`. The Rust `EcdsaProofSigner`
   normalizes to low-`s` and `v = 27 + recid`, refusing `recid > 1`; the mock's bare `ecrecover`
   returns `address(0)` on malformed inputs, rejected by the non-zero-signer check. Risk is
@@ -470,22 +564,21 @@
   every new proof-system contract, and document the exact signed digest (raw `publicInputsHash`,
   no EIP-191) as authoritative.
 
-### L-3. `slot_number` always `None`
+### L-3. `slot_number` is absent
 
-- **Spec requirement.** The header `slot_number` (Amsterdam EIP) behavior must be defined for
-  chains where Amsterdam is active ([§5](05-block-production.md)).
-- **Current behavior.** `slot_number` is always `None` ("not active for stage-1 dev chains");
-  behavior on an Amsterdam-active chain is unspecified.
+- **Spec requirement.** Rollup0 v0 requires `slotNumber` and `blockAccessListHash` to be absent;
+  activating Amsterdam requires a versioned change
+  ([Rollup0 §2 — Block Production](../docs/rollup0-network-spec/02-block-production.md)).
+- **Current behavior.** Both fields are absent under the selected schedule.
 - **Evidence.** `crates/eez-driver/src/sequencer.rs:158-159`.
-- **Impact.** None today (Amsterdam inactive); a forward-compat hole.
-- **Recommended fix.** Specify the `slot_number` value once Amsterdam is in scope, bound
-  identically across sequencer/deriver/composer.
+- **Impact.** None in v0; the implementation conforms.
+- **Future work.** Specify and activate both fields together in a future profile version.
 
 ### L-4. Aggregator is scaffolding only
 
 - **Spec requirement.** Multi-rollup window assembly (how N rollups' batches combine into one L1
   bundle, `OnTerminal`/`OnTerminalOrAfter` trigger semantics) is part of the multi-rollup design
-  ([§8](08-da-and-bundles.md)).
+  ([Rollup0 §4 — DA & Bundles](../docs/rollup0-network-spec/04-da-batches-bundles.md)).
 - **Current behavior.** The `SubmitTrigger` enum exists but the `Aggregator` struct does not;
   multi-rollup assembly and trigger semantics are unspecified for Rollup0.
 - **Evidence.** `crates/eez-l1/src/aggregator.rs:1-34`.
@@ -497,7 +590,7 @@
 
 - **Spec requirement.** `group_calls_for` + `build_batch` run twice (CCM-verify then emission)
   and must be **pure** — the two batches byte-identical — per the `ChainProtocol` contract
-  ([§7](07-composer.md)).
+  ([Rollup0 §3 — Composer](../docs/rollup0-network-spec/03-composer.md)).
 - **Current behavior.** No runtime assertion that the CCM-verified batch and the emitted batch
   are byte-identical; correctness relies on the purity contract. A non-pure impl would silently
   desync CCM-verified roots from emitted roots.
@@ -510,7 +603,7 @@
 ### L-6. Witness path stubbed (Phase-2 zk)
 
 - **Spec requirement.** A witness format for the future zk/validator-set proving path
-  ([§9](09-proving-settlement.md)).
+  ([EEZ Framework §5 — Proving & Settlement](../docs/eez-protocol-spec/05-proving-settlement.md)).
 - **Current behavior.** `ExecutionCheckpoint.witness` is always `None` outside a Phase-2
   `WitnessRecordingDB` build; `EvmWitness` is a placeholder. The zk path is future; the
   checkpoint type carries dead capacity — consistent with "Rollup0 ≠ zk."
@@ -519,6 +612,22 @@
 - **Recommended fix.** Define the witness format when the zk/validator proving path is scoped;
   until then, document the field as reserved.
 
+### L-7. Timing and header additions do not fail on `uint64` overflow
+
+- **Spec requirement.** Scheduling-anchor and parent-derived number/timestamp additions use
+  checked `uint64` arithmetic and return an explicit error on overflow
+  ([Rollup0 §2 — Block Production](../docs/rollup0-network-spec/02-block-production.md)).
+- **Current behavior.** The scheduler uses ordinary addition for `head.timestamp + trigger`,
+  `head.timestamp + D1`, and `l1_head + 1`; generic and deriver builders use saturating timestamp
+  addition.
+- **Evidence.** `crates/eez-driver/src/slot.rs:342-343`;
+  `crates/eez-driver/src/sequencer.rs:142`;
+  `crates/eez-deriver/src/deriver.rs:460-463`.
+- **Impact.** Normal timestamps are unaffected, but boundary behavior differs by path instead of
+  producing one deterministic error.
+- **Recommended fix.** Use checked operations, propagate a typed error, and retain
+  `uint64::MAX` timing/header vectors.
+
 ---
 
-*Next: [Appendix B — Constants, Formulae & Glossary](B1-reference.md).*
+*Next: [EEZ Framework Appendix A — Protocol Reference](../docs/eez-protocol-spec/A-reference.md).*
