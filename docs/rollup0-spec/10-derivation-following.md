@@ -1,55 +1,78 @@
-# 10. Derivation & Following
+# 10. Derivation and Following
 
-**Re-derivability is a Rollup0/GC choice** (§6 R6): the chain publishes enough data that any party
-can reconstruct the **byte-identical** L2 chain from L1 alone, without trusting the operator. EEZ
-does not require this; Rollup0/GC provides it.
+Rollup0 publishes enough data on Ethereum for a follower to reconstruct the selected Rollup0 chain
+without trusting a composer.
 
-## 10.1 Derivation
+## 10.1 Canonical Input
 
-From L1 alone, a deriver rebuilds the L2 chain:
+A follower starts from the production Rollup0 genesis and the selected EEZ deployment on Ethereum.
+It processes relevant Ethereum blocks, transactions, receipts, and logs in canonical order:
 
-1. Read each `BatchPosted` and the associated `L2ExecutionPerformed(rollupId, newState)` (§8).
-2. Fetch the batch's DA payload and decode it (§7.1) into per-block user transactions and the
-   L2-shape entries.
-3. For each L2 block in `[fromBlock+1 … toBlock]` (range recovered from on-chain state, §7.2):
-   reconstruct the header by the §4 rules, re-execute the user transactions, and — for the Sync
-   block — reconstruct and prepend the system transactions deterministically from the batch's
-   entries (§3.4).
-4. Commit the rebuilt blocks.
+```text
+(blockNumber, transactionIndex, logIndex)
+```
 
-Because the deriver uses the same rules and inputs as the operator, the rebuilt chain is
-byte-identical — unless the operator deviated, in which case derivation detects it (§10.3).
+RPC response order is not consensus order. The follower authenticates each Ethereum header,
+transaction, receipt, contract address, and Rollup0 identifier before using it.
 
-## 10.2 Safe / finalized
+`BatchPosted` locates a candidate publication. `L2ExecutionPerformed` identifies an applied
+Rollup0 endpoint. The follower accepts both only from the selected EEZ deployment.
 
-A follower derives the **safe** and **finalized** L2 views from L1: a block is safe once its batch
-has landed, finalized once that L1 block is finalized. The operator may run an **unsafe** head
-ahead of L1; a follower advances safe/finalized only from L1, never from the operator's word.
+## 10.2 Derivation
 
-## 10.3 Equivocation and divergence
+For each applicable candidate, the follower:
 
-A follower MUST reject any operator-published head that does not descend from the L1-confirmed safe
-head. If a follower's re-derived state root for a settled batch disagrees with the on-chain
-`L2ExecutionPerformed` root, derivation **halts** rather than adopting the bad head — the
-attestation can advance the on-chain root, but re-derivation makes a wrong advancement detectable
-and non-canonical to honest participants (§8.6). Under **partial consumption** (an entry left
-unconsumed), the deriver validates its replay against the *actual* settled endpoint (the last
-applied `newState`), not a claimed full-range endpoint.
+1. verifies that `fromBlock` and the candidate pre-state match its Ethereum-confirmed Rollup0 head;
+2. decodes the EEZ batch and Rollup0 DA payload;
+3. partitions the user transactions using `blockTxCounts`;
+4. reconstructs each header from its parent under Chapter 4;
+5. reconstructs the Sync system transaction from the EEZ entries and Rollup0 rules;
+6. executes every block in order;
+7. recomputes every state, transaction, receipt, and header commitment;
+8. compares the executed endpoint with canonical settlement evidence; and
+9. commits the complete accepted range and advances its cursor.
 
-## 10.4 L1 reorgs
+The follower MUST reject missing, extra, reordered, or malformed transactions and sidecar data. It
+MUST NOT trust a candidate's claimed endpoint without replay.
 
-The L1 is the source of truth, so an L1 reorg moves the L2. On a reorg, the deriver retreats the L2
-to the highest L2 block whose batch survives at the L1 common ancestor, then re-derives forward; a
-batch's on-chain L1-block binding lets a deriver re-check a record's canonicality even across a
-missed reorg notification. A reorg deeper than L1 finality is outside the protocol's automatic
-recovery and halts pending operator intervention (§12).
+## 10.3 Competing Candidates
 
-## 10.5 L2 → L1 (not in v0)
+The follower processes settlements in canonical Ethereum transaction order. After one candidate
+advances the cursor, a sibling for the old parent is stale. A stale sibling does not create a
+Rollup0 block range.
 
-Synchronous L2→L1 — an L2-originated call into L1 within one interaction — is **not in v0**. v0 is
-L1→L2 only (§1.2, §9). L2-originated messages and withdrawals are a general-model capability (§13);
-any v0 withdrawal path is a separate, asynchronous mechanism outside this specification.
+If an EEZ entry is not consumed, the follower validates replay against the last state root that
+canonical settlement actually applied, not against a claimed full-candidate endpoint.
+
+## 10.4 Unsafe, Safe, and Finalized
+
+- **Unsafe:** locally executed but not selected by canonical Ethereum settlement.
+- **Safe:** reconstructed and verified from canonical Ethereum settlement.
+- **Finalized:** safe and included in finalized Ethereum history.
+
+A proof, validator signature, candidate announcement, or local execution result cannot make a
+Rollup0 block safe by itself.
+
+## 10.5 Ethereum Reorganizations
+
+On an Ethereum reorganization, a follower:
+
+1. finds the canonical common ancestor;
+2. removes candidate evidence from orphaned Ethereum blocks;
+3. retreats the safe and finalized Rollup0 views to the last surviving endpoint;
+4. discards conflicting unsafe descendants; and
+5. derives the replacement Ethereum branch in order.
+
+A reorganization beyond retained history or a displacement of finalized Ethereum settlement
+requires an authenticated recovery decision. The automatic history bound and recovery authority
+are not yet defined.
+
+## 10.6 Invalid Canonical Data
+
+If canonical Ethereum data cannot be reconciled with the selected EEZ and Rollup0 rules, the
+follower MUST halt. It MUST NOT guess a missing transaction, repair an ambiguous candidate, or
+substitute a matching state-root value from another effect.
 
 ---
 
-*Next: [§11 Gas, Limits & Economics](11-gas-economics.md).*
+*Next: [Chapter 11, Gas and Economics](11-gas-economics.md).*

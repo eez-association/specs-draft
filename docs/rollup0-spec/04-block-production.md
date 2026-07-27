@@ -1,65 +1,92 @@
-# 4. Block Production & Header Fields
+# 4. Block Production and Header Fields
 
-The operator and any follower build L2 blocks by the **same** rules from the same inputs, so the
-blocks are byte-identical; a field not derivable identically by both would fork the chain. Header
-fields are therefore pinned to protocol constants wherever a choice exists.
+## 4.1 Production Cadence
 
-## 4.1 Header fields
+Rollup0 production uses:
 
-| Field | Value / derivation |
+```text
+nominal Ethereum interval = 12 seconds
+Rollup0 block interval     = 2 seconds
+positions per interval     = 6
+```
+
+The six positions are five Live positions followed by one Sync position:
+
+```text
+Live, Live, Live, Live, Live, Sync
+```
+
+A Live block contains ordinary Rollup0 transactions. A Sync block terminates the interval and
+carries the system transaction described in [Chapter 3](03-evm-proxy-systemtx.md) when an inbound
+action is accepted.
+
+This draft has no proof window. All five non-Sync positions are Live positions.
+
+Each Sync block shares the timestamp of the Ethereum block that carries its candidate. The six
+Rollup0 blocks in that interval use the same Ethereum anchor.
+
+Chiado is a development settlement network only. Its nominal 5-second interval contains five
+1-second Rollup0 positions: four Live positions followed by one Sync position. Chiado values are
+not production values.
+
+The block interval is a whole number of seconds, and the nominal settlement interval is an integer
+multiple of it.
+
+## 4.2 Block Construction
+
+Every block is derived from its parent:
+
+```text
+number    = parent.number + 1
+timestamp = parent.timestamp + block_interval
+```
+
+Both additions MUST be checked. A composer MUST NOT replace the parent-derived timestamp with its
+wall clock.
+
+The fixed header choices are:
+
+| Field | Rollup0 rule |
 |---|---|
-| `parentHash` | the parent block's hash |
-| `number` | `parent.number + 1` |
-| `timestamp` | `parent.timestamp + L2_BLOCK_TIME` (2 s), strictly increasing |
-| `prev_randao` (`mixHash`) | the RANDAO of the L1 block the L2 block is anchored to (§4.3) |
-| `suggested_fee_recipient` | the deployment fee recipient (§11) |
-| `gasLimit` | `30_000_000` (protocol constant) |
-| `baseFeePerGas` | EIP-1559 from the parent header (parameters in [Appendix A](A-reference.md)) |
+| `parentHash` | exact parent hash |
+| `number` | checked parent number plus one |
+| `timestamp` | checked parent timestamp plus 2 seconds |
+| `gasLimit` | `30,000,000` |
 | `extraData` | empty |
-| `withdrawalsRoot` / `withdrawals` | `Some(empty)` when Shanghai-active; Rollup0 has no L1-style withdrawals |
-| `parentBeaconBlockRoot` | `Some(0x0)` when Cancun-active; the L2 has no beacon chain |
-| `difficulty`, `nonce` | `0` (post-Merge) |
-| `blobGasUsed`, `excessBlobGas` | per Cancun; L2 blocks carry no blobs |
-| roots / bloom / `gasUsed` | computed by execution over the block's transactions |
+| `difficulty` | zero |
+| `nonce` | eight zero bytes |
+| `beneficiary` | deployment fee recipient |
+| `baseFeePerGas` | EIP-1559 value derived from the parent |
+| `withdrawals` | present and empty when required by the selected EVM fork |
+| `parentBeaconBlockRoot` | zero when required by the selected EVM fork |
+| transaction, receipt, state, request, and blob fields | exact execution-derived or parent-derived values required by the selected EVM fork |
 
-## 4.2 Slot model (v0)
+The `prevRandao` value is the RANDAO of the Ethereum block to which the interval is anchored. All
+six Rollup0 blocks in that interval use the same value. The shared Sync/Ethereum timestamp identifies
+that block. Applications MUST NOT use this value as secure randomness: it is visible to builders
+and can be biased by the Ethereum proposer.
 
-L2 production is organized into **sync slots**, one per L1 block. v0 fixes **K = 6** L2 blocks per
-slot: **5 Live blocks followed by 1 Sync block** (the last block of the slot). There is **no
-proof-window** — every non-Sync block is an ordinary Live block. (A proof-window is only needed by
-a future sequencer+ZK variant; see [§12](12-open-issues.md).)
+## 4.3 Sync Blocks and Candidate Ranges
 
-- **Live block** — ordinary cadence; user transactions only.
-- **Sync block** — the last block of the slot. It carries the cross-chain **system transactions**
-  at its head (§3.4) and is aligned to the L1 block that carries the slot's batch (§7). When a
-  slot has no cross-chain work, the Sync block is empty.
+A normal candidate range:
 
-L2 block time MUST be a whole number of seconds, and the L1 block time MUST be an integer multiple
-of it (so `K` is integral). Each Sync block shares the **timestamp of the L1 block it anchors to** —
-the two are co-produced for the same instant — which fixes the slot's L1 anchor (and therefore
-`prev_randao`, §4.3).
+- starts immediately after its named settled Rollup0 parent;
+- contains the six Rollup0 blocks for one nominal interval;
+- ends at a Sync block; and
+- publishes one transaction count for every block in the range.
 
-## 4.3 `prev_randao`
+The range begins at the last Ethereum-confirmed Rollup0 head. Its first block is
+`fromBlock + 1`, and its Sync block is `toBlock`.
 
-`prev_randao` is the **RANDAO of the L1 block the slot is anchored to** — the L1 block whose
-timestamp the Sync block shares (§4.2) and that carries the slot's batch (§7, §8). All `K` L2 blocks
-of the slot use this one value. The shared timestamp pins *which* L1 block supplies it, so the value
-is identical across operator and follower — deterministic and re-derivable — and known to the
-builder at build time.
+## 4.4 Unsafe Blocks
 
-> `prev_randao` on Rollup0 is **predictable to the operator and L1-proposer-biasable** — like L1's
-> own RANDAO, the value is an input to the block and is therefore known to whoever builds it. It
-> MUST NOT be used as a source of adversary-resistant randomness; applications needing secure
-> randomness must use a VRF or commit-reveal. (Unpredictable in-block randomness is impossible
-> under synchronous deterministic execution — the value must be fixed before the block runs.)
+A composer MAY publish an unsafe candidate before Ethereum selects it. Several composers can
+publish different valid unsafe siblings.
 
-## 4.4 Optimistic commit and rollback
-
-The operator commits the Sync block to L2 **immediately**, then posts the batch and the triggering
-L1 transaction to L1 as one atomic bundle (§7). **L1 is the source of truth:** if the bundle does
-not land, the operator MUST roll the Sync block back so the L2 keeps only what L1 confirmed. A
-follower never adopts an operator head that L1 has not confirmed (§10).
+Only canonical Ethereum settlement advances the safe Rollup0 chain. A composer whose candidate
+loses or is not included MUST discard the conflicting unsafe blocks before building on the
+canonical settled parent.
 
 ---
 
-*Next: [§5 Execution Model](05-execution-model.md).*
+*Next: [Chapter 5, Execution Profile](05-execution-model.md).*

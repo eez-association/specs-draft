@@ -1,43 +1,65 @@
-# 11. Gas, Limits & Economics
+# 11. Gas, Limits, and Economics
 
-## 11.1 L2 gas
+## 11.1 Rollup0 Execution Gas
 
-- **Block gas limit:** `30_000_000`, a protocol constant ([Appendix A](A-reference.md)).
-- **Base fee:** standard EIP-1559 from the parent header; the elasticity multiplier and
-  base-fee-change denominator are pinned in [Appendix A](A-reference.md).
-- The L2 charges gas in its native token under the standard Cancun schedule (§3.1).
+Rollup0 blocks use a gas limit of `30,000,000`. Transaction gas follows the selected EVM fork.
+The base fee follows EIP-1559 and is derived from the parent header.
 
-## 11.2 Fees (a Rollup0/GC choice)
+The production EIP-1559 parameters, genesis base fee, fee recipient, and treatment of base and
+priority fees are not yet defined.
 
-How L2 fees are distributed is a **Rollup0/GC choice**, not an EEZ requirement. Rollup0/GC routes
-fees to dedicated **fee-vault** recipients (base fee, priority fee, and the L1-data-fee portion)
-rather than burning them; the exact recipients are deployment parameters
-([Appendix A](A-reference.md)).
+The draft budgets approximately `2,000,000` Rollup0 gas for an inbound system transaction.
 
-## 11.3 L1 settlement cost
+Rollup0 routes fees to deployment-selected fee-vault recipients rather than requiring the
+Ethereum-style base-fee burn. The exact vaults remain deployment parameters.
 
-Settlement costs the operator one `postAndVerifyBatch` transaction plus the bundle (§7.4), paid on
-L1 in the L1 native token. The transaction has a gas budget ([Appendix A](A-reference.md)); the
-per-batch user-transaction count bundled with it is bounded by L1 block-gas headroom under that
-budget. Measured settlement gas figures and the bundle-size derivation are in
-[Appendix B](B-gas-cost-analysis.md).
+## 11.2 Composer Costs
 
-## 11.4 Data-availability cost
+A composer can pay for:
 
-DA is posted on L1 (calldata in v0; blobs as the intended default, §7.1). Under elevated L1 fees
-the per-batch DA cost dominates settlement cost. **Who bears the L1 DA cost is a Rollup0/GC choice**
-— v0 has the operator absorb it; an L1-data-fee charged to L2 users and routed to a data-fee vault
-is the intended production model ([Appendix A](A-reference.md)). The blob-vs-calldata channel is
-chosen per batch by a submit-time cost comparison.
+- Rollup0 execution;
+- validation or proving;
+- calldata publication;
+- the Ethereum settlement transaction;
+- the trigger transaction or bundle inclusion; and
+- retries for a candidate that loses or is not included.
 
-## 11.5 Inbound-execution gas and `SYSTEM_ADDRESS`
+Rollup0 does not currently guarantee reimbursement. Open composition therefore does not imply that
+candidate production is profitable.
 
-The inbound system transaction (§3.4) executes within a gas budget ([Appendix A](A-reference.md))
-and mints the delivered `value`. `SYSTEM_ADDRESS` pays the L2 gas for inbound execution from its
-own balance and is the mint source; its funding/top-up policy — and how minted value is backed by
-L1-locked value (reconciled against the rollup's on-chain ether balance) — is a deployment
-parameter ([Appendix A](A-reference.md)).
+## 11.3 Data Availability Cost
+
+The tag-`0x00` payload is Ethereum calldata. Cost grows with payload bytes and Ethereum calldata
+pricing.
+
+The production design must select:
+
+- a maximum payload size;
+- a maximum user-transaction count;
+- a maximum candidate range;
+- who pays the DA cost; and
+- whether Rollup0 charges users an explicit Ethereum-data fee.
+
+This draft does not define a blob channel.
+
+## 11.4 Settlement and Bundle Limits
+
+The settlement transaction, trigger, and all other transactions in their Ethereum block must fit
+within the Ethereum block gas limit. The candidate must also fit the limits of its selected proof
+system and inclusion mechanism.
+
+The draft budgets `4,000,000` Ethereum gas for `postAndVerifyBatch`. The maximum bundle capacity
+still depends on the final batch shape, proof threshold, trigger, and Ethereum block gas headroom.
+
+## 11.5 System-Transaction Gas and Value
+
+The Sync system transaction requires an exact gas limit, fee rule, nonce rule, and value source.
+These values must be deterministic and available to every composer and follower.
+
+`SYSTEM_ADDRESS` is the transaction sender and pays the Rollup0 gas from its balance. The
+production design must define its funding and top-up policy, and how value supplied on Rollup0 is
+backed by value held on Ethereum.
 
 ---
 
-*Next: [§12 Open Issues & Limitations](12-open-issues.md).*
+*Next: [Chapter 12, Limitations and Open Issues](12-open-issues.md).*

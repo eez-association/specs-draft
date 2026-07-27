@@ -1,45 +1,59 @@
 # 2. Architecture
 
-Rollup0 consists of **three roles** and **two contracts**, connected by standard interfaces.
-
 ## 2.1 Roles
 
-- **Operator** — the single, permissioned actor. It sequences L2 transactions, produces L2
-  blocks, observes cross-chain intents, simulates each interaction across both chains, builds the
-  batch, commits the Sync block on L2, and posts the batch together with the triggering L1
-  transaction to L1 as one atomic bundle. The operator MUST produce blocks that any follower can
-  re-derive byte-identically (§10). (How the operator is decomposed into sub-components is an
-  implementation matter.)
-- **Validator set** — a permissioned set of *M* signers. Each independently verifies a batch and
-  signs its public-inputs hash; the L1 contract advances L2 state only when an **N-of-M** threshold
-  of signatures verifies (§8). A validator MUST sign only a batch it has verified to be a correct
-  state transition.
-- **Follower / Deriver** — any party that reconstructs the L2 chain from L1 data alone, without
-  trusting the operator (§10). It derives the L2 **safe** and **finalized** views from L1 and
-  rejects any operator-published head that does not descend from them.
+### Composer
 
-## 2.2 Contracts
+A composer collects transactions, constructs Rollup0 blocks, simulates cross-network execution,
+builds the EEZ batch and Rollup0 DA payload, obtains the required proofs or signatures, and submits
+the candidate to Ethereum.
 
-- **EEZ** (L1) — the registry and execution manager. It holds, per registered rollup, a **state
-  root** and an **ether balance**; verifies batches (`postAndVerifyBatch`, §8); and replays
-  cross-chain calls against cross-chain proxies (§5). Per-rollup policy — the validator set and
-  threshold — lives in a per-rollup **manager** contract the registry consults; the registry
-  itself holds no policy.
-- **EEZL2** (L2) — the L2-side execution manager, a genesis predeploy at
-  `0x4200000000000000000000000000000000000007`. It has no proofs and no registry: a trusted
-  `SYSTEM_ADDRESS` drives inbound cross-chain delivery (§3.4) and the L2 mirrors EEZ's execution
-  model (§5).
+Composition is open. Composer identity is not a validity input and gives no settlement priority.
 
-Both contracts share the cross-chain **proxy** machinery, the **rolling-hash** accumulator, the
-`authorizedProxies` registry, and the cross-chain **call hash** (§3, §5).
+### Validator/Prover
 
-## 2.3 Interfaces
+A validator/prover independently checks a candidate. It MUST sign every candidate it receives that
+satisfies the selected EEZ rules and every Rollup0 rule in this specification. It MUST NOT reject a
+valid candidate because:
 
-- **Engine API** — between the operator (and a follower) and its L2 execution client. Standard;
-  clients implement it.
-- **EEZ contract ABI** — the L1 settlement surface (`registerRollup`, `postAndVerifyBatch`,
-  `executeCrossChainCall`, `executeL2TX`, `setStateRoot`; §8).
+- the composer is unknown;
+- it already signed another candidate;
+- the candidate is a sibling of another valid candidate; or
+- another valid candidate arrived first.
+
+The production validator/prover membership, threshold, proof system, and key-rotation rules are
+not yet defined.
+
+### Relayer
+
+Any account or contract MAY relay a completed candidate. A relayer cannot change the candidate
+bytes covered by its proof or signatures.
+
+### Follower
+
+A follower reconstructs Rollup0 from canonical Ethereum data. It maintains unsafe, safe, and
+finalized Rollup0 views as described in [Chapter 10](10-derivation-following.md).
+
+## 2.2 Contracts and Interfaces
+
+Rollup0 uses the settlement contracts and EVM binding defined by
+[EEZ Architecture](../eez-protocol-spec/01-architecture.md). The EEZ specification owns:
+
+- registration and settlement operations;
+- batch and proof interfaces;
+- cross-chain proxies;
+- execution and lookup tables;
+- state-delta and value accounting;
+- proof-input construction; and
+- generic events and ABI encodings.
+
+Rollup0 additionally requires an L2 EEZ predeploy and a deterministic system-transaction mechanism
+for inbound execution. Their Rollup0-specific placement and unresolved production parameters are
+defined in [Chapter 3](03-evm-proxy-systemtx.md).
+
+Execution clients expose the standard Engine API needed to build, validate, execute, and import
+Rollup0 blocks.
 
 ---
 
-*Next: [§3 EVM, Cross-Chain Proxy & System Transaction](03-evm-proxy-systemtx.md).*
+*Next: [Chapter 3, EVM, Proxy, and System Transactions](03-evm-proxy-systemtx.md).*

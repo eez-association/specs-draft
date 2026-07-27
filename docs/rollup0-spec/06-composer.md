@@ -1,58 +1,73 @@
-# 6. The Composer
+# 6. Composer and Candidate Competition
 
-The composer is the operator function that turns a cross-chain intent into a settled interaction.
-This chapter specifies **what** it must do and the requirements it must uphold; the mechanisms it
-uses to do so are not part of the protocol.
+## 6.1 Open Composition
 
-## 6.1 Lifecycle
+Rollup0 has no composer allowlist and no elected composer. Any party MAY construct a candidate from
+the current settled parent and submit it for validation.
 
-For each cross-chain intent, once per sync slot, the composer:
+A candidate does not gain priority from:
 
-1. **Observes** the intent — an L1 transaction whose execution calls a cross-chain proxy (§3.2).
-2. **Simulates** the whole interaction across both chains: it executes the L1 side, and where the
-   L1 execution calls a proxy it resolves that call by simulating the destination (the one L2 call,
-   in v0), feeding the L2 return value back so the L1 execution continues as if the call were
-   local. It records every cross-chain call and its result.
-3. **Builds the batch** — folds the recorded interaction into execution entries with their state
-   deltas, return data, and rolling hash (§5), and assembles the data-availability payload (§7).
-4. **Commits the Sync block** on L2 (§4.4) — system transactions delivering the inbound call,
-   then the slot's user transactions.
-5. **Posts to L1** the batch together with the triggering L1 transaction as one all-or-nothing
-   bundle (§7), targeting the slot's L1 block.
-6. **Reconciles** against L1: if the bundle lands, the Sync block is confirmed; if it does not,
-   the composer rolls the Sync block back (§4.4). L1 is the source of truth.
+- composer identity;
+- arrival time at a validator/prover;
+- proof completion time;
+- fee offered outside Ethereum; or
+- a validator/prover having already signed it.
 
-## 6.2 Requirements
+## 6.2 Candidate Lifecycle
 
-A conforming composer (and the resulting batch) MUST satisfy:
+A composer:
 
-- **R1 — Faithful, provable batch.** The batch is a provable record of a *correct* cross-chain
-  execution: every recorded call's result is what a correct re-execution yields, every entry's
-  `stateDeltas` are its true state transition, and the rolling hash binds the on-chain replay to
-  the recorded execution (§5). A validator signs only after confirming this (§8).
-- **R2 — Simulation ≡ on-chain replay.** The results the composer records MUST equal what the
-  on-chain replay produces; otherwise settlement reverts (`RollingHashMismatch` /
-  `StateRootMismatch` / `EtherDeltaMismatch`, §5.4). The simulation environment MUST therefore
-  match on-chain execution semantics (including gas accounting).
-- **R3 — Determinism.** The composer and any follower MUST build byte-identical L2 blocks from the
-  same inputs (§4, §10). The composer MUST introduce no block content that is not either a
-  published user transaction or a deterministically-reconstructible system transaction.
-- **R4 — All-or-nothing bundle.** The `postAndVerifyBatch` transaction and the triggering L1
-  transaction MUST land together in one L1 block, or not at all — this is the basis of the
-  synchronous L1↔L2 guarantee (§7).
-- **R5 — Optimistic rollback.** An optimistically-committed Sync block whose bundle does not land
-  MUST be rolled back; the L2 keeps only what L1 confirms (§4.4).
-- **R6 — Data availability (Rollup0/GC choice).** Rollup0/GC publishes enough data that any party
-  can re-derive the byte-identical L2 chain from L1 alone (§7, §10). *This is a Rollup0/GC choice,
-  not an EEZ requirement* — EEZ does not mandate data availability.
+1. reads the current settled Rollup0 parent from canonical Ethereum state;
+2. collects and orders Rollup0 user transactions;
+3. observes an Ethereum-to-Rollup0 intent when the candidate includes one;
+4. simulates the complete Ethereum and Rollup0 interaction;
+5. builds the Rollup0 blocks and terminal Sync block;
+6. builds the EEZ batch and Rollup0 DA payload;
+7. asks the validator/prover set to verify the complete candidate;
+8. obtains the required proof or signatures;
+9. submits the exact Ethereum bundle; and
+10. reconciles its unsafe blocks with canonical Ethereum settlement.
 
-## 6.3 Non-guarantees (v0)
+The composer MAY perform these steps with any internal architecture. The resulting candidate MUST
+be independently verifiable from its published inputs.
 
-v0 has a **single, centralized, permissioned** operator. It makes **no transaction-ordering or
-censorship-resistance guarantee**: the operator chooses ordering, and liveness depends on it. A
-hostile or unavailable operator can halt or censor (§12). Safety does not depend on the operator
-(§5.4, §8, §10).
+## 6.3 Candidate Validity
+
+A validator/prover checks at least:
+
+- the candidate names the exact parent from which it was built;
+- the block range and terminal Sync position follow Chapter 4;
+- every block and header is valid;
+- every transaction executes from the claimed parent state;
+- the EEZ batch is the exact result of that execution;
+- the DA payload reconstructs the complete range;
+- the system transaction is byte-identical to the deterministic Rollup0 construction;
+- the proposed Ethereum bundle matches the simulated interaction.
+
+Each validator/prover MUST sign every candidate it receives that passes these checks. It MAY sign
+several valid candidates with the same parent.
+
+## 6.4 Candidate Competition
+
+Candidates are ordered only by canonical Ethereum transaction order. When a candidate settlement
+is evaluated:
+
+1. its `fromBlock` and pre-state must equal the current Ethereum-confirmed Rollup0 head;
+2. all EEZ and Rollup0 validity checks must pass; and
+3. its proof or validator/prover signatures must satisfy the production policy.
+
+The first candidate that meets all three conditions advances Rollup0. A later sibling whose parent
+has been superseded is stale and MUST NOT advance, even if it was valid when built or has enough
+signatures.
+
+## 6.5 Failure and Retry
+
+A candidate that is invalid, stale, not included, or whose bundle cannot execute does not advance
+Rollup0. Its composer MAY return eligible user transactions to its local pool after checking the
+canonical winning candidate.
+
+A local timeout is not a settlement result. Settlement follows canonical Ethereum evidence.
 
 ---
 
-*Next: [§7 Data Availability, Batches & L1 Bundles](07-da-batches-bundles.md).*
+*Next: [Chapter 7, Data Availability, Batches, and Bundles](07-da-batches-bundles.md).*

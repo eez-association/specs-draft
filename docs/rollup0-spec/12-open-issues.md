@@ -1,65 +1,61 @@
-# 12. Open Issues & Limitations
+# 12. Limitations and Open Issues
 
-A consolidated register of v0's accepted limitations, deployment parameters still to be pinned, and
-tradeoffs of the future variants.
+## 12.1 Protocol Limitations
 
-## 12.1 Accepted v0 limitations
+- **Permissioned validity:** candidate production and relay are open, but settlement depends on a
+  permissioned validator/prover set.
+- **No force inclusion:** the protocol does not guarantee that a valid candidate reaches or is
+  included by Ethereum.
+- **No trustless exit:** a follower can detect invalid history but cannot reverse Ethereum
+  settlement or force a withdrawal.
+- **One cross-network direction:** only one top-level Ethereum-to-Rollup0 state-changing call is
+  selected.
+- **Calldata-only DA:** no blob encoding or fallback DA channel is defined.
+- **Unsafe siblings:** local unsafe state can be replaced when another valid sibling settles first.
+- **Builder dependency:** synchronous execution depends on ordered, all-or-none inclusion of the
+  settlement and trigger transactions.
+- **Trusted manager:** the Rollup0 manager selects the proof policy and retains the EEZ
+  `setStateRoot` escape power assigned by the generic protocol.
+- **Permissioned recovery:** exceptional recovery requires an authority that is not yet defined.
+- **No secure in-block randomness:** the interval's Ethereum-derived `prevRandao` is predictable to
+  block builders and proposer-biasable.
+- **Simulation parity:** a composer and every validator/prover must simulate the exact Cancun gas
+  and execution semantics. A mismatch makes an apparently valid candidate fail on Ethereum or
+  derive a different Rollup0 block.
 
-- **Centralized, permissioned operator; no escape hatch.** v0 has a single operator. There is **no
-  L1 force-inclusion and no trustless exit**: a hostile or unavailable operator can censor or halt
-  the chain, and bridged funds cannot be withdrawn without operator cooperation. Safety does not
-  depend on the operator (§5.4, §8, §10); liveness does. Removed under Rollup1 (§13).
-- **The per-rollup manager is fully trusted (Rollup0/GC).** The manager defines the validator set
-  and threshold and holds `setStateRoot`, which can overwrite the L2 state root outside the L1 block
-  a batch locked it (§5.6 H.1, §5.8). For Rollup0/GC this is an **accepted trust assumption**; it can
-  be replaced with a stronger scheme, or have these powers revoked/burned, under Rollup1 (§13).
-- **L1→L2 only, single return.** Synchronous L2→L1 and multi-call/reentrant cross-chain flows are
-  not in v0 (§1.2, §9); they are general-model (§13).
-- **`prev_randao` is not secure randomness.** It is predictable to the operator and
-  L1-proposer-biasable (§4.3); unpredictable in-block randomness is impossible under synchronous
-  deterministic execution. Applications needing randomness must use a VRF or commit-reveal.
-- **Deep-L1-reorg recovery is manual.** A reorg deeper than L1 finality is outside automatic
-  recovery and requires operator intervention (§10.4).
-- **Simulation/on-chain gas parity.** The operator's simulation MUST match on-chain execution
-  semantics including gas (§6 R2); a divergence makes an apparently-valid batch revert on-chain.
-  The simulation environment is responsible for matching the on-chain gas schedule exactly.
+## 12.2 Undefined Production Choices
 
-## 12.2 Deployment parameters to pin
+The following need exact definitions before production:
 
-The following are deployment choices, not yet fixed; until pinned the development defaults apply
-(see [Appendix A](A-reference.md)):
+- Rollup0 chain ID, EEZ rollup ID, native asset, and genesis;
+- the selected EEZ version;
+- production contract addresses, predeploy bytecode, and upgrade rules;
+- production fee-market parameters and the genesis base fee;
+- validator/prover membership, proof systems, keys, threshold, and rotation;
+- proof context and domain separation;
+- the `0x7e` system-transaction envelope, authorization, nonce, gas, and value source;
+- deterministic lowering from EEZ entries to the system transaction;
+- the Ethereum bundle builder or inclusion mechanism;
+- maximum payload size, transaction count, and gas;
+- value custody and backing;
+- fee recipients, DA charging, and composer reimbursement;
+- genesis-timestamp alignment to the 2-second block grid;
+- deployment start block and historical upgrade boundaries; and
+- reorganization history bounds and emergency authority.
 
-- **L2 `chainId`** — must be a unique id, distinct from any L1 it settles to.
-- **EIP-1559 parameters** — elasticity multiplier, base-fee-change denominator, initial base fee.
-- **`prev_randao` anchor** — which confirmed L1 block supplies the RANDAO (§4.3), and that it is
-  constant across the slot.
-- **Fee recipients** — the base-fee / priority-fee / L1-data-fee vault recipients, and whether the
-  L1 DA cost is charged to L2 users (§11).
-- **Blob DA format** — specified separately (§7.1); all EEZ chains conform.
-- **`SYSTEM_ADDRESS` value + funding** — the production key, and how minted value is backed by
-  L1-locked value (§9.3, §11.5).
-- **Validator set `M` and threshold `N`** — the member count (≤ 20 in v0) and quorum (§8).
-- **Bundle user-transaction bound** — the max user transactions per bundle, tied to L1 block-gas
-  headroom (§7.4, §11.3).
-- **Genesis-timestamp grid alignment** — the genesis timestamp should align to the L2 block-time
-  grid so slot heights land cleanly (§4.2).
+These are unresolved protocol inputs. A client MUST NOT select production values by convention.
 
-## 12.3 Future-variant tradeoffs
+## 12.3 Interoperability Boundary
 
-- **Proof-window / pre-building (a sequencer + ZK variant).** v0 needs no proof-window because it
-  has no ZK proving (§4.2). A future variant that adds a sequencer and ZK validity proofs needs
-  proving time before L1 submission: the operator would have to **pre-build the slot's trailing
-  blocks and the Sync block ahead of wall-clock** (roughly the proving time plus L1 block-building
-  time — on the order of seconds) or **skip** those trailing blocks. This adds latency and
-  block-building complexity and is the main cost of moving to ZK; it is not present in v0.
-- **Open/based sequencing & state-root chaining (Rollup1).** Under v0's single sequencer, one
-  `postAndVerifyBatch` per L1 block publishes the whole slot, so batch *chaining* never arises.
-  Under Rollup1's open/based sequencing (§13), independent parties may post multiple batches for
-  one L2 in one L1 block; those batches must **chain** (`entries[k].currentState ==
-  entries[k-1].newState`), which in turn requires that each batch commit a *stable end-of-block*
-  state — i.e. the L2 must have **no post-block / end-of-block state mutations**. This constraint
-  is a Rollup1 concern, not a v0 one.
+The fixed parts of this draft define the Rollup0 network model, normal cadence, open candidate
+rules, calldata codec, and deterministic derivation requirements.
+
+The undefined choices above prevent a byte-identical production genesis, Sync system transaction,
+proof policy, and settlement path. Independent production implementations are not interoperable
+until those choices are specified and accompanied by conformance vectors.
+
+Detailed questions are listed in [Appendix C](C-open-questions.md).
 
 ---
 
-*Next: [§13 Rollup1 & the General Model](13-rollup1-general-model.md).*
+*Next: [Appendix A, Reference](A-reference.md).*
