@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specs.eez.network/eez/0.1-draft/network-profile.schema.json",
-  "title": "EEZ network profile",
-  "description": "Required configuration surface for an EEZ rollup or settlement-host profile. Specification identity is independent of source-repository revisions.",
+  "$id": "https://specs.eez.network/eez/network-profile/2/schema.json",
+  "title": "EEZ execution-network profile",
+  "description": "Required configuration surface for one EEZ execution network and its direct Ethereum settlement binding.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -10,6 +10,7 @@
     "schema_version",
     "profile",
     "eez_dependency",
+    "ruleset_dependency",
     "chain_identity",
     "settlement_binding",
     "execution_binding",
@@ -24,108 +25,16 @@
       "const": "../eez-protocol-spec/network-profile.schema.json"
     },
     "schema_version": {
-      "const": "1"
+      "const": "2"
     },
     "profile": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "id",
-        "name",
-        "version",
-        "status",
-        "role",
-        "network_name",
-        "environment"
-      ],
-      "properties": {
-        "id": {
-          "type": "string",
-          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
-        },
-        "name": {
-          "type": "string",
-          "minLength": 1,
-          "pattern": "\\S"
-        },
-        "version": {
-          "type": "string",
-          "minLength": 1,
-          "pattern": "\\S"
-        },
-        "status": {
-          "enum": [
-            "draft",
-            "development",
-            "production"
-          ]
-        },
-        "role": {
-          "enum": [
-            "rollup",
-            "settlement-host"
-          ]
-        },
-        "network_name": {
-          "type": "string",
-          "minLength": 1,
-          "pattern": "\\S"
-        },
-        "environment": {
-          "type": "string",
-          "minLength": 1,
-          "pattern": "\\S"
-        }
-      }
+      "$ref": "#/$defs/profile"
     },
     "eez_dependency": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "framework",
-        "evm_binding"
-      ],
-      "properties": {
-        "framework": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "id",
-            "version"
-          ],
-          "properties": {
-            "id": {
-              "const": "eez-framework"
-            },
-            "version": {
-              "const": "0.1-draft"
-            }
-          }
-        },
-        "evm_binding": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "id",
-            "version",
-            "specification"
-          ],
-          "properties": {
-            "id": {
-              "const": "eez-evm"
-            },
-            "version": {
-              "type": "string",
-              "minLength": 1,
-              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
-            },
-            "specification": {
-              "type": "string",
-              "pattern": "^[A-Za-z0-9._/-]+\\.md$"
-            }
-          }
-        }
-      }
+      "$ref": "#/$defs/eez_dependency"
+    },
+    "ruleset_dependency": {
+      "$ref": "#/$defs/ruleset_dependency"
     },
     "chain_identity": {
       "$ref": "#/$defs/chain_identity"
@@ -188,178 +97,141 @@
           }
         }
       }
-    },
-    {
-      "if": {
-        "type": "object",
-        "properties": {
-          "profile": {
-            "type": "object",
-            "properties": {
-              "role": {
-                "const": "settlement-host"
-              }
-            },
-            "required": [
-              "role"
-            ]
-          }
-        },
-        "required": [
-          "profile"
-        ]
-      },
-      "then": {
-        "type": "object",
-        "properties": {
-          "chain_identity": {
-            "type": "object",
-            "properties": {
-              "eez_rollup_id": {
-                "$ref": "#/$defs/not_applicable_selection"
-              }
-            }
-          },
-          "settlement_binding": {
-            "type": "object",
-            "properties": {
-              "host_profile": {
-                "$ref": "#/$defs/not_applicable_selection"
-              },
-              "host_network": {
-                "$ref": "#/$defs/not_applicable_selection"
-              },
-              "host_chain_id": {
-                "$ref": "#/$defs/not_applicable_selection"
-              },
-              "manager_contract": {
-                "$ref": "#/$defs/not_applicable_selection"
-              },
-              "proof_system_contracts": {
-                "$ref": "#/$defs/not_applicable_selection"
-              }
-            }
-          },
-          "execution_binding": {
-            "type": "object",
-            "properties": {
-              "fee_recipient": {
-                "$ref": "#/$defs/not_applicable_selection"
-              },
-              "eez_predeploys": {
-                "$ref": "#/$defs/not_applicable_selection"
-              },
-              "system_address": {
-                "$ref": "#/$defs/not_applicable_selection"
-              },
-              "system_transaction_envelope": {
-                "$ref": "#/$defs/not_applicable_selection"
-              }
-            }
-          },
-          "operation": {
-            "type": "object",
-            "properties": {
-              "max_user_transactions_per_bundle": {
-                "$ref": "#/$defs/not_applicable_selection"
-              },
-              "proof_routing_mitigation": {
-                "$ref": "#/$defs/not_applicable_selection"
-              }
-            }
-          },
-          "proof_policy": {
-            "type": "object",
-            "properties": {
-              "model": {
-                "$ref": "#/$defs/not_applicable_selection"
-              },
-              "allowed_proof_systems_and_vkeys": {
-                "$ref": "#/$defs/not_applicable_selection"
-              },
-              "threshold": {
-                "$ref": "#/$defs/not_applicable_selection"
-              }
-            }
-          },
-          "data_availability": {
-            "type": "object",
-            "properties": {
-              "requirement": {
-                "$ref": "#/$defs/not_applicable_selection"
-              },
-              "channel": {
-                "$ref": "#/$defs/not_applicable_selection"
-              },
-              "codec": {
-                "$ref": "#/$defs/not_applicable_selection"
-              },
-              "derivation_rule": {
-                "$ref": "#/$defs/not_applicable_selection"
-              }
-            }
-          },
-          "governance_recovery": {
-            "type": "object",
-            "properties": {
-              "manager_authority": {
-                "$ref": "#/$defs/not_applicable_selection"
-              }
-            }
-          }
-        }
-      }
-    },
-    {
-      "if": {
-        "type": "object",
-        "properties": {
-          "profile": {
-            "type": "object",
-            "properties": {
-              "role": {
-                "const": "rollup"
-              }
-            },
-            "required": [
-              "role"
-            ]
-          }
-        },
-        "required": [
-          "profile"
-        ]
-      },
-      "then": {
-        "type": "object",
-        "properties": {
-          "operation": {
-            "type": "object",
-            "required": [
-              "proof_routing_mitigation"
-            ],
-            "properties": {
-              "proof_routing_mitigation": {
-                "$ref": "#/$defs/selection_proof_routing_mitigation"
-              }
-            }
-          },
-          "settlement_binding": {
-            "type": "object",
-            "properties": {
-              "eez_contract": {
-                "$ref": "#/$defs/not_applicable_selection"
-              },
-              "deployment_block": {
-                "$ref": "#/$defs/not_applicable_selection"
-              }
-            }
-          }
-        }
-      }
     }
   ],
   "$defs": {
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "version",
+        "status",
+        "role",
+        "network_name",
+        "environment"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "name": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "version": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "status": {
+          "enum": [
+            "draft",
+            "development",
+            "production"
+          ]
+        },
+        "role": {
+          "const": "eez-network"
+        },
+        "network_name": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "environment": {
+          "$ref": "#/$defs/nonempty_string"
+        }
+      }
+    },
+    "eez_dependency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "framework",
+        "evm_binding"
+      ],
+      "properties": {
+        "framework": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "version"
+          ],
+          "properties": {
+            "id": {
+              "const": "eez-framework"
+            },
+            "version": {
+              "const": "0.1-draft"
+            }
+          }
+        },
+        "evm_binding": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "version",
+            "specification",
+            "conformance_source"
+          ],
+          "properties": {
+            "id": {
+              "const": "eez-evm"
+            },
+            "version": {
+              "const": "0.2-draft"
+            },
+            "specification": {
+              "const": "eez-protocol-spec/index.md"
+            },
+            "conformance_source": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "repository",
+                "revision"
+              ],
+              "properties": {
+                "repository": {
+                  "const": "eez-core-protocol"
+                },
+                "revision": {
+                  "const": "3a6ca65c4858792fc3a143d34c5484877ef8f68c"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "ruleset_dependency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "version",
+        "specification",
+        "content_digest"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+        },
+        "specification": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]*\\.md$"
+        },
+        "content_digest": {
+          "$ref": "#/$defs/selection_content_digest"
+        }
+      }
+    },
     "selection": {
       "oneOf": [
         {
@@ -380,9 +252,7 @@
               }
             },
             "source": {
-              "type": "string",
-              "minLength": 1,
-              "pattern": "\\S"
+              "$ref": "#/$defs/nonempty_string"
             }
           }
         },
@@ -403,14 +273,10 @@
               "pattern": "^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+$"
             },
             "issue": {
-              "type": "string",
-              "minLength": 1,
-              "pattern": "\\S"
+              "$ref": "#/$defs/nonempty_string"
             },
             "source": {
-              "type": "string",
-              "minLength": 1,
-              "pattern": "\\S"
+              "$ref": "#/$defs/nonempty_string"
             }
           }
         },
@@ -426,23 +292,10 @@
               "const": "not-applicable"
             },
             "reason": {
-              "type": "string",
-              "minLength": 1,
-              "pattern": "\\S"
+              "$ref": "#/$defs/nonempty_string"
             }
           }
         }
-      ]
-    },
-    "not_applicable_selection": {
-      "type": "object",
-      "properties": {
-        "status": {
-          "const": "not-applicable"
-        }
-      },
-      "required": [
-        "status"
       ]
     },
     "fixed_selection": {
@@ -475,10 +328,6 @@
       "type": "string",
       "pattern": "^0x[0-9a-fA-F]{40}$"
     },
-    "bytes32": {
-      "type": "string",
-      "pattern": "^0x[0-9a-fA-F]{64}$"
-    },
     "nonzero_address": {
       "type": "string",
       "pattern": "^0x(?!0{40}$)[0-9a-fA-F]{40}$"
@@ -486,6 +335,194 @@
     "nonzero_bytes32": {
       "type": "string",
       "pattern": "^0x(?!0{64}$)[0-9a-fA-F]{64}$"
+    },
+    "sha256_digest": {
+      "type": "string",
+      "pattern": "^0x[0-9a-f]{64}$"
+    },
+    "content_digest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "algorithm",
+        "digest"
+      ],
+      "properties": {
+        "algorithm": {
+          "const": "sha256"
+        },
+        "digest": {
+          "$ref": "#/$defs/sha256_digest"
+        }
+      }
+    },
+    "manager_proof_context_rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "context_block_rule",
+        "manager_method",
+        "custom_data_encoding",
+        "authentication_rule",
+        "failure_rule"
+      ],
+      "properties": {
+        "context_block_rule": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "manager_method": {
+          "const": "getCustomData(uint64)"
+        },
+        "custom_data_encoding": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "authentication_rule": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "failure_rule": {
+          "$ref": "#/$defs/nonempty_string"
+        }
+      }
+    },
+    "header_construction_rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "parent_hash",
+        "ommers_hash",
+        "beneficiary",
+        "state_root",
+        "transactions_root",
+        "receipts_root",
+        "logs_bloom",
+        "difficulty",
+        "number",
+        "gas_limit",
+        "gas_used",
+        "timestamp",
+        "extra_data",
+        "prev_randao",
+        "nonce",
+        "base_fee_per_gas",
+        "withdrawals_root",
+        "blob_gas_fields",
+        "parent_beacon_block_root",
+        "requests_hash",
+        "later_optional_fields",
+        "body_rule",
+        "validation_rule"
+      ],
+      "properties": {
+        "parent_hash": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "ommers_hash": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "beneficiary": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "state_root": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "transactions_root": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "receipts_root": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "logs_bloom": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "difficulty": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "number": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "gas_limit": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "gas_used": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "timestamp": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "extra_data": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "prev_randao": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "nonce": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "base_fee_per_gas": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "withdrawals_root": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "blob_gas_fields": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "parent_beacon_block_root": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "requests_hash": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "later_optional_fields": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "body_rule": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "validation_rule": {
+          "$ref": "#/$defs/nonempty_string"
+        }
+      }
+    },
+    "l1_l2_lowering_rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "semantic_action_rule",
+        "l1_entry_rule",
+        "l2_sidecar_rule",
+        "explicit_inbound_arguments_rule",
+        "system_transaction_rule",
+        "validation_rule",
+        "failure_rule",
+        "conformance_vectors"
+      ],
+      "properties": {
+        "semantic_action_rule": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "l1_entry_rule": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "l2_sidecar_rule": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "explicit_inbound_arguments_rule": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "system_transaction_rule": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "validation_rule": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "failure_rule": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "conformance_vectors": {
+          "$ref": "#/$defs/nonempty_string"
+        }
+      }
     },
     "string_or_object": {
       "oneOf": [
@@ -591,63 +628,6 @@
         }
       }
     },
-    "proof_routing_mitigation": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "mechanism",
-        "binding_evidence",
-        "authenticates_caller",
-        "authenticated_calldata_fields",
-        "prevents_replay",
-        "prevents_front_running",
-        "failure_rule"
-      ],
-      "properties": {
-        "mechanism": {
-          "$ref": "#/$defs/nonempty_string"
-        },
-        "binding_evidence": {
-          "$ref": "#/$defs/nonempty_string"
-        },
-        "authenticates_caller": {
-          "const": true
-        },
-        "authenticated_calldata_fields": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/nonempty_string"
-          },
-          "uniqueItems": true
-        },
-        "prevents_replay": {
-          "const": true
-        },
-        "prevents_front_running": {
-          "const": true
-        },
-        "failure_rule": {
-          "$ref": "#/$defs/nonempty_string"
-        }
-      }
-    },
-    "host_profile": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "profile_id",
-        "profile_version"
-      ],
-      "properties": {
-        "profile_id": {
-          "type": "string",
-          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
-        },
-        "profile_version": {
-          "$ref": "#/$defs/nonempty_string"
-        }
-      }
-    },
     "deployment": {
       "type": "object",
       "additionalProperties": false,
@@ -696,7 +676,7 @@
       "type": "object",
       "minProperties": 1,
       "additionalProperties": {
-        "$ref": "#/$defs/address"
+        "$ref": "#/$defs/nonzero_address"
       }
     },
     "canonical_header_integer_rule": {
@@ -735,6 +715,253 @@
         }
       ]
     },
+    "proof_routing_mitigation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mechanism",
+        "binding_evidence",
+        "authenticates_caller",
+        "authenticated_calldata_fields",
+        "prevents_replay",
+        "prevents_front_running",
+        "failure_rule"
+      ],
+      "properties": {
+        "mechanism": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "binding_evidence": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "authenticates_caller": {
+          "const": true
+        },
+        "authenticated_calldata_fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nonempty_string"
+          },
+          "uniqueItems": true
+        },
+        "prevents_replay": {
+          "const": true
+        },
+        "prevents_front_running": {
+          "const": true
+        },
+        "failure_rule": {
+          "$ref": "#/$defs/nonempty_string"
+        }
+      }
+    },
+    "candidate_admission_rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "acceptance_rule",
+        "invalid_candidate_rule"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "permissionless-validity",
+            "permissioned"
+          ]
+        },
+        "acceptance_rule": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "invalid_candidate_rule": {
+          "$ref": "#/$defs/nonempty_string"
+        }
+      }
+    },
+    "candidate_authentication_parameters": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identity_rule",
+        "verification_rule"
+      ],
+      "properties": {
+        "identity_rule": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "verification_rule": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "canonical_candidate_encoding": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "digest_rule": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "replay_domain": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "signature_scheme": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "accepted_signature_form": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "authorization_set_rule": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "test_vectors": {
+          "$ref": "#/$defs/nonempty_string"
+        }
+      }
+    },
+    "candidate_authentication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "parameters"
+      ],
+      "properties": {
+        "mode": {
+          "$ref": "#/$defs/selection_candidate_authentication_mode"
+        },
+        "parameters": {
+          "$ref": "#/$defs/selection_candidate_authentication_parameters"
+        }
+      }
+    },
+    "slot_construction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "settlement_interval_ms",
+        "block_interval_ms",
+        "blocks_per_settlement_interval",
+        "proof_budget_ms",
+        "submission_slack_ms",
+        "max_catch_up_blocks"
+      ],
+      "properties": {
+        "settlement_interval_ms": {
+          "$ref": "#/$defs/selection_positive_integer",
+          "description": "D1, the nominal settlement-network interval in milliseconds."
+        },
+        "block_interval_ms": {
+          "$ref": "#/$defs/selection_positive_integer",
+          "description": "D2, the execution-network block interval in milliseconds."
+        },
+        "blocks_per_settlement_interval": {
+          "$ref": "#/$defs/selection_positive_integer",
+          "description": "K, which must equal D1 divided by D2."
+        },
+        "proof_budget_ms": {
+          "$ref": "#/$defs/selection_positive_integer",
+          "description": "P, the candidate-construction and proof budget in milliseconds."
+        },
+        "submission_slack_ms": {
+          "$ref": "#/$defs/selection_nonnegative_integer",
+          "description": "S, the required submission lead time in milliseconds."
+        },
+        "max_catch_up_blocks": {
+          "$ref": "#/$defs/selection_positive_integer",
+          "description": "C, the producer-side maximum blocks emitted at one catch-up trigger. This is not a candidate-range validity bound."
+        }
+      }
+    },
+    "competition_rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "ordering_rule",
+        "conflict_rule",
+        "stale_candidate_rule"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "first-valid",
+            "priority",
+            "leader-election",
+            "single-authority",
+            "other"
+          ]
+        },
+        "ordering_rule": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "conflict_rule": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "stale_candidate_rule": {
+          "$ref": "#/$defs/nonempty_string"
+        }
+      }
+    },
+    "settlement_relay_rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "authorization_rule",
+        "submission_rule",
+        "failure_rule"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "permissionless",
+            "permissioned",
+            "single-authority"
+          ]
+        },
+        "authorization_rule": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "submission_rule": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "failure_rule": {
+          "$ref": "#/$defs/nonempty_string"
+        }
+      }
+    },
+    "system_address_safety_rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "can_execute_code",
+        "prevents_reentrant_table_replacement",
+        "enforces_single_inbound_call_per_transaction",
+        "enforcement",
+        "failure_rule"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "node-controlled-non-reentrant",
+            "contract-guarded"
+          ]
+        },
+        "can_execute_code": {
+          "type": "boolean"
+        },
+        "prevents_reentrant_table_replacement": {
+          "const": true
+        },
+        "enforces_single_inbound_call_per_transaction": {
+          "const": true
+        },
+        "enforcement": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "failure_rule": {
+          "$ref": "#/$defs/nonempty_string"
+        }
+      }
+    },
     "selection_nonempty_string": {
       "allOf": [
         {
@@ -755,6 +982,86 @@
         }
       ]
     },
+    "selection_content_digest": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/selection"
+        },
+        {
+          "if": {
+            "$ref": "#/$defs/fixed_selection"
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/content_digest"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "selection_manager_proof_context": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/selection"
+        },
+        {
+          "if": {
+            "$ref": "#/$defs/fixed_selection"
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/manager_proof_context_rule"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "selection_header_construction": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/selection"
+        },
+        {
+          "if": {
+            "$ref": "#/$defs/fixed_selection"
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/header_construction_rule"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "selection_l1_l2_lowering": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/selection"
+        },
+        {
+          "if": {
+            "$ref": "#/$defs/fixed_selection"
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/l1_l2_lowering_rule"
+              }
+            }
+          }
+        }
+      ]
+    },
     "selection_string_or_object": {
       "allOf": [
         {
@@ -769,46 +1076,6 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/string_or_object"
-              }
-            }
-          }
-        }
-      ]
-    },
-    "selection_evm_fork": {
-      "allOf": [
-        {
-          "$ref": "#/$defs/selection"
-        },
-        {
-          "if": {
-            "$ref": "#/$defs/fixed_selection"
-          },
-          "then": {
-            "type": "object",
-            "properties": {
-              "value": {
-                "$ref": "#/$defs/evm_fork_rule"
-              }
-            }
-          }
-        }
-      ]
-    },
-    "selection_proof_routing_mitigation": {
-      "allOf": [
-        {
-          "$ref": "#/$defs/selection"
-        },
-        {
-          "if": {
-            "$ref": "#/$defs/fixed_selection"
-          },
-          "then": {
-            "type": "object",
-            "properties": {
-              "value": {
-                "$ref": "#/$defs/proof_routing_mitigation"
               }
             }
           }
@@ -875,6 +1142,46 @@
         }
       ]
     },
+    "selection_nonzero_address": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/selection"
+        },
+        {
+          "if": {
+            "$ref": "#/$defs/fixed_selection"
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/nonzero_address"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "selection_nonzero_bytes32": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/selection"
+        },
+        {
+          "if": {
+            "$ref": "#/$defs/fixed_selection"
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/nonzero_bytes32"
+              }
+            }
+          }
+        }
+      ]
+    },
     "selection_object": {
       "allOf": [
         {
@@ -896,7 +1203,7 @@
         }
       ]
     },
-    "selection_host_profile": {
+    "selection_evm_fork": {
       "allOf": [
         {
           "$ref": "#/$defs/selection"
@@ -909,7 +1216,7 @@
             "type": "object",
             "properties": {
               "value": {
-                "$ref": "#/$defs/host_profile"
+                "$ref": "#/$defs/evm_fork_rule"
               }
             }
           }
@@ -1043,6 +1350,151 @@
         }
       ]
     },
+    "selection_proof_routing_mitigation": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/selection"
+        },
+        {
+          "if": {
+            "$ref": "#/$defs/fixed_selection"
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/proof_routing_mitigation"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "selection_candidate_admission": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/selection"
+        },
+        {
+          "if": {
+            "$ref": "#/$defs/fixed_selection"
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/candidate_admission_rule"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "selection_candidate_authentication_mode": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/selection"
+        },
+        {
+          "if": {
+            "$ref": "#/$defs/fixed_selection"
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "enum": [
+                  "none",
+                  "signature",
+                  "allowlist",
+                  "protocol"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "selection_candidate_authentication_parameters": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/selection"
+        },
+        {
+          "if": {
+            "$ref": "#/$defs/fixed_selection"
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/candidate_authentication_parameters"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "selection_competition_rule": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/selection"
+        },
+        {
+          "if": {
+            "$ref": "#/$defs/fixed_selection"
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/competition_rule"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "selection_settlement_relay": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/selection"
+        },
+        {
+          "if": {
+            "$ref": "#/$defs/fixed_selection"
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/settlement_relay_rule"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "selection_system_address_safety": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/selection"
+        },
+        {
+          "if": {
+            "$ref": "#/$defs/fixed_selection"
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/system_address_safety_rule"
+              }
+            }
+          }
+        }
+      ]
+    },
     "chain_identity": {
       "type": "object",
       "additionalProperties": false,
@@ -1075,31 +1527,35 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "host_profile",
-        "host_network",
-        "host_chain_id",
+        "ethereum_network",
+        "ethereum_chain_id",
+        "ethereum_genesis_hash",
         "eez_contract",
         "manager_contract",
+        "manager_proof_context",
         "proof_system_contracts",
         "deployment_block",
         "settlement_rule",
         "finality_rule"
       ],
       "properties": {
-        "host_profile": {
-          "$ref": "#/$defs/selection_host_profile"
-        },
-        "host_network": {
+        "ethereum_network": {
           "$ref": "#/$defs/selection_nonempty_string"
         },
-        "host_chain_id": {
-          "$ref": "#/$defs/selection_nonnegative_integer"
+        "ethereum_chain_id": {
+          "$ref": "#/$defs/selection_positive_integer"
+        },
+        "ethereum_genesis_hash": {
+          "$ref": "#/$defs/selection_nonzero_bytes32"
         },
         "eez_contract": {
           "$ref": "#/$defs/selection_deployment"
         },
         "manager_contract": {
           "$ref": "#/$defs/selection_deployment"
+        },
+        "manager_proof_context": {
+          "$ref": "#/$defs/selection_manager_proof_context"
         },
         "proof_system_contracts": {
           "$ref": "#/$defs/selection_deployment_array"
@@ -1121,10 +1577,12 @@
       "required": [
         "block_time_ms",
         "block_gas_limit",
+        "header_construction",
         "fee_market",
         "fee_recipient",
         "eez_predeploys",
         "system_address",
+        "system_address_safety",
         "system_transaction_envelope"
       ],
       "properties": {
@@ -1133,6 +1591,9 @@
         },
         "block_gas_limit": {
           "$ref": "#/$defs/selection_block_gas_limit"
+        },
+        "header_construction": {
+          "$ref": "#/$defs/selection_header_construction"
         },
         "fee_market": {
           "$ref": "#/$defs/selection_object"
@@ -1144,7 +1605,10 @@
           "$ref": "#/$defs/selection_address_map"
         },
         "system_address": {
-          "$ref": "#/$defs/selection_address"
+          "$ref": "#/$defs/selection_nonzero_address"
+        },
+        "system_address_safety": {
+          "$ref": "#/$defs/selection_system_address_safety"
         },
         "system_transaction_envelope": {
           "$ref": "#/$defs/selection_object"
@@ -1155,21 +1619,45 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "sequencing_model",
-        "sequencing_authority",
+        "candidate_admission",
+        "candidate_authentication",
+        "competition_rule",
+        "settlement_relay",
         "slot_construction",
+        "l1_l2_lowering",
+        "max_candidate_range_blocks",
+        "cursor_applicability",
+        "applied_prefix_safety",
         "atomic_inclusion",
         "max_user_transactions_per_bundle",
         "proof_routing_mitigation"
       ],
       "properties": {
-        "sequencing_model": {
-          "$ref": "#/$defs/selection_string_or_object"
+        "candidate_admission": {
+          "$ref": "#/$defs/selection_candidate_admission"
         },
-        "sequencing_authority": {
-          "$ref": "#/$defs/selection_string_or_object"
+        "candidate_authentication": {
+          "$ref": "#/$defs/candidate_authentication"
+        },
+        "competition_rule": {
+          "$ref": "#/$defs/selection_competition_rule"
+        },
+        "settlement_relay": {
+          "$ref": "#/$defs/selection_settlement_relay"
         },
         "slot_construction": {
+          "$ref": "#/$defs/slot_construction"
+        },
+        "l1_l2_lowering": {
+          "$ref": "#/$defs/selection_l1_l2_lowering"
+        },
+        "max_candidate_range_blocks": {
+          "$ref": "#/$defs/selection_positive_integer"
+        },
+        "cursor_applicability": {
+          "$ref": "#/$defs/selection_string_or_object"
+        },
+        "applied_prefix_safety": {
           "$ref": "#/$defs/selection_string_or_object"
         },
         "atomic_inclusion": {

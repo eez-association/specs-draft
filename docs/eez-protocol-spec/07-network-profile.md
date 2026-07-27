@@ -1,218 +1,316 @@
 # 7. Required Network Profile
 
-EEZ deliberately leaves deployment and network policy outside the reusable protocol. Every
-network specification that uses EEZ MUST therefore publish a complete network profile.
+EEZ leaves deployment and network policy outside the reusable protocol. Every EEZ execution
+network MUST publish one complete network profile. Rollup0 and Gnosis Chain are separate peer
+execution networks. Neither profile inherits from, hosts, or completes the other.
 
 The machine-readable schema is
-[`network-profile.schema.json`](network-profile.schema.json). The published instances are:
+[`network-profile.schema.json`](network-profile.schema.json). Profile schema version `2` has one
+role, `eez-network`. The published instances are:
 
 - [Rollup0 profile JSON](../rollup0-network-spec/network-profile.json)
-- [Gnosis Chain current EEZ profile JSON](../gnosis-chain-eez-spec/network-profile.json)
-- [Gnosis Chain Rollup0 compatibility profile JSON](../gnosis-chain-eez-spec/network-profile-rollup0.json)
+- [Gnosis Chain profile JSON](../gnosis-chain-eez-spec/network-profile.json)
+
+Each profile names its own execution network and records its Ethereum settlement configuration
+directly. There is no cross-profile host reference and no Gnosis compatibility profile for
+Rollup0.
 
 ## 7.1 Value states
 
-Every field selected by the schema MUST use exactly one state:
+Every selected field uses exactly one state:
 
 | State | Meaning |
 |---|---|
 | `fixed` | Normative for this profile. `value` and an auditable `source` are required. |
-| `not-applicable` | The field does not apply to the profile's declared role. A `reason` is required. |
-| `release-blocker` | The repository does not contain an authoritative choice. A stable blocker `id` and an `issue` describing what must be decided are required. |
+| `release-blocker` | The repository has no authoritative choice. A stable blocker `id` and an `issue` describing the required decision are required. |
+| `not-applicable` | The field does not apply. A `reason` is required. Schema v2 defines every listed field as owned by an `eez-network`, so the validator rejects this state for those fields. |
 
 `release-blocker` is a draft-only placeholder. A production profile containing one is
-non-conforming. Implementations MUST NOT silently substitute a development default for a release
-blocker. The root `release_blockers` array MUST contain exactly the unique set of blocker IDs used
-by nested selections: no omitted, stale, or duplicate IDs are permitted.
+non-conforming. An implementation MUST NOT substitute a development default for a release
+blocker. The root `release_blockers` array MUST contain exactly the unique blocker IDs used by
+nested selections.
 
 Conformance uses this semantic algorithm:
 
-1. Recursively visit every object below the profile root and collect the `id` of each object whose
-   `status` is `release-blocker`.
+1. Recursively collect the `id` of each object whose `status` is `release-blocker`.
 2. Require `release_blockers` to contain each distinct collected ID exactly once and no other ID.
-   The order of the root array is not significant.
-3. If `profile.status` is `production`, require the collected set and the root array to be empty.
+3. If `profile.status` is `production`, require both sets to be empty.
 
-JSON Schema cannot express the recursive set equality in step 2 or reliably exclude a blocker at
-an arbitrary future nesting depth. The dependency-free
-[`validate_profiles.py`](validate_profiles.py) validator implements this algorithm, the typed
-schema checks, the EVM-fork minimum, the proxy-artifact hash check, and the conditional
-proof-routing rule. A profile is not conforming unless it passes both the schema and the semantic
-checks.
+The dependency-free [`validate_profiles.py`](validate_profiles.py) validator implements this
+algorithm, the typed schema, ruleset path and digest checks, the EVM-fork minimum, settlement
+identity checks, timing relations, deployment uniqueness, proof-routing checks, and immutable
+EVM-binding artifact checks. It validates Rollup0 and Gnosis Chain as independent peer profiles. It
+performs no cross-profile resolution.
 
-## 7.2 Required fields
+## 7.2 Required groups
 
-The schema requires the following groups:
+Schema version `2` requires:
 
 | Group | Required selections |
 |---|---|
-| Identity | stable profile ID; profile name/version/status/role; network name and environment |
-| EEZ dependency | exact EEZ framework ID/version and EVM-binding ID/version/specification path |
-| Chain identity | EIP-155 chain ID; EEZ rollup ID; native asset; genesis commitment; EVM fork |
-| Settlement binding | settlement profile/network/chain ID; `EEZ`, manager, and proof-system deployments; deployment block; settlement and finality rules |
-| Execution binding | block cadence and gas limit; fee-market parameters and recipient; EEZ predeploys; system address and system-transaction envelope |
-| Operation | sequencing model and authority; slot construction; atomic-inclusion mechanism; bundle bound; binding-specific proof-routing mitigation |
-| Proof policy | proof model; allowed proof systems and verification keys; threshold |
+| Identity | stable profile ID; name; version; status; role `eez-network`; network name; environment |
+| EEZ dependency | `eez-framework@0.1-draft`; `eez-evm@0.2-draft`; specification path; conformance source `eez-core-protocol@3a6ca65c4858792fc3a143d34c5484877ef8f68c` |
+| Ruleset dependency | ruleset ID and version; specification path; SHA-256 content-digest selection |
+| Chain identity | execution-network EIP-155 chain ID; EEZ rollup ID; native asset; genesis commitment; EVM fork |
+| Settlement binding | Ethereum network, chain ID, and genesis hash; `EEZ`, manager, and proof-system deployments; manager proof-context rule; deployment block; settlement and finality rules |
+| Execution binding | block cadence and gas limit; complete header construction; fee market and recipient; EEZ predeploys; system address, safety rule, and transaction envelope |
+| Operation | candidate admission; authentication mode and parameters; competition; settlement relay; separate `D1`, `D2`, `K`, `P`, `S`, and `C` timing selections; deterministic L1/L2 lowering; candidate-range bound; applied-prefix safety; atomic inclusion; bundle bound; proof-routing mitigation |
+| Proof policy | proof model; allowed proof-system deployments and verification keys; threshold |
 | Data availability | availability requirement; channel; codec; derivation rule |
-| Governance and recovery | manager authority; upgrade policy; reorg/emergency handling |
+| Governance and recovery | manager authority; upgrade policy; reorg and emergency handling |
 
-The schema rejects undeclared fields. A value is fixed only for the profile version that contains
-it; changing a normative fixed value, a role assignment, a dependency version, or a conformance
-vector requires a new applicable version.
+A ruleset dependency names one complete reusable network-rules document. The `id`, `version`, and
+`specification` path are direct selectors. `content_digest` is a value-state selection. A fixed
+digest uses `algorithm: sha256` and the lowercase `0x`-prefixed SHA-256 digest of the exact bytes at
+the specification path. A draft that has not published that digest MUST mark it as a release
+blocker.
 
-Fixed chain IDs, rollup IDs, block numbers, durations, gas values, bounds, and thresholds use
-non-negative JSON integers where the schema permits zero and positive JSON integers otherwise.
-They are not decimal or hexadecimal strings and MUST be at most `9007199254740991` (`2^53 - 1`),
-so an implementation can parse them exactly in both arbitrary-precision and IEEE-754 JSON
-environments. A future profile schema that needs a wider EVM integer must define a canonical
-string encoding instead of an imprecise JSON number. Fixed addresses and `bytes32` commitments use
-`0x`-prefixed fixed-width hexadecimal strings. A deployment address,
-runtime-bytecode hash, deployment-transaction hash, and deployment-block hash MUST also be
-non-zero, and a transaction deployment block number MUST be positive. Proof-system deployment
-addresses MUST be unique after case normalization. A fixed `host_profile` is exactly an object
-with `profile_id` and `profile_version`. The canonical-header form of `block_gas_limit` selects a
-header field and its validation rule rather than freezing one observed block's integer value.
-A fixed `evm_fork` value is an object whose `minimum_execution_fork` is an explicit recognized
-execution fork at or after Cancun. It MUST also contain:
+The settlement fields describe the Ethereum settlement layer used by that network. They do not
+describe another EEZ execution network. A profile MUST identify the precise Ethereum environment,
+chain ID, and genesis hash. It MUST pin the `EEZ`, manager, and proof-system deployments, their code
+commitments, the deployment record, and the finality rule that consumers apply. The Rollup0 and
+Gnosis Chain production-draft profiles both select Ethereum mainnet, chain ID `1`, and mainnet
+genesis hash `0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3`.
+Chiado is a development settlement environment and requires a separate development profile.
 
-- `activation`: exactly `{"kind": "genesis"}`, or a `block` or `timestamp` kind with one
-  non-negative integer `value`;
-- `opcode_semantics`: exactly `transient_storage: EIP-1153`, `blobhash: EIP-4844`, and
-  `mcopy: EIP-5656`; and
-- `validation`: a non-empty rule for checking the activation against the canonical chain.
+The operation fields describe different authorities:
 
-Mentioning a fork or EIP name in free text, including a negated statement, does not select or
-affirm it. `Deneb` alone is not a valid `minimum_execution_fork` because it names the consensus
-fork, not the required EVM execution semantics.
+- `candidate_admission` states whether every valid candidate is eligible or only permissioned
+  candidates are eligible.
+- `candidate_authentication` states how a candidate producer identity is established.
+- `competition_rule` orders conflicting valid candidates and rejects stale candidates.
+- `settlement_relay` states who may submit the selected result to Ethereum and how failures are
+  handled.
 
-The selections above MUST be complete enough to answer these security-critical questions:
+These fields are independent of `proof_policy.allowed_proof_systems_and_vkeys`. Candidate
+admission identifies who may propose a network block. Proof-system membership identifies which
+verifier contracts or attestations can authorize an EEZ batch. A profile MUST NOT use one field as
+an implicit substitute for the other.
 
-- **Cross-side construction:** How does each supported interaction become the exact, distinct L1
-  and L2 tuples in §4.2? Which entries produce which inbound system transactions, and in what
-  order?
-- **Action consistency:** How are explicit inbound parameters tied field-by-field to the first L2
-  incoming call and to the action observed on the other side?
-- **Value and custody:** Where does inbound `msg.value` come from? How do L1 physical custody,
-  per-rollup book balances, L2 supply or burn, residual balances, failures, and withdrawals
-  reconcile?
-- **Partial settlement:** Which consumed entries and genuine ordered events define the network
-  endpoint when entries are skipped, discarded, replaced, or left unconsumed?
-- **Replay domain:** What exact manager custom data binds a proof to the host, deployment, binding
-  version, and batch position? What prevents stale resubmission?
-- **Submitter-controlled routing:** If the selected binding does not prove its dispatch partition
-  or submitter, what versioned mechanism authenticates both before contract execution and prevents
-  proof reuse or front-running?
-- **Authority:** Which identities can sequence, submit, change proof policy, replace roots, upgrade
-  code, supply system transactions, or invoke emergency recovery?
+Rollup0 selects permissionless-validity candidate admission: validators and provers accept a
+candidate from any producer when it is valid under the Rollup0 rules. Gnosis Chain selects
+permissioned candidate admission. Their remaining rules can be identical without making either
+network a profile of the other.
 
-A field is not fixed merely because its `value` names a component. The value or its auditable
-source MUST define the component's byte-level behavior and failure rule.
-Required names, reasons, issues, sources, and validation rules MUST contain a non-whitespace
-character. Profiles use strict JSON: objects MUST NOT contain duplicate member names, and numeric
-values MUST NOT use `NaN`, `Infinity`, or `-Infinity`. Conforming parsers reject these inputs
-instead of choosing a first or last member or accepting a language-specific numeric extension.
+## 7.3 Typed operation rules
 
-A role-owned selection MUST be `fixed` or, in a non-production profile, `release-blocker`; it MUST
-NOT be `not-applicable`. For a rollup, these selections include its chain and genesis identity,
-settlement-host reference, manager and proof deployments, execution parameters, operation and
-proof policy, DA, and governance/recovery rules. For a settlement host, they include its chain and
-genesis identity, `EEZ` deployment, deployment block, execution parameters, atomic-inclusion
-capability, and governance/recovery rules. Conversely, every role-excluded selection MUST be
-`not-applicable`; it cannot claim a fixed value or introduce a release blocker. In particular, a
-rollup profile cannot override the host-owned shared `EEZ` deployment or its deployment block.
-The validator enforces both complete field lists. The role semantics in §7.4 determine ownership.
+A fixed `candidate_admission` value contains:
 
-Every `rollup` profile MUST select `operation.proof_routing_mitigation`. A development profile MAY
-mark it `release-blocker`. A production profile MUST fix a versioned access, relay, builder,
-contract, or wrapper rule that authenticates the submitter and every routing input that the
-selected proof statement leaves unbound before the call reaches `EEZ`. The rule MUST specify
-replay, front-running, and failure behavior. If the selected binding itself commits all of these
-values, the profile MAY satisfy this requirement by citing that normative binding rule and its
-conformance vector.
+```text
+mode: permissionless-validity | permissioned
+acceptance_rule: non-empty string
+invalid_candidate_rule: non-empty string
+```
 
-A fixed mitigation is a structured object. It MUST provide non-empty `mechanism`,
-`binding_evidence`, and `failure_rule` values; set `authenticates_caller`, `prevents_replay`, and
-`prevents_front_running` to the JSON boolean `true`; and list every authenticated calldata field
-in `authenticated_calldata_fields`. Prose that merely contains these terms, or states that a
-property is absent, does not satisfy the rule.
+A `candidate_authentication` object contains separate `mode` and `parameters` selections. A fixed
+`mode` value is:
 
-For `eez-evm@0.2-draft`, the fixed rule MUST authenticate `msg.sender` and list exactly
-`transientExecutionEntryCount` and `transientLookupCallCount`; that binding does not itself prove
-them. The historical `eez-evm@0.1-rollup0` rule has the same required field names, but it is a
-separate binding claim and requires its own evidence. Other binding editions MUST state their own
-exact unbound caller and calldata fields. Similar field names are not evidence that two editions
-have the same proof-routing statement.
+```text
+mode: none | signature | allowlist | protocol
+```
 
-## 7.3 Binding editions and precedence
+A fixed `parameters` value contains:
 
-This framework edition is `eez-framework@0.1-draft`. The current EVM binding specified by
-§§3–5 and Appendix B is `eez-evm@0.2-draft`, with conformance evidence reproduced from
-`eez-core-protocol@3a6ca65c4858792fc3a143d34c5484877ef8f68c`.
+```text
+identity_rule: non-empty string
+verification_rule: non-empty string
+```
 
-Every profile that selects this EVM binding MUST select an EVM fork or activation rule with
-Cancun-compatible `TLOAD`, `TSTORE`, `MCOPY`, and `BLOBHASH` semantics. A fork selection older
-than Cancun is invalid. Selecting a later fork is valid only when those Cancun semantics remain
-available.
+A fixed `signature` mode additionally requires non-empty
+`canonical_candidate_encoding`, `digest_rule`, `replay_domain`, `signature_scheme`,
+`accepted_signature_form`, `authorization_set_rule`, and `test_vectors` parameters. A profile can
+therefore fix that signatures are required while keeping the exact signature and authorization
+parameters as a release blocker.
 
-The schema records an exact binding version and a documentation-root-relative `specification`
-path rather than forcing every profile onto `0.2-draft`. The conformance validator maintains the
-binding registry for this specification set. It currently recognizes
-`eez-evm@0.2-draft` at `eez-protocol-spec/index.md` and `eez-evm@0.1-rollup0` at
-`rollup0-network-spec/E-compatibility-binding.md`. A profile MAY select another binding edition
-only after the registry and this specification are versioned to identify its own self-contained
-normative layouts, algorithms, selectors, and vectors. An arbitrary version string, source
-commit, branch, repository `HEAD`, or similarity of Solidity struct names is not a binding
-edition.
+A fixed `competition_rule` value contains:
 
-For behavior governed by this specification, precedence is:
+```text
+mode: first-valid | priority | leader-election | single-authority | other
+ordering_rule: non-empty string
+conflict_rule: non-empty string
+stale_candidate_rule: non-empty string
+```
 
-1. a network activation record selects the profile and exact binding edition;
-2. the selected binding specification controls contract behavior, layouts, selectors, and hashes;
-3. the network profile controls only the choices delegated to it by that binding; and
-4. source repositories and companion implementation notes are conformance evidence, not silent
-   protocol amendments.
+A fixed `settlement_relay` value contains:
 
-An implementation MUST NOT decode a batch, entry, lookup, or proof input using types from another
-binding edition. A network upgrade that changes any ABI type, selector, hash preimage, proxy
-creation code, or verification input requires a new binding edition and an explicit activation
-boundary.
+```text
+mode: permissionless | permissioned | single-authority
+authorization_rule: non-empty string
+submission_rule: non-empty string
+failure_rule: non-empty string
+```
 
-## 7.4 Role semantics
+The enumerated `mode` is machine-readable. The accompanying rules are normative and MUST define
+acceptance, conflicts, staleness, and failure without relying on an unnamed operator.
 
-This edition defines two profile roles:
+A `slot_construction` object contains six independent selections:
 
-- `rollup` — an EEZ-managed execution network whose state is settled through an `EEZ` deployment;
-- `settlement-host` — the EVM network on which a shared `EEZ` deployment executes.
+```text
+settlement_interval_ms: D1, positive integer
+block_interval_ms: D2, positive integer
+blocks_per_settlement_interval: K, positive integer
+proof_budget_ms: P, positive integer
+submission_slack_ms: S, non-negative integer
+max_catch_up_blocks: C, positive integer producer-output bound
+```
 
-Rollup-only fields in a settlement-host profile remain present and are marked `not-applicable`.
-This keeps profiles mechanically comparable without pretending the settlement host is itself the
-rollup. The rollup profile owns its rollup ID, manager and proof-system deployments, L2 execution,
-sequencing, proof policy, DA codec, and derivation rule even when the corresponding contracts or
-data are located on the host. The settlement-host profile owns host-chain identity and finality,
-the shared `EEZ` deployment, and the host capability needed for atomic inclusion. A
-`not-applicable` selection means that the role does not own the choice; it does not mean that a
-consumer may leave the choice unspecified.
+`D2` MUST be a whole number of seconds, `K` MUST be at least `2`, and a fixed
+`execution_binding.block_time_ms` MUST equal `D2`. When `D1`, `D2`, and `K` are fixed, `D1` MUST
+be divisible by `D2`, and `K = D1 / D2`. When `P` and `S` are also fixed, `P + S < D1` and
+`P + S <= (K - 1) * D2`. A profile MUST NOT hide fixed cadence values inside a blocker for the
+remaining parameters.
 
-## 7.5 Cross-profile references
+`max_catch_up_blocks` is `C`, the producer-side maximum number of blocks emitted at one catch-up
+trigger. It does not make a longer candidate invalid. `operation.max_candidate_range_blocks` is
+`N_max`, the separate positive-integer consensus validity bound for every candidate range.
 
-A profile reference MUST include the referenced profile's stable ID and exact version. A Rollup0
-profile that says only “Gnosis” does not fix whether it means Gnosis Chain mainnet, Chiado, or
-another environment. It also does not select an EVM binding edition. The Rollup0 development
-profile therefore selects
-`gnosis-chain-eez-chiado-rollup0@0.1-draft`, while a current `eez-evm@0.2-draft` consumer selects
-`gnosis-chain-eez-chiado@0.1-draft`.
+A fixed `manager_proof_context` value contains:
 
-The referenced host profile MUST be loaded when the profile set is validated. It MUST have role
-`settlement-host`; select the exact same EEZ framework and EVM binding IDs and versions; and agree
-with the rollup profile's fixed host network and EIP-155 chain ID. The dependency-free validator
-enforces these relationships. A production rollup MUST reference a production host profile with
-no release blockers. Two host profiles for the same underlying chain are distinct when they
-select different EVM binding editions or deployments.
+```text
+context_block_rule: non-empty string
+manager_method: getCustomData(uint64)
+custom_data_encoding: non-empty string
+authentication_rule: non-empty string
+failure_rule: non-empty string
+```
 
-When a rollup profile and its settlement-host profile disagree, neither profile conforms. The
-rollup profile remains authoritative for L2 execution choices; the settlement-host profile remains
-authoritative for host-chain identity and host capabilities. A consumer MUST also treat unresolved
-blockers in the referenced host profile as unresolved dependencies of its own deployment claim.
+This selection supplies `MANAGER(n)` for the common ruleset. Naming a manager deployment does not
+select the recent block-number rule, opaque custom-data bytes, or their authentication.
+
+A fixed `header_construction` value defines every canonical header field from `parentHash` through
+the activated optional fields, plus the exact body and validation rules. Its required members are:
+
+```text
+parent_hash, ommers_hash, beneficiary, state_root, transactions_root,
+receipts_root, logs_bloom, difficulty, number, gas_limit, gas_used,
+timestamp, extra_data, prev_randao, nonce, base_fee_per_gas,
+withdrawals_root, blob_gas_fields, parent_beacon_block_root,
+requests_hash, later_optional_fields, body_rule, validation_rule
+```
+
+Genesis, fork, fee, and header-construction selections remain independent. Fixing one does not
+supply a missing value in another.
+
+A fixed `l1_l2_lowering` value contains exact rules for:
+
+```text
+semantic_action_rule
+l1_entry_rule
+l2_sidecar_rule
+explicit_inbound_arguments_rule
+system_transaction_rule
+validation_rule
+failure_rule
+conformance_vectors
+```
+
+The common rules require this field-by-field construction but do not invent a network's lowering
+algorithm. A profile with this selection blocked cannot claim that its cross-layer execution path
+is implementable.
+
+`operation.cursor_applicability` selects an enforceable settlement rule that authenticates the
+current execution-network cursor and compares it with the candidate's exact named parent. The
+identity MUST commit to the parent height, block hash, and state root, or to an unambiguous
+collision-resistant encoding of those values. Applying a candidate atomically advances this
+identity to the authenticated selected prefix endpoint. The rule MUST bind every endpoint that
+partial settlement can select. State-root equality alone is insufficient because different blocks
+and competing ranges can have the same state root.
+
+`operation.applied_prefix_safety` selects an enforceable rule that prevents a non-applied anchor or
+effect from allowing a later effect to apply. The rule MUST preserve occurrence indices and
+multiplicity when consecutive effects have repeated or equal root values. A description of
+expected ordering without an enforcement mechanism is not a fixed safety rule.
+
+## 7.4 System-address safety
+
+`EEZL2` trusts `SYSTEM_ADDRESS` to load and replace execution tables. The contract also sends ETH
+to `SYSTEM_ADDRESS` before it resolves an L2-originated action. The binding is conforming only
+inside an execution-layer envelope that:
+
+1. prevents `SYSTEM_ADDRESS` code from reentering either table-loading function during execution;
+2. permits at most one top-level `executeIncomingCrossChainCall` in one transaction; and
+3. starts that call with fresh transaction-scoped cursors.
+
+A fixed `system_address_safety` value contains:
+
+```text
+mode: node-controlled-non-reentrant | contract-guarded
+can_execute_code: boolean
+prevents_reentrant_table_replacement: true
+enforces_single_inbound_call_per_transaction: true
+enforcement: non-empty string
+failure_rule: non-empty string
+```
+
+For `node-controlled-non-reentrant`, `can_execute_code` MUST be `false`. A
+`contract-guarded` design MAY execute code, but its cited guard MUST provide the two required
+properties. The unmodified `EEZL2` contract does not enforce them. A second or reentrant inbound
+call in the same transaction is outside the conforming envelope; an implementation MUST NOT
+invent deterministic fresh-cursor behavior for it.
+
+## 7.5 Proof-routing mitigation
+
+`eez-evm@0.2-draft` does not bind `msg.sender`,
+`transientExecutionEntryCount`, or `transientLookupCallCount` in proof public inputs.
+Every profile MUST select `operation.proof_routing_mitigation`. A development profile MAY mark it
+`release-blocker`. A production profile MUST fix a versioned access, relay, builder, contract, or
+wrapper rule that authenticates the submitter and the unbound routing fields before the call
+reaches `EEZ`.
+
+A fixed mitigation MUST:
+
+- provide non-empty `mechanism`, `binding_evidence`, and `failure_rule` values;
+- set `authenticates_caller`, `prevents_replay`, and `prevents_front_running` to `true`; and
+- list exactly `transientExecutionEntryCount` and `transientLookupCallCount` in
+  `authenticated_calldata_fields`.
+
+This mitigation concerns batch routing. It does not determine candidate admission, candidate
+authentication, proof-system membership, or settlement-relay competition.
+
+## 7.6 Encoding and completeness
+
+The schema rejects undeclared fields. Fixed chain IDs, rollup IDs, block numbers, durations, gas
+values, bounds, and thresholds use JSON integers no larger than `9007199254740991`
+(`2^53 - 1`). A future schema that needs a wider EVM integer must define a canonical string
+encoding.
+
+Addresses and `bytes32` commitments use fixed-width `0x`-prefixed hexadecimal strings. Deployment
+addresses, code hashes, transaction hashes, and deployment-block hashes are non-zero. A deployment
+block number is positive. Proof-system deployment addresses are unique after case normalization.
+
+A fixed `evm_fork` selects a recognized execution fork at or after Cancun, its activation, exact
+EIP-1153, EIP-4844, and EIP-5656 opcode semantics, and a validation rule. A consensus-fork name
+alone does not establish the required execution semantics.
+
+The profile MUST answer:
+
+- how each supported interaction becomes the distinct L1 and L2 tuples in §4.2;
+- how explicit inbound parameters match the first incoming call;
+- how L1 custody and book balances reconcile with L2 value;
+- which committed effects define a network endpoint after partial consumption;
+- which manager custom data supplies the deployment and replay domain;
+- how unbound proof-routing inputs are authenticated;
+- who may propose, authenticate, select, and relay a candidate; and
+- who may change proof policy, replace roots, upgrade code, or invoke recovery.
+
+A component name is not a fixed rule. Its value or source MUST define byte-level behavior and
+failure handling. Profiles use strict JSON: duplicate members, `NaN`, `Infinity`, and
+`-Infinity` are invalid.
+
+## 7.7 Binding and precedence
+
+Schema version `2` selects `eez-framework@0.1-draft` and `eez-evm@0.2-draft`. A network profile
+also selects its reusable network ruleset independently. The source revision is reproducible
+conformance evidence, not the protocol version. For behavior governed here:
+
+1. a network activation record selects the profile and binding;
+2. the binding specification controls contract behavior, layouts, selectors, and hashes;
+3. the selected ruleset controls its complete reusable network algorithms;
+4. the network profile controls only delegated network choices; and
+5. source repositories are evidence, not silent amendments.
+
+An upgrade that changes an ABI type, selector, hash preimage, proxy creation code, or verification
+input requires a new binding edition and an explicit activation boundary.
 
 ---
 

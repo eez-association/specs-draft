@@ -21,6 +21,11 @@ this summary disagrees with them.
 The exact bytes, rather than a source-repository revision, are normative in the immutable
 [proxy creation-code artifact](fixtures/cross-chain-proxy-creation-code.json).
 
+Only `EEZ`, `EEZL2`, `CrossChainProxy`, and their collaborator interfaces belong to the core
+binding. The source snapshot's `Rollup`, `ECDSAProofSystem`, and periphery contracts are
+non-binding reference implementations unless a network profile pins their complete deployment
+and administrative behavior.
+
 EEZ does not define a chain ID, a network-specific fork beyond the Cancun minimum, block time, gas
 limit, fee policy, `SYSTEM_ADDRESS`, predeploy address, DA tag, finality rule, or deployment
 address.
@@ -135,7 +140,7 @@ sum(StateDelta.etherDelta)
     - sum(all successful non-static replay outflow)
 ```
 
-**Successful replay partition** (§4.6.2):
+**Canonical producer replay partition** (§4.6.2):
 
 ```text
 entry.callCount
@@ -143,8 +148,9 @@ entry.callCount
     = flat-call array length
 ```
 
-The authoritative endpoint checks are equality of the live flat and expected-call cursors with
-their array lengths.
+This equation is a producer invariant. The deployed contract authoritatively checks equality of
+the live flat and expected-call cursors with their array lengths; a malformed overlong
+`revertSpan` can violate the equation while reaching those endpoints.
 
 **Proof public inputs** (§5.3): hash each ABI-encoded L1 entry and top-level lookup; fold each
 manager's opaque custom data in rollup-ID order; hash those arrays, blob hashes, `callData`, and

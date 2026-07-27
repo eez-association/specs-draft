@@ -11,9 +11,10 @@ standard Cancun opcodes:
 - EIP-5656 `MCOPY` in the compiler-generated ABI and memory-copy paths; and
 - EIP-4844 `BLOBHASH` when constructing the L1 proof public input.
 
-Both the settlement host and every rollup EVM that deploys this binding MUST execute a Cancun-or-
-later fork that implements those opcodes with Cancun-compatible semantics. A network profile MUST
-pin that fork or activation rule, the chain ID, genesis or host identity, deployed contract
+Both the Ethereum settlement EVM and every execution-network EVM that deploys this binding MUST
+execute a Cancun-or-later fork that implements those opcodes with Cancun-compatible semantics. A
+network profile MUST pin that fork or activation rule, the chain ID, genesis or settlement
+identity, deployed contract
 addresses and code commitments, and any L2 predeploys.
 
 This binding does not select a particular gas schedule beyond that minimum fork, a transaction
@@ -247,6 +248,14 @@ compare the explicit action parameters with `entries[0].incomingCalls[0]` field 
 network profile MUST define the value source and the deterministic construction linking the
 explicit action, L1 objects, L2 objects, and transaction.
 
+The implementation relies on an execution-layer precondition that is not enforced by `EEZL2`.
+`SYSTEM_ADDRESS` MUST be node-controlled and unable to execute reentrant code, or the profile MUST
+pin an equivalent guard that prevents table replacement during execution. The delivery envelope
+MUST permit at most one top-level `executeIncomingCrossChainCall` per transaction. The function
+does not reset all transaction-scoped replay state before it starts; it relies on zero-valued
+transient storage at transaction entry. A second or reentrant inbound call in the same transaction
+is outside the conforming envelope and has no profile-portable fresh-cursor semantics.
+
 EEZ does not select the L2 transaction that carries this call. A profile MUST pin its byte
 serialization, authorization or signature rule, sender, nonce, fee fields, gas limit, placement,
 value-supply rule, and reconstruction inputs. A network cannot claim deterministic derivation
@@ -263,6 +272,13 @@ Executing proxy code in the caller's storage context does not make that caller a
 so manager authorization normally fails. A profile MAY reject those call schemes as producer
 inputs, but an implementation MUST NOT invent a core custom error or claim an opcode rule that this
 binding does not implement.
+
+A cross-chain proxy is an identity and dispatch adapter, not a code-equivalent copy of the remote
+contract. Code and balance inspection of the proxy observes the proxy, and block-environment
+opcodes observe the EVM on which the destination executes. The destination sees the deterministic
+proxy as `msg.sender`. A proxy also forwards manager and destination reverts without adding an
+origin envelope, so an application cannot rely on revert bytes alone to distinguish missing EEZ
+execution data from an application failure.
 
 Reentrant proxy calls, static and failed lookups, and forced rollback are current execution
 behavior, not fields reserved only for a future protocol. Their exact semantics are in §4.

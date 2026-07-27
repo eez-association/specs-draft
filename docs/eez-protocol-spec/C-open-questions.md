@@ -5,20 +5,21 @@ network-profile selection.
 
 ## C.1 Enforced deployment domain
 
-The action hash contains no host chain ID, manager address, binding version, or per-call nonce. The
+The action hash contains no Ethereum settlement chain ID, manager address, binding version, or
+per-call nonce. The
 proxy salt contains no chain or deployment term. The batch has no explicit monotonic nonce.
 
 The current binding folds each participating manager's opaque
 `getCustomData(batch.blockNumber)` result into proof inputs. A manager can use those bytes to bind a
-host chain, `EEZ` address, profile version, and batch position, but EEZ does not require one
+settlement chain, `EEZ` address, profile version, and batch position, but EEZ does not require one
 encoding. The binding therefore does not provide a universal deployment domain.
 
 Open protocol questions are:
 
-- Should a future binding require a canonical commitment to the host chain ID, `EEZ` address,
+- Should a future binding require a canonical commitment to the settlement chain ID, `EEZ` address,
   rollup ID, binding version, and monotonic batch nonce?
 - Which nonce or state must the contract persist to reject stale resubmission?
-- How should a binding distinguish deployments that share pre-fork host history?
+- How should a binding distinguish deployments that share pre-fork settlement history?
 - Should action hashes also carry an explicit deployment or per-action domain?
 
 Until a future binding answers these questions, every profile MUST define its manager custom data
@@ -70,5 +71,5 @@ Open questions are whether a future binding should:
 - define a canonical deposit and withdrawal surface; or
 - continue delegating all economic backing to network profiles.
 
-Rollup-specific DA, transaction-envelope, gas, sequencing, finality, and reorg questions belong to
-the relevant network specification.
+Execution-network-specific DA, transaction-envelope, gas, candidate-admission, finality, and reorg
+questions belong to the relevant network specification.

@@ -25,7 +25,6 @@ CORPUS_PATH = SPEC_DIR / "fixtures" / "eez-evm-0.2-conformance.json"
 DEFAULT_PROFILES = (
     DOCS_DIR / "rollup0-network-spec" / "network-profile.json",
     DOCS_DIR / "gnosis-chain-eez-spec" / "network-profile.json",
-    DOCS_DIR / "gnosis-chain-eez-spec" / "network-profile-rollup0.json",
 )
 
 EXPECTED_PROXY_LENGTH = 1111
@@ -51,18 +50,25 @@ REQUIRED_OPCODE_SEMANTICS = {
     "mcopy": "EIP-5656",
 }
 REQUIRED_ROUTING_FIELDS = {
-    "0.1-rollup0": {
-        "transientExecutionEntryCount",
-        "transientLookupCallCount",
-    },
     "0.2-draft": {
         "transientExecutionEntryCount",
         "transientLookupCallCount",
     },
 }
 SUPPORTED_BINDINGS = {
-    "0.1-rollup0": "rollup0-network-spec/E-compatibility-binding.md",
     "0.2-draft": "eez-protocol-spec/index.md",
+}
+SUPPORTED_RULESETS = {
+    ("rollup0-common-execution", "0.2-draft"): (
+        "rollup0-network-spec/common-execution.md"
+    ),
+}
+ETHEREUM_MAINNET_GENESIS_HASH = (
+    "0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3"
+)
+EXPECTED_CONFORMANCE_SOURCE = {
+    "repository": "eez-core-protocol",
+    "revision": "3a6ca65c4858792fc3a143d34c5484877ef8f68c",
 }
 EXPECTED_ERROR_SIGNATURES = {
     "shared": {
@@ -130,29 +136,47 @@ EXPECTED_COLLABORATOR_SIGNATURES = {
     "executeMetaCrossChainTransactions": "executeMetaCrossChainTransactions()",
 }
 ROLE_OWNED_SELECTIONS = {
-    "rollup": (
+    "eez-network": (
+        ("ruleset_dependency", "content_digest"),
         ("chain_identity", "eip155_chain_id"),
         ("chain_identity", "eez_rollup_id"),
         ("chain_identity", "native_asset"),
         ("chain_identity", "genesis_commitment"),
         ("chain_identity", "evm_fork"),
-        ("settlement_binding", "host_profile"),
-        ("settlement_binding", "host_network"),
-        ("settlement_binding", "host_chain_id"),
+        ("settlement_binding", "ethereum_network"),
+        ("settlement_binding", "ethereum_chain_id"),
+        ("settlement_binding", "ethereum_genesis_hash"),
+        ("settlement_binding", "eez_contract"),
         ("settlement_binding", "manager_contract"),
+        ("settlement_binding", "manager_proof_context"),
         ("settlement_binding", "proof_system_contracts"),
+        ("settlement_binding", "deployment_block"),
         ("settlement_binding", "settlement_rule"),
         ("settlement_binding", "finality_rule"),
         ("execution_binding", "block_time_ms"),
         ("execution_binding", "block_gas_limit"),
+        ("execution_binding", "header_construction"),
         ("execution_binding", "fee_market"),
         ("execution_binding", "fee_recipient"),
         ("execution_binding", "eez_predeploys"),
         ("execution_binding", "system_address"),
+        ("execution_binding", "system_address_safety"),
         ("execution_binding", "system_transaction_envelope"),
-        ("operation", "sequencing_model"),
-        ("operation", "sequencing_authority"),
-        ("operation", "slot_construction"),
+        ("operation", "candidate_admission"),
+        ("operation", "candidate_authentication", "mode"),
+        ("operation", "candidate_authentication", "parameters"),
+        ("operation", "competition_rule"),
+        ("operation", "settlement_relay"),
+        ("operation", "slot_construction", "settlement_interval_ms"),
+        ("operation", "slot_construction", "block_interval_ms"),
+        ("operation", "slot_construction", "blocks_per_settlement_interval"),
+        ("operation", "slot_construction", "proof_budget_ms"),
+        ("operation", "slot_construction", "submission_slack_ms"),
+        ("operation", "slot_construction", "max_catch_up_blocks"),
+        ("operation", "l1_l2_lowering"),
+        ("operation", "max_candidate_range_blocks"),
+        ("operation", "cursor_applicability"),
+        ("operation", "applied_prefix_safety"),
         ("operation", "atomic_inclusion"),
         ("operation", "max_user_transactions_per_bundle"),
         ("operation", "proof_routing_mitigation"),
@@ -166,53 +190,6 @@ ROLE_OWNED_SELECTIONS = {
         ("governance_recovery", "manager_authority"),
         ("governance_recovery", "upgrade_policy"),
         ("governance_recovery", "reorg_and_emergency_rule"),
-    ),
-    "settlement-host": (
-        ("chain_identity", "eip155_chain_id"),
-        ("chain_identity", "native_asset"),
-        ("chain_identity", "genesis_commitment"),
-        ("chain_identity", "evm_fork"),
-        ("settlement_binding", "eez_contract"),
-        ("settlement_binding", "deployment_block"),
-        ("settlement_binding", "settlement_rule"),
-        ("settlement_binding", "finality_rule"),
-        ("execution_binding", "block_time_ms"),
-        ("execution_binding", "block_gas_limit"),
-        ("execution_binding", "fee_market"),
-        ("operation", "sequencing_model"),
-        ("operation", "sequencing_authority"),
-        ("operation", "slot_construction"),
-        ("operation", "atomic_inclusion"),
-        ("governance_recovery", "upgrade_policy"),
-        ("governance_recovery", "reorg_and_emergency_rule"),
-    ),
-}
-ROLE_EXCLUDED_SELECTIONS = {
-    "rollup": (
-        ("settlement_binding", "eez_contract"),
-        ("settlement_binding", "deployment_block"),
-    ),
-    "settlement-host": (
-        ("chain_identity", "eez_rollup_id"),
-        ("settlement_binding", "host_profile"),
-        ("settlement_binding", "host_network"),
-        ("settlement_binding", "host_chain_id"),
-        ("settlement_binding", "manager_contract"),
-        ("settlement_binding", "proof_system_contracts"),
-        ("execution_binding", "fee_recipient"),
-        ("execution_binding", "eez_predeploys"),
-        ("execution_binding", "system_address"),
-        ("execution_binding", "system_transaction_envelope"),
-        ("operation", "max_user_transactions_per_bundle"),
-        ("operation", "proof_routing_mitigation"),
-        ("proof_policy", "model"),
-        ("proof_policy", "allowed_proof_systems_and_vkeys"),
-        ("proof_policy", "threshold"),
-        ("data_availability", "requirement"),
-        ("data_availability", "channel"),
-        ("data_availability", "codec"),
-        ("data_availability", "derivation_rule"),
-        ("governance_recovery", "manager_authority"),
     ),
 }
 
@@ -458,6 +435,165 @@ def validate_binding_specification(profile: dict[str, Any], path: Path) -> None:
         raise ValidationError(
             f"{path}: binding specification does not exist: {specification}"
         )
+    if binding.get("conformance_source") != EXPECTED_CONFORMANCE_SOURCE:
+        raise ValidationError(
+            f"{path}: eez-evm@0.2-draft conformance_source must be "
+            "eez-core-protocol@3a6ca65c4858792fc3a143d34c5484877ef8f68c"
+        )
+
+
+def validate_ruleset_dependency(profile: dict[str, Any], path: Path) -> None:
+    dependency = profile["ruleset_dependency"]
+    identity = (dependency["id"], dependency["version"])
+    expected_specification = SUPPORTED_RULESETS.get(identity)
+    if expected_specification is None:
+        supported = ", ".join(
+            f"{ruleset_id}@{version}"
+            for ruleset_id, version in sorted(SUPPORTED_RULESETS)
+        )
+        raise ValidationError(
+            f"{path}: unregistered ruleset dependency "
+            f"{identity[0]}@{identity[1]}; supported: {supported}"
+        )
+    specification = dependency["specification"]
+    if specification != expected_specification:
+        raise ValidationError(
+            f"{path}: {identity[0]}@{identity[1]} must cite ruleset specification "
+            f"{expected_specification!r}, got {specification!r}"
+        )
+    specification_path = (DOCS_DIR / specification).resolve()
+    try:
+        specification_path.relative_to(DOCS_DIR.resolve())
+    except ValueError as exc:
+        raise ValidationError(
+            f"{path}: ruleset specification escapes the documentation root"
+        ) from exc
+    if not specification_path.is_file():
+        raise ValidationError(
+            f"{path}: ruleset specification does not exist: {specification}"
+        )
+    content_digest = dependency["content_digest"]
+    if content_digest.get("status") == "fixed":
+        try:
+            actual_digest = "0x" + hashlib.sha256(
+                specification_path.read_bytes()
+            ).hexdigest()
+        except OSError as exc:
+            raise ValidationError(
+                f"{path}: cannot read ruleset specification: {specification}"
+            ) from exc
+        declared_digest = content_digest["value"]["digest"]
+        if declared_digest != actual_digest:
+            raise ValidationError(
+                f"{path}: ruleset content digest must be {actual_digest}, "
+                f"got {declared_digest}"
+            )
+
+
+def validate_settlement_identity(profile: dict[str, Any], path: Path) -> None:
+    settlement = profile["settlement_binding"]
+    network = settlement["ethereum_network"]
+    if network.get("status") != "fixed" or network.get("value") != "Ethereum mainnet":
+        return
+    chain_id = settlement["ethereum_chain_id"]
+    if chain_id.get("status") != "fixed" or chain_id.get("value") != 1:
+        raise ValidationError(
+            f"{path}: Ethereum mainnet settlement requires fixed chain ID 1"
+        )
+    genesis_hash = settlement["ethereum_genesis_hash"]
+    if (
+        genesis_hash.get("status") != "fixed"
+        or genesis_hash.get("value") != ETHEREUM_MAINNET_GENESIS_HASH
+    ):
+        raise ValidationError(
+            f"{path}: Ethereum mainnet settlement requires genesis hash "
+            f"{ETHEREUM_MAINNET_GENESIS_HASH}"
+        )
+
+
+def validate_slot_construction(profile: dict[str, Any], path: Path) -> None:
+    slots = profile["operation"]["slot_construction"]
+
+    def fixed_value(name: str) -> int | None:
+        selection = slots[name]
+        if selection.get("status") != "fixed":
+            return None
+        value = selection.get("value")
+        if not isinstance(value, int) or isinstance(value, bool):
+            raise ValidationError(
+                f"{path}: fixed operation.slot_construction.{name} must be an integer"
+            )
+        return value
+
+    d1 = fixed_value("settlement_interval_ms")
+    d2 = fixed_value("block_interval_ms")
+    k = fixed_value("blocks_per_settlement_interval")
+    p = fixed_value("proof_budget_ms")
+    s = fixed_value("submission_slack_ms")
+
+    if d2 is not None and d2 % 1000 != 0:
+        raise ValidationError(
+            f"{path}: slot construction requires D2 to be whole seconds"
+        )
+    if k is not None and k < 2:
+        raise ValidationError(
+            f"{path}: slot construction requires K >= 2"
+        )
+    if d1 is not None and d2 is not None:
+        if d1 % d2 != 0:
+            raise ValidationError(
+                f"{path}: slot construction requires D1 to be divisible by D2"
+            )
+        if k is not None and k != d1 // d2:
+            raise ValidationError(
+                f"{path}: slot construction requires K = D1 / D2"
+            )
+    if d1 is not None and d2 is not None and k is not None and p is not None and s is not None:
+        if p + s >= d1:
+            raise ValidationError(
+                f"{path}: slot construction requires P + S < D1"
+            )
+        if p + s > (k - 1) * d2:
+            raise ValidationError(
+                f"{path}: slot construction requires P + S <= (K - 1) * D2"
+            )
+    execution_block_time = profile["execution_binding"]["block_time_ms"]
+    if (
+        d2 is not None
+        and execution_block_time.get("status") == "fixed"
+        and execution_block_time.get("value") != d2
+    ):
+        raise ValidationError(
+            f"{path}: execution_binding.block_time_ms must equal slot D2"
+        )
+
+
+def validate_candidate_authentication(profile: dict[str, Any], path: Path) -> None:
+    authentication = profile["operation"]["candidate_authentication"]
+    mode = authentication["mode"]
+    parameters = authentication["parameters"]
+    if (
+        mode.get("status") != "fixed"
+        or mode.get("value") != "signature"
+        or parameters.get("status") != "fixed"
+    ):
+        return
+    required_signature_fields = (
+        "canonical_candidate_encoding",
+        "digest_rule",
+        "replay_domain",
+        "signature_scheme",
+        "accepted_signature_form",
+        "authorization_set_rule",
+        "test_vectors",
+    )
+    value = parameters["value"]
+    missing = [field for field in required_signature_fields if field not in value]
+    if missing:
+        raise ValidationError(
+            f"{path}: fixed signature authentication parameters are incomplete: "
+            f"{', '.join(missing)}"
+        )
 
 
 def validate_deployment_sets(profile: dict[str, Any], path: Path) -> None:
@@ -483,8 +619,14 @@ def validate_deployment_sets(profile: dict[str, Any], path: Path) -> None:
 
 def require_cancun_compatible_fork(profile: dict[str, Any], path: Path) -> None:
     selection = profile["chain_identity"]["evm_fork"]
+    if selection.get("status") == "release-blocker":
+        if profile["profile"]["status"] == "production":
+            raise ValidationError(f"{path}: production chain_identity.evm_fork must be fixed")
+        return
     if selection.get("status") != "fixed":
-        raise ValidationError(f"{path}: chain_identity.evm_fork must be fixed")
+        raise ValidationError(
+            f"{path}: chain_identity.evm_fork must be fixed or a release blocker"
+        )
     value = selection["value"]
     if not isinstance(value, dict):
         raise ValidationError(
@@ -533,13 +675,10 @@ def require_cancun_compatible_fork(profile: dict[str, Any], path: Path) -> None:
 
 def validate_proof_routing(profile: dict[str, Any], path: Path) -> None:
     metadata = profile["profile"]
-    if metadata["role"] != "rollup":
-        return
-
     selection = profile["operation"].get("proof_routing_mitigation")
     if not isinstance(selection, dict):
         raise ValidationError(
-            f"{path}: rollup requires operation.proof_routing_mitigation"
+            f"{path}: eez-network requires operation.proof_routing_mitigation"
         )
     status = selection.get("status")
     if status not in ("fixed", "release-blocker"):
@@ -590,18 +729,35 @@ def validate_proof_routing(profile: dict[str, Any], path: Path) -> None:
 
 def validate_role_owned_selections(profile: dict[str, Any], path: Path) -> None:
     role = profile["profile"]["role"]
-    for group, field in ROLE_OWNED_SELECTIONS[role]:
-        status = profile[group][field].get("status")
+    for selection_path in ROLE_OWNED_SELECTIONS[role]:
+        selection: Any = profile
+        for field in selection_path:
+            selection = selection[field]
+        status = selection.get("status")
         if status not in ("fixed", "release-blocker"):
+            dotted_path = ".".join(selection_path)
             raise ValidationError(
-                f"{path}: {role}-owned {group}.{field} must be fixed or a release blocker"
+                f"{path}: {role}-owned {dotted_path} must be fixed or a release blocker"
             )
-    for group, field in ROLE_EXCLUDED_SELECTIONS[role]:
-        status = profile[group][field].get("status")
-        if status != "not-applicable":
-            raise ValidationError(
-                f"{path}: {role}-excluded {group}.{field} must be not-applicable"
-            )
+
+
+def validate_system_address_safety(profile: dict[str, Any], path: Path) -> None:
+    selection = profile["execution_binding"]["system_address_safety"]
+    if selection.get("status") != "fixed":
+        return
+    value = selection["value"]
+    if value["mode"] == "node-controlled-non-reentrant" and value["can_execute_code"]:
+        raise ValidationError(
+            f"{path}: node-controlled-non-reentrant SYSTEM_ADDRESS cannot execute code"
+        )
+    if value["prevents_reentrant_table_replacement"] is not True:
+        raise ValidationError(
+            f"{path}: SYSTEM_ADDRESS rule must prevent reentrant table replacement"
+        )
+    if value["enforces_single_inbound_call_per_transaction"] is not True:
+        raise ValidationError(
+            f"{path}: SYSTEM_ADDRESS rule must enforce one inbound call per transaction"
+        )
 
 
 def validate_profile_semantics(profile: dict[str, Any], path: Path) -> None:
@@ -629,18 +785,23 @@ def validate_profile_semantics(profile: dict[str, Any], path: Path) -> None:
         )
 
     validate_binding_specification(profile, path)
+    validate_ruleset_dependency(profile, path)
+    validate_settlement_identity(profile, path)
+    validate_slot_construction(profile, path)
+    validate_candidate_authentication(profile, path)
     validate_deployment_sets(profile, path)
     validate_role_owned_selections(profile, path)
     require_cancun_compatible_fork(profile, path)
     validate_proof_routing(profile, path)
+    validate_system_address_safety(profile, path)
 
 
-def validate_profile_references(
+def validate_unique_profile_identities(
     profiles: list[tuple[Path, dict[str, Any]]],
 ) -> None:
-    """Resolve fixed rollup host references within the validated profile set."""
+    """Reject duplicate peer profile identities without resolving profile dependencies."""
 
-    by_identity: dict[tuple[str, str], tuple[Path, dict[str, Any]]] = {}
+    by_identity: dict[tuple[str, str], Path] = {}
     for path, profile in profiles:
         metadata = profile["profile"]
         identity = (metadata["id"], metadata["version"])
@@ -648,77 +809,9 @@ def validate_profile_references(
         if previous is not None:
             raise ValidationError(
                 f"{path}: duplicate profile identity "
-                f"{identity[0]}@{identity[1]} also loaded from {previous[0]}"
+                f"{identity[0]}@{identity[1]} also loaded from {previous}"
             )
-        by_identity[identity] = (path, profile)
-
-    for path, profile in profiles:
-        if profile["profile"]["role"] != "rollup":
-            continue
-
-        host_selection = profile["settlement_binding"]["host_profile"]
-        if host_selection.get("status") != "fixed":
-            continue
-        reference = host_selection["value"]
-        identity = (reference["profile_id"], reference["profile_version"])
-        resolved = by_identity.get(identity)
-        if resolved is None:
-            raise ValidationError(
-                f"{path}: referenced host profile {identity[0]}@{identity[1]} "
-                "is not in the validated profile set"
-            )
-
-        host_path, host = resolved
-        if host["profile"]["role"] != "settlement-host":
-            raise ValidationError(
-                f"{path}: referenced profile {identity[0]}@{identity[1]} "
-                f"from {host_path} is not a settlement host"
-            )
-        if profile["profile"]["status"] == "production":
-            if host["profile"]["status"] != "production":
-                raise ValidationError(
-                    f"{path}: a production rollup must reference a production host profile"
-                )
-            if host["release_blockers"]:
-                raise ValidationError(
-                    f"{path}: a production rollup cannot reference a host profile with "
-                    "release blockers"
-                )
-
-        for dependency_name in ("framework", "evm_binding"):
-            rollup_dependency = profile["eez_dependency"][dependency_name]
-            host_dependency = host["eez_dependency"][dependency_name]
-            if rollup_dependency != host_dependency:
-                raise ValidationError(
-                    f"{path}: {dependency_name} dependency "
-                    f"{rollup_dependency['id']}@{rollup_dependency['version']} disagrees with "
-                    f"host profile {host_dependency['id']}@{host_dependency['version']}"
-                )
-
-        rollup_chain = profile["settlement_binding"]["host_chain_id"]
-        host_chain = host["chain_identity"]["eip155_chain_id"]
-        if rollup_chain.get("status") != "fixed" or host_chain.get("status") != "fixed":
-            raise ValidationError(
-                f"{path}: a fixed host_profile reference requires fixed host_chain_id "
-                "in both profiles"
-            )
-        if not json_equal(rollup_chain["value"], host_chain["value"]):
-            raise ValidationError(
-                f"{path}: host_chain_id {rollup_chain['value']!r} disagrees with "
-                f"{identity[0]}@{identity[1]} chain ID {host_chain['value']!r}"
-            )
-
-        rollup_network = profile["settlement_binding"]["host_network"]
-        if rollup_network.get("status") != "fixed":
-            raise ValidationError(
-                f"{path}: a fixed host_profile reference requires fixed host_network"
-            )
-        if rollup_network["value"] != host["profile"]["network_name"]:
-            raise ValidationError(
-                f"{path}: host_network {rollup_network['value']!r} disagrees with "
-                f"{identity[0]}@{identity[1]} network name "
-                f"{host['profile']['network_name']!r}"
-            )
+        by_identity[identity] = path
 
 
 ROTATION = (
@@ -978,7 +1071,7 @@ def main() -> int:
         "profiles",
         nargs="*",
         type=Path,
-        help="Profile JSON paths. Defaults to Rollup0 and both Gnosis Chain host profiles.",
+        help="Profile JSON paths. Defaults to the peer Rollup0 and Gnosis Chain profiles.",
     )
     arguments = parser.parse_args()
 
@@ -1001,11 +1094,11 @@ def main() -> int:
             print(f"OK profile schema and semantics: {path}")
 
     try:
-        validate_profile_references(validated_profiles)
+        validate_unique_profile_identities(validated_profiles)
     except ValidationError as exc:
         failures.append(str(exc))
     else:
-        print("OK cross-profile references")
+        print("OK unique peer profile identities")
 
     try:
         if keccak256(b"").hex() != (

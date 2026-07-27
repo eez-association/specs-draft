@@ -385,8 +385,10 @@ Before any external call, L1 rejects a batch unless all of the following hold:
 
 Rules 4 and 6 make an empty delta or pin array invalid because its destination cannot be a member.
 The contract does not pre-validate call-count partitions, `revertSpan` bounds, lookup-key
-uniqueness, static-call metadata, or L2 zero entry hashes. Those are producer invariants in
-§4.13; malformed values otherwise fail during replay, sometimes with an EVM bounds panic.
+uniqueness, static-call metadata, L2 zero entry hashes, or `blobIndices`. Blob indices can be
+empty, repeated, unsorted, or outside the transaction's blob range. The other values are producer
+invariants in §4.13; malformed values otherwise fail during replay, sometimes with an EVM bounds
+or arithmetic panic.
 
 ### 4.5.2 Public-input construction
 
@@ -421,11 +423,22 @@ for each global proof-system index k from 0 through batch.proofSystems.length - 
         .verify(batch.proofs[k], publicInputsHash_k))
 ```
 
+Each `blobIndices[i]` is passed directly to the EIP-4844 `BLOBHASH` opcode. An index at or above
+the number of versioned blob hashes in the transaction produces `bytes32(0)`; it does not revert.
+Repeated indices repeat the same hash in `blobHashes`, and order is preserved.
+
 For each rollup, L1 first resolves the indexed proof-system addresses and calls
 `checkProofSystemsAndGetVkeys(address[])` on its registered manager. The returned vector MUST have
 the same length; the manager is responsible for membership and threshold policy. Manager and
 proof-system calls are `view` calls. Any revert, invalid vector, false verification result, or
 unavailable custom data reverts the batch.
+
+The key, custom-data, and verifier calls execute as EVM static calls. A manager or verifier revert
+is forwarded unchanged. Malformed successful ABI return data fails Solidity ABI decoding. `EEZ`
+checks only the returned verification-key vector length; it does not reject a zero key, which is
+folded verbatim when a manager returns one. A verifier return value of `false` becomes
+`InvalidProof()`, while a verifier revert remains that verifier's revert data. A
+`getCustomData(uint64)` revert or malformed successful return also reverts the complete batch.
 
 `getCustomData(uint64)` returns opaque bytes. The reference rollup manager returns empty bytes for
 block number `0`; for `type(uint64).max` it returns an ABI encoding of the current timestamp and
@@ -502,7 +515,7 @@ lookups (§4.8).
 
 ### 4.6.2 Call-count partition
 
-At successful entry completion:
+For a canonical producer, the call-count partition is:
 
 ```text
 entry.callCount
@@ -510,10 +523,14 @@ entry.callCount
     == entry.flatCalls.length
 ```
 
-This is a dynamic partition, not necessarily a static sum over all records before execution:
+This is a producer invariant, not a separate on-chain equality check. It is a dynamic partition,
+not necessarily a static sum over all records before execution:
 expected calls may themselves be consumed from reverted lookup hosts, and `revertSpan` changes how
 outer loop iterations advance. The authoritative checks are that the flat cursor equals the flat
-array length and the expected-call cursor equals the expected-call array length.
+array length and the expected-call cursor equals the expected-call array length. A malformed
+positive span that exceeds the remaining current-frame iteration count can still reach those
+cursor endpoints and pass the contract checks. Such an entry is outside the conforming producer
+domain even if the deployed contract accepts it.
 
 ## 4.7 Forced rollback with `revertSpan`
 
@@ -523,7 +540,8 @@ isolated forced-rollback span:
 1. save the current flat-call index and the positive span;
 2. temporarily write `revertSpan = 0` at that element;
 3. self-call `executeInContextAndRevert(span)`;
-4. process `span` **current-frame loop iterations**; the helper always reverts with
+4. process `span` **current-frame loop iterations**; after successful logical processing, the
+   helper reverts with
    `ContextResult(rollingHash, expectedConsumed, callsProcessed, callNotFound)`;
 5. decode and restore only those logical replay values in the caller;
 6. restore the stored span, emit `RevertSpanExecuted`, and advance the outer processed count by
@@ -670,6 +688,13 @@ The non-transient remainder is nevertheless published. Its `StateDelta.currentSt
 preconditions cause dependent entries to fail later if a required transient predecessor was
 dropped. If the hook itself reverts, the entire `postAndVerifyBatch` call reverts.
 
+The transient phase is isolated from every persistent queue. While the transient entry table is
+non-empty, all entry and top-level lookup resolution uses only the current batch's transient
+tables. A rollup verified by an earlier batch in the same Ethereum block can satisfy the
+current-block gate but still cannot consume its persistent entries or lookups from inside the
+later batch's meta hook. Cross-network interaction during the hook therefore requires every
+participating entry and lookup in the same transient batch.
+
 Both transient counts and `msg.sender` are unbound routing inputs controlled by the transaction
 submitter. A submitter can reuse an otherwise valid proof, change either count, submit from a
 different address, and obtain a different immediate/meta/persistent split. In particular, a
@@ -728,8 +753,14 @@ Unconsumed entries and all old lookups are discarded.
    consumption;
 6. sets `executionIndex = 1`, emits `EntryExecuted`, and returns the cached entry result.
 
-The system call is assumed to be a top-level, once-per-transaction call so its transient cursors
-start at zero. The contract does **not** compare the explicit action parameters with
+The conforming execution-layer envelope MUST make the system call top-level and allow it at most
+once per transaction so its transient cursors start at zero. `SYSTEM_ADDRESS` MUST be unable to
+reenter either table-loading entry point while execution is active, or an equivalent profile-pinned
+guard MUST reject that reentry. The contract does **not** enforce those conditions and does not
+reset every transient cursor at the beginning of the call. A second or reentrant
+`executeIncomingCrossChainCall` in the same transaction is outside the conforming envelope.
+
+The contract does **not** compare the explicit action parameters with
 `entries[0].incomingCalls[0]` field by field. The producer MUST construct a consistent L2 entry.
 The network profile must specify the cross-side construction rule under
 [§7](07-network-profile.md).
@@ -767,6 +798,13 @@ if the book balance is insufficient. The ledger does not itself transfer ETH. If
 initial physical balance equals the sum of rollup ledgers and it receives no forced ETH, successful
 entries preserve that aggregate relationship. Forced transfers can break the physical-versus-book
 equality without changing the entry accounting rule.
+
+All Solidity `int256` additions, subtractions, and negations in this accounting use checked
+arithmetic and can revert with panic code `0x11`. Explicit conversion of a `uint256` call value to
+`int256` interprets the same 256 bits as a signed two's-complement value; the conversion itself
+does not range-check the value. In particular, negating `type(int256).min` in a negative state
+delta panics. Producers MUST keep every value and intermediate sum in the signed range and MUST
+reproduce the checked-operation order.
 
 `setStateRoot` changes no ETH ledger. There is no core deposit or withdrawal entry point other
 than value moving through replay.
@@ -956,7 +994,7 @@ A conforming producer, prover, L1 manager, L2 system caller, and follower MUST m
 | ID | Invariant |
 |---|---|
 | E.1 | **Side separation.** L1 and L2 objects use their own exact ABI layouts; no object is decoded as the other side's type. |
-| E.2 | **Action identity.** Every entry, expected call, and lookup carries the action hash derived from the exact six identity fields observed at its dispatch point. |
+| E.2 | **Action identity.** Every proxy-dispatched entry with a non-zero `proxyEntryHash`, expected call, and lookup carries the action hash derived from the exact six identity fields observed at its dispatch point. An entry dispatched through `attemptApplyImmediate` or `executeL2TX` carries the zero-hash sentinel instead. |
 | E.3 | **Routing proof.** Every L1 entry destination occurs in its sorted delta set; every top-level lookup destination occurs in its sorted pin set; all call sources and reentrant destinations occur in that host set. |
 | E.4 | **State trajectory.** Every applied `currentState` equals the live L1 root and every lookup pin describes the state at observation. |
 | E.5 | **Exact order.** Transient entries use one batch-global FIFO; persistent entries use one FIFO per destination; expected reentrant calls use one sequential host cursor. |

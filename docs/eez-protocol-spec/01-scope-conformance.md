@@ -12,9 +12,15 @@ binding. It specifies:
 - EVM ABI layouts and byte-exact hashing rules; and
 - the reusable security boundary and schema every EEZ network profile MUST complete.
 
-It does not choose an L1, an L2 chain ID, a block schedule, a sequencer, a proof-system policy, a
-data-availability codec, fee recipients, deployment addresses, or a finality rule. Those are
-network-profile fields.
+It does not choose an Ethereum environment or deployment, an execution-network chain ID, a block
+schedule, a sequencer, a proof-system policy, a data-availability codec, fee recipients, or a
+finality rule. Those are network-profile fields.
+
+The normative deployed-contract surface of `eez-evm@0.2-draft` is limited to `EEZ`, `EEZL2`, and
+`CrossChainProxy`, plus the collaborator interfaces that those contracts call. The source
+snapshot also contains `Rollup`, `ECDSAProofSystem`, bridge contracts, wrapped tokens, flash-loan
+examples, and tests. Those implementations are not part of this binding unless a network profile
+separately pins their ABI, bytecode, configuration, and administrator behavior.
 
 ## 1.2 Version identifiers
 

@@ -39,7 +39,7 @@ caller's meta hook, which unconsumed transient objects cleanup discards, and whi
 persistent queues. If the new caller is a contract, it also selects a different meta hook.
 
 Structural bounds prevent out-of-range partitions; they do not bind the intended partition.
-Consequently, a production rollup profile selecting this binding MUST specify a versioned external
+Consequently, a production execution-network profile selecting this binding MUST specify a versioned external
 mechanism that authenticates the submitting identity and exact counts before execution. The
 profile MUST describe front-running and proof-reuse prevention and MUST treat failure of that
 mechanism as a validity or availability failure, as applicable. The current `EEZ` contract has no
@@ -57,7 +57,7 @@ authorize its proof slot. A deployment that places `EEZ`, a manager, or a proof 
 upgrade proxy adds that proxy's administrators to the trusted set.
 
 `registerRollup` is permissionless. Registration does not endorse the manager or proof systems.
-Consumers MUST identify an intended deployment by the host chain, `EEZ` address and code
+Consumers MUST identify an intended deployment by the Ethereum settlement chain, `EEZ` address and code
 commitment, rollup ID, manager address and code commitment, proof-system addresses and code
 commitments, and applicable administrator set. A rollup ID alone is insufficient.
 
@@ -70,15 +70,16 @@ The following concepts are distinct:
 | **Recorded root** | Current `EEZ` storage for the rollup | The commitment currently accepted by the deployed contract. It may have been written by entry consumption or `setStateRoot`. |
 | **Applied batch endpoint** | Genuine, ordered `L2ExecutionPerformed` logs from a successful receipt | A state delta that actually committed during entry execution. `BatchPosted` alone does not prove this. |
 | **Valid rollup state** | The profile's proof, execution, DA, and derivation requirements | A state that satisfies the network's complete transition rule. EEZ cannot establish this independently of the selected proof policy. |
-| **Safe or finalized state** | Profile-defined host inclusion and finality evidence | A network consensus conclusion outside this reusable binding. |
+| **Safe or finalized state** | Profile-defined Ethereum inclusion and finality evidence | A network consensus conclusion outside this reusable binding. |
 
 A consumer MUST NOT infer a valid, safe, or finalized rollup block from `BatchPosted`. It MUST
-filter events by the exact host chain, deployed `EEZ` address, transaction receipt, rollup ID, and
+filter events by the exact Ethereum settlement chain, deployed `EEZ` address, transaction receipt,
+rollup ID, and
 log order. It MUST also handle manager root replacement and same-block queue replacement according
 to the network profile.
 
 Independent re-execution can detect disagreement between published inputs and a claimed endpoint.
-It does not reverse host-chain state, override manager authority, create a fraud proof, or provide
+It does not reverse Ethereum state, override manager authority, create a fraud proof, or provide
 an exit.
 
 ## 6.4 Atomicity and partial execution
@@ -95,9 +96,14 @@ Entry execution has narrower boundaries:
    If the hook returns successfully, cleanup deletes every unconsumed transient entry and lookup.
    If the hook reverts, the complete batch transaction reverts.
 3. Entries after the transient prefix are routed to per-rollup persistent queues. They can remain
-   unconsumed and become unusable after the current host block.
+   unconsumed and become unusable after the current Ethereum block.
 4. A later verification for the same rollup in the same block replaces its unconsumed persistent
    queues.
+
+The transient window is self-contained. While its entry table is non-empty, entry and top-level
+lookup resolution cannot fall through to a persistent queue, including a queue verified by an
+earlier batch in the same Ethereum block. A meta-hook interaction across execution networks is
+available only when the required records are present together in the current transient batch.
 
 Successful earlier entries and their state deltas remain applied when another immediate entry is
 skipped or a persistent entry is never consumed. A profile MUST define how it associates actual
@@ -129,6 +135,8 @@ sum(entry.stateDeltas[i].etherDelta) = I - O
 
 The accumulator includes top-level and reentrant flows. Failed calls and reverted frames do not
 contribute to `O`. Each negative delta is checked against that rollup's recorded balance.
+Signed arithmetic follows Solidity's checked operation order. An overflow, underflow, or negation
+of `type(int256).min` reverts with arithmetic panic code `0x11`.
 
 The binding does not iterate over all rollups and does not enforce aggregate solvency. A
 value-bearing profile MUST define an initial and continuing backing rule. A common required
@@ -149,6 +157,14 @@ deposit or book delta to an L2 value supply, an L2-originated transfer to an L1 
 manager balances, or a withdrawal. A profile MUST specify and test those relations for every
 success and failure path before it can claim backing.
 
+`SYSTEM_ADDRESS` is an execution-layer trust boundary. The core contract authorizes it to replace
+L2 tables and sends it value before resolving an L2-originated proxy action. A conforming profile
+MUST make that address non-code-bearing and non-reentrant, or MUST pin an equivalent guard that
+prevents table replacement during active replay. It MUST also enforce at most one top-level
+`executeIncomingCrossChainCall` per transaction. Without these conditions, a system callback can
+replace tables during execution, and a later inbound call can inherit transaction-scoped replay
+state that the entry point does not reset.
+
 ## 6.6 Replay and deployment domains
 
 The core encodings do not provide complete deployment-level domain separation:
@@ -164,8 +180,8 @@ The manager address still affects the final CREATE2 proxy address. State-root pr
 manager-supplied custom data can also prevent a replay in a particular deployment. Neither fact is
 a universal domain rule.
 
-A profile MUST specify how its manager binds proofs to the intended host chain, `EEZ` deployment,
-binding version, and batch position. It MUST state stale-resubmission behavior and any assumptions
+A profile MUST specify how its manager binds proofs to the intended Ethereum settlement chain,
+`EEZ` deployment, binding version, and batch position. It MUST state stale-resubmission behavior and any assumptions
 that remain across forks or deployments. A profile MUST NOT claim that an opaque custom-data value
 provides a domain unless its construction and enforcement are specified.
 
@@ -173,7 +189,7 @@ provides a domain unless its construction and enforcement are specified.
 
 EEZ does not define:
 
-- sequencing authority, ordering fairness, or force inclusion;
+- candidate admission, authentication, competition, ordering fairness, or force inclusion;
 - the L2 transaction envelope or system-call value source;
 - the cross-side lowering between L1 and L2 tuple families;
 - data-availability publication and reconstruction;
@@ -185,8 +201,8 @@ EEZ does not define:
 
 The required profile in [§7](07-network-profile.md) makes these boundaries explicit. A production
 profile has no unresolved release-blocker selection and MUST state its trusted authorities and the
-consequence of each authority failing. A production rollup profile selecting
-`eez-evm@0.2-draft` must additionally satisfy the proof-routing mitigation requirement in §7.2.
+consequence of each authority failing. A production execution-network profile selecting
+`eez-evm@0.2-draft` must additionally satisfy the proof-routing mitigation requirement in §7.5.
 
 ---
 

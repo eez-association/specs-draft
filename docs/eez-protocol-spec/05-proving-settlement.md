@@ -25,12 +25,33 @@ The returned vector MUST have exactly the requested length. The manager is respo
 membership and threshold policy. A manager revert, a malformed vector, a proof-system revert, or a
 `false` verification result reverts the complete batch transaction.
 
+These calls are static at the EVM boundary. A revert from
+`checkProofSystemsAndGetVkeys`, `getCustomData`, or `verify` is forwarded without a core wrapper.
+A successful response with invalid ABI encoding reverts during Solidity decoding. `EEZ` rejects a
+verification-key vector only when its length differs from the requested length; it folds every
+returned `bytes32`, including zero, verbatim. `verify(...) == false` is the one verifier failure
+translated to `InvalidProof()`.
+
+External-call order is also observable on failure. `EEZ` first calls every participating manager's
+key-vector function in rollup-ID order. It then calls every participating manager's
+`getCustomData` in the same order. Finally, it calls proof systems in global proof-system-array
+order. A failure stops at that call and prevents every later call.
+
 The reproduced source snapshot includes a single-signer ECDSA adapter. A profile that selects it
 supplies an exact 65-byte `r || s || v` signature over the raw `publicInputsHash`: there is no
 EIP-191 prefix or EIP-712 domain. The adapter enforces canonical low `s` and `v` in `{27, 28}`.
 One adapter recovers one configured signer. An N-of-M committee therefore uses separate adapter
 instances rather than packing M signatures into one proof. This adapter is available to profiles;
 it is not an EEZ-wide proof-policy requirement.
+
+The snapshot's `Rollup` manager and `ECDSAProofSystem` adapter are reference implementations, not
+normative contracts of `eez-evm@0.2-draft`. A profile that uses either MUST pin its complete ABI,
+runtime bytecode, constructor/configuration values, and administrator behavior. In particular, the
+reference manager permits threshold zero or a threshold above its current proof-system count, and
+the reference adapter permits signer replacement without a signer-change event or zero-address
+check. Its OpenZeppelin signature decoder reverts on malformed signatures instead of returning
+`false`. A client MUST obtain these behaviors from the pinned network component, not infer them
+from the three core-contract ABIs.
 
 ## 5.2 Batch structural validation
 
@@ -80,6 +101,10 @@ for each global proof-system index k:
     publicInputsHash_k = H(abi.encodePacked(sharedPublicInput, acc_k))
 ```
 
+`blobIndices` has no structural sort, uniqueness, or range check. `BLOBHASH` returns zero for an
+index outside the transaction's versioned blob-hash list. Empty, repeated, unsorted, and
+out-of-range indices therefore remain part of the byte-exact public-input construction.
+
 `getCustomData(uint64)` returns opaque `bytes`. The EVM binding assigns no required internal
 encoding. A profile MUST specify the manager implementation and the exact meaning of
 `batch.blockNumber` and returned custom data. The reference manager returns empty bytes for block
@@ -102,7 +127,7 @@ proved entry and lookup bytes remain unchanged, but their immediate, meta-hook, 
 persistent-queue treatment can change.
 
 This is a routing-integrity limitation of `eez-evm@0.2-draft`, not authority granted by the proof.
-A production rollup profile MUST NOT select this binding unless it also selects a versioned
+A production execution-network profile MUST NOT select this binding unless it also selects a versioned
 external submission or inclusion mechanism that authorizes one exact caller and the exact two
 counts before `EEZ` executes the transaction. The mechanism MUST define proof-reuse,
 front-running, rejection, and partial-inclusion behavior. An off-chain convention that honest
@@ -133,14 +158,15 @@ The other settlement entry points are:
 - `registerRollup(manager, initialState)`: performs the allocation, store, callback, and event
   transition in [§4.3.1](04-execution-model.md#431-rollup-registration-transition);
 - `setStateRoot(rollupId, newRoot)`: lets the registered manager replace its root outside active
-  replay and outside a host block that already verified that rollup; and
+  replay and outside an Ethereum block that already verified that rollup; and
 - the consumption functions in §4.3, which apply state deltas and emit execution events.
 
 ## 5.5 Settlement evidence
 
 For this EVM binding, a state delta actually committed only when a surviving
 `L2ExecutionPerformed(rollupId, newState)` log was emitted by the profile-pinned `EEZ` deployment.
-`BatchPosted` alone is insufficient. Consumers MUST associate logs with the exact host chain,
+`BatchPosted` alone is insufficient. Consumers MUST associate logs with the exact Ethereum
+settlement chain,
 contract address, transaction receipt, rollup ID, and log order. They MUST account for later
 same-block queue replacement.
 
@@ -149,7 +175,7 @@ MUST state whether and how consumers accept such a replacement.
 
 EEZ does not map a committed state root to a network block, safe head, or finalized head. A network
 profile defines that mapping, its data-availability evidence, its partial-consumption rule, and its
-host finality rule.
+Ethereum finality rule.
 
 ## 5.6 Authority and upgrade boundary
 
@@ -175,7 +201,7 @@ non-binding verifier sound. They also do not authenticate the transient prefix c
 submitter in `eez-evm@0.2-draft`.
 
 Data availability, independent derivation, sequencing, atomic cross-transaction inclusion,
-censorship resistance, exits, and host finality are not supplied by EEZ. The complete reusable
+censorship resistance, exits, and Ethereum finality are not supplied by EEZ. The complete reusable
 security boundary is in [§6](06-security-model.md). Every network profile MUST state the guarantees
 it adds and the authorities on which those guarantees depend.
 
