@@ -1,68 +1,60 @@
 # Gnosis Chain EEZ Network Specification
 
-**Chiado EEZ settlement-host network profiles**
+**A permissioned EEZ execution network settled on Ethereum**
 
 | | |
 |---|---|
-| **Status** | Both host profiles are development drafts; neither is production conforming |
-| **Current environment** | Gnosis Chiado testnet, EIP-155 chain ID `10200` |
+| **Network protocol** | `gnosis-chain-eez@0.2-draft` |
+| **Network profile** | `gnosis-chain-eez-ethereum@0.2-draft` |
+| **Status** | Draft; no production activation exists |
 | **EEZ framework** | [`eez-framework@0.1-draft`](../eez-protocol-spec/index.md) |
-| **Role** | Identifies Chiado and an edition-specific L1 `EEZ` deployment and specifies the host finality, governance, and atomic-inclusion trust boundary |
-| **Nominal slot** | 5 seconds |
-| **Minimum EVM fork** | Chiado Dencun activation at timestamp `1706724940`; later compatible forks are permitted |
-| **Gas and fee rules** | Canonical Chiado execution-header and chain-configuration rules |
-| **Native asset** | Chiado xDAI |
+| **EVM binding** | `eez-evm@0.2-draft` |
+| **Binding source** | `eez-core-protocol@3a6ca65c4858792fc3a143d34c5484877ef8f68c` |
+| **Settlement network** | Ethereum mainnet; canonical Ethereum finality under common §6.3; contract deployments and activation are unresolved |
+| **Candidate admission** | Full validity plus an authorized sequencer/composer signature |
+| **Submission** | Any relayer may submit an authorized, proven batch |
 
-These are Gnosis-specific profiles of the EEZ settlement-host role. They are separate from the
-[Rollup0 Network Specification](../rollup0-network-spec/index.md): Gnosis Chiado supplies the EVM
-and consensus in which Rollup0 batches settle, while Rollup0 supplies the L2 execution network.
-Per-rollup IDs, managers, proof systems, sequencing, DA, and derivation remain owned by each
-consumer network profile even when their contracts and data reside on Chiado.
+Gnosis Chain and Rollup0 are separate EEZ execution networks. Neither network is the other
+network's settlement host. They make nearly the same execution, block-production, data-availability,
+and derivation choices. Gnosis Chain adds permissioned candidate authorization. Rollup0 does not.
 
-The reviewed implementations support **Chiado**. This draft does not assert that an EEZ deployment
-exists on Gnosis Chain mainnet, does not identify Gnosis Chain as Rollup0, and assigns no
-recursive EEZ settlement target to either host profile.
+This specification imports the exact, self-contained
+`rollup0-common-execution@0.2-draft` ruleset instead of copying its algorithms. The import does not
+include Rollup0's identity, activation, governance, admission policy, header parameters, fees, or
+compatibility binding. [§1](01-profile-imports.md) maps every common parameter to its Gnosis
+selection or explicit blocker.
 
-The following machine-readable profiles share the Chiado consensus choices but select different
-and non-interchangeable EEZ EVM bindings and deployments:
+An authorized Gnosis candidate is not valid merely because an authorized party signed it. The
+Ethereum settlement path MUST verify both:
 
-| Profile | EVM binding | Consumer | Release blockers |
-|---|---|---|---|
-| [`gnosis-chain-eez-chiado@0.1-draft`](network-profile.json) | `eez-evm@0.2-draft` | Current-binding EEZ consumers | `GC-DEPLOYMENT`, `GC-GENESIS`, `GC-ATOMIC-INCLUSION`, `GC-UPGRADES` |
-| [`gnosis-chain-eez-chiado-rollup0@0.1-draft`](network-profile-rollup0.json) | `eez-evm@0.1-rollup0` | Rollup0 v0 | `GC-R0-DEPLOYMENT`, `GC-R0-GENESIS`, `GC-R0-ATOMIC-INCLUSION`, `GC-R0-UPGRADES` |
+1. the complete network validity statement; and
+2. a candidate authorization signature from the active Gnosis
+   sequencer/composer set, checked by the Gnosis proof contract.
 
-A consumer MUST select one exact profile ID and version. A deployment record, contract address, or
-release-blocker resolution from one profile MUST NOT satisfy the other profile. The complete
-blocker conditions are normative in [§2.2](02-deployment.md#22-release-blockers).
+This draft does not assume that one contract performs both checks. The exact
+composition of the validity verifier, authorization proof contract, and `EEZ`
+call is a release blocker.
 
-## Normative precedence
+The signature authorizes a candidate, not a relayer. Any relayer may submit the exact authorized and
+proven batch. When several authorized valid candidates extend the same settled parent, the first
+applicable candidate in canonical Ethereum execution order wins. Later candidates for the stale
+parent are not applicable.
 
-The consumer's exact profile selection determines which row applies. The selected EVM-binding
-specification controls the `EEZ` ABI and binding behavior. This specification controls only
-Chiado identity, consensus/finality, the binding-specific host deployment, host governance, and
-the atomic-inclusion trust boundary. The consuming rollup profile controls its rollup ID,
-manager, proof systems, sequencing, DA, and derivation.
+No production Gnosis execution-network identity, genesis, deployment, authority set, signature
+scheme, proof-contract deployment, or activation record is selected by this draft. The explicit
+blockers are in [§4](04-implementation-conformance-status.md).
 
-These ownership surfaces do not override one another. A mismatch in binding version, deployment
-identity, or supposedly shared field is a release blocker; a client MUST NOT fall back to the
-other host profile. Rollup0 v0 uses its
-[compatibility binding](../rollup0-network-spec/E-compatibility-binding.md), while a current
-`eez-evm@0.2-draft` consumer uses the binding in the
-[EEZ Framework Specification](../eez-protocol-spec/index.md#edition-boundary).
+## Normative Reading Order
 
-## Reading order
+1. [Protocol Version and Precedence](00-protocol-version.md)
+2. [Network Profile and Imported Rules](01-profile-imports.md)
+3. [Candidate Admission and Canonical Selection](02-admission.md)
+4. [Security and Trust Model](03-security-trust-model.md)
+5. [Implementation and Conformance Status](04-implementation-conformance-status.md)
+6. The EEZ framework chapters and the common execution rules named in §1
 
-After the consumer selects one exact profile ID and binding edition, read:
-
-1. The selected binding specification: the
-   [current EEZ binding](../eez-protocol-spec/index.md#reading-order) or the Rollup0
-   [compatibility binding](../rollup0-network-spec/E-compatibility-binding.md)
-2. [Host Profile](01-host-profile.md)
-3. [Deployment & Release Blockers](02-deployment.md)
-4. [Security & Trust Model](03-security-trust-model.md)
-
-Reusable framework semantics remain in the
-[EEZ Framework Specification](../eez-protocol-spec/index.md). Binding-specific ABI rules remain in
-the exact selected binding specification identified above.
+The machine-readable profile is [`network-profile.json`](network-profile.json). A human-readable
+chapter controls when it is more restrictive than the draft profile. A conflict between two
+supposedly identical fixed values is a release blocker.
 
 [Return to the specification set](../index.md).

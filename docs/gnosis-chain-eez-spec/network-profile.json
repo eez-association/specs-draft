@@ -1,14 +1,14 @@
 {
   "$schema": "../eez-protocol-spec/network-profile.schema.json",
-  "schema_version": "1",
+  "schema_version": "2",
   "profile": {
-    "id": "gnosis-chain-eez-chiado",
+    "id": "gnosis-chain-eez-ethereum",
     "name": "Gnosis Chain EEZ Network Specification",
-    "version": "0.1-draft",
-    "status": "development",
-    "role": "settlement-host",
-    "network_name": "Gnosis Chiado",
-    "environment": "testnet"
+    "version": "0.2-draft",
+    "status": "draft",
+    "role": "eez-network",
+    "network_name": "Gnosis Chain",
+    "environment": "production-draft"
   },
   "eez_dependency": {
     "framework": {
@@ -18,214 +18,352 @@
     "evm_binding": {
       "id": "eez-evm",
       "version": "0.2-draft",
-      "specification": "eez-protocol-spec/index.md"
+      "specification": "eez-protocol-spec/index.md",
+      "conformance_source": {
+        "repository": "eez-core-protocol",
+        "revision": "3a6ca65c4858792fc3a143d34c5484877ef8f68c"
+      }
+    }
+  },
+  "ruleset_dependency": {
+    "id": "rollup0-common-execution",
+    "version": "0.2-draft",
+    "specification": "rollup0-network-spec/common-execution.md",
+    "content_digest": {
+      "status": "fixed",
+      "value": {
+        "algorithm": "sha256",
+        "digest": "0x61430766b7d5a4114a7e9c159184d394b8e5d308d20726d5c93297e965ee67c0"
+      },
+      "source": "SHA-256 of docs/rollup0-network-spec/common-execution.md"
     }
   },
   "chain_identity": {
     "eip155_chain_id": {
-      "status": "fixed",
-      "value": 10200,
-      "source": "Gnosis Chain Chiado network definition: https://docs.gnosischain.com/about/networks/chiado"
+      "status": "release-blocker",
+      "id": "GC-IDENTITY",
+      "issue": "Pin the unique production Gnosis EIP-155 chain ID in an authenticated activation record."
     },
     "eez_rollup_id": {
-      "status": "not-applicable",
-      "reason": "A settlement host is reserved as MAINNET_ROLLUP_ID 0 in the EEZ binding and is not a registered rollup."
+      "status": "release-blocker",
+      "id": "GC-IDENTITY",
+      "issue": "Pin the unique production Gnosis EEZ rollup ID."
     },
     "native_asset": {
-      "status": "fixed",
-      "value": "Chiado xDAI",
-      "source": "Gnosis Chain Chiado network definition: https://docs.gnosischain.com/about/networks/chiado"
+      "status": "release-blocker",
+      "id": "GC-IDENTITY",
+      "issue": "Pin the production native asset and its custody and backing semantics."
     },
     "genesis_commitment": {
       "status": "release-blocker",
       "id": "GC-GENESIS",
-      "issue": "Pin the Chiado chain-spec or genesis commitment used by conforming settlement clients."
+      "issue": "Publish the exact production genesis artifact, artifact digest, state root, block hash, allocations, and validation vectors."
     },
     "evm_fork": {
-      "status": "fixed",
-      "value": {
-        "minimum_execution_fork": "Dencun/Cancun",
-        "activation": {
-          "kind": "timestamp",
-          "value": 1706724940
-        },
-        "opcode_semantics": {
-          "transient_storage": "EIP-1153",
-          "blobhash": "EIP-4844",
-          "mcopy": "EIP-5656"
-        },
-        "validation": "The EEZ deployment and every transaction that invokes eez-evm@0.2-draft must execute in a canonical Chiado block at or after this timestamp. A later canonical Chiado fork is valid only while it retains these opcode semantics."
-      },
-      "source": "Gnosis Chain Dencun specification: https://docs.gnosischain.com/about/specs/hard-forks/dencun"
+      "status": "release-blocker",
+      "id": "GC-GENESIS",
+      "issue": "Pin the complete production EVM fork schedule and every fork-dependent chain parameter."
     }
   },
   "settlement_binding": {
-    "host_profile": {
-      "status": "not-applicable",
-      "reason": "This profile is the settlement host."
+    "ethereum_network": {
+      "status": "fixed",
+      "value": "Ethereum mainnet",
+      "source": "Gnosis Chain EEZ Network Specification §1.1"
     },
-    "host_network": {
-      "status": "not-applicable",
-      "reason": "This profile is the settlement host and makes no recursive EEZ settlement claim."
+    "ethereum_chain_id": {
+      "status": "fixed",
+      "value": 1,
+      "source": "Ethereum mainnet chain identity"
     },
-    "host_chain_id": {
-      "status": "not-applicable",
-      "reason": "The host chain ID is chain_identity.eip155_chain_id."
+    "ethereum_genesis_hash": {
+      "status": "fixed",
+      "value": "0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3",
+      "source": "Ethereum mainnet genesis block hash"
     },
     "eez_contract": {
       "status": "release-blocker",
-      "id": "GC-DEPLOYMENT",
-      "issue": "Pin the canonical Chiado EEZ address, runtime-bytecode hash, deployment transaction, and authenticated deployment record."
+      "id": "GC-EEZ-DEPLOYMENT",
+      "issue": "Pin the Ethereum EEZ address, runtime-code hash, deployment transaction, and proxy implementation where applicable."
     },
     "manager_contract": {
-      "status": "not-applicable",
-      "reason": "Each consuming rollup profile owns its manager deployment identity."
+      "status": "release-blocker",
+      "id": "GC-EEZ-DEPLOYMENT",
+      "issue": "Pin the Ethereum Gnosis manager address, runtime-code hash, deployment transaction, and authority configuration."
+    },
+    "manager_proof_context": {
+      "status": "release-blocker",
+      "id": "GC-PROOF-CONTEXT",
+      "issue": "Pin MANAGER(n): the exact recent Ethereum block-number rule, getCustomData(uint64) encoding, canonical block-hash authentication, and failure behavior."
     },
     "proof_system_contracts": {
-      "status": "not-applicable",
-      "reason": "Each consuming rollup profile owns its proof-system deployments and verification policy."
+      "status": "release-blocker",
+      "id": "GC-PROOF-CONTRACT",
+      "issue": "Pin every Ethereum validity and authorization proof-contract address, runtime-code hash, verification key, and public-input layout."
     },
     "deployment_block": {
       "status": "release-blocker",
-      "id": "GC-DEPLOYMENT",
-      "issue": "Pin the canonical Chiado deployment block number and hash."
+      "id": "GC-ACTIVATION",
+      "issue": "Pin the canonical Ethereum deployment and activation block numbers and hashes and the first governed Gnosis block."
     },
     "settlement_rule": {
       "status": "fixed",
-      "value": "Chiado executes eez-evm@0.2-draft. Host evidence is the exact canonical transaction receipt and ordered log occurrence from the profile-pinned EEZ deployment; matching only a root value or event signature elsewhere in the block is insufficient. Each consuming rollup separately defines which genuine occurrence establishes its network endpoint.",
-      "source": "Gnosis Chain EEZ Network Specification §3.1 and §3.5"
+      "value": {
+        "network": "Ethereum",
+        "candidate_rule": "Apply only a candidate for which the activated Ethereum settlement path verifies complete Gnosis validity and the Gnosis authorization proof contract verifies the required sequencer/composer signature over the same candidate.",
+        "ordering": "Process successful applications in canonical Ethereum execution order. The first authorized valid candidate whose exact parent height, block hash, and state root equal the live settled cursor wins.",
+        "stale_rule": "A later candidate that names a replaced parent is stale and does not advance Gnosis state, even when its parent root equals the current root.",
+        "relay_rule": "Any relayer may submit the exact authorized and proven batch."
+      },
+      "source": "Gnosis Chain EEZ Network Specification §2"
     },
     "finality_rule": {
       "status": "fixed",
-      "value": "Use the canonical Chiado finalized consensus view; EEZ adds no independent host finality.",
-      "source": "Gnosis Chain EEZ Network Specification §3.1 and §3.5"
+      "value": "A deterministically derived Gnosis block is safe after complete replay of canonical Ethereum settlement evidence and finalized when the containing Ethereum history is finalized. Reorganizations follow rollup0-common-execution@0.2-draft §6.3; recovery outside the activated automatic history uses the selected governance procedure.",
+      "source": "Gnosis Chain EEZ Network Specification §1.4; rollup0-common-execution@0.2-draft §6.3"
     }
   },
   "execution_binding": {
     "block_time_ms": {
       "status": "fixed",
-      "value": 5000,
-      "source": "Gnosis Chain Chiado network definition: https://docs.gnosischain.com/about/networks/chiado"
+      "value": 2000,
+      "source": "Gnosis Chain EEZ Network Specification §1.1"
     },
     "block_gas_limit": {
-      "status": "fixed",
-      "value": {
-        "source": "canonical_execution_header",
-        "field": "gasLimit",
-        "validation": "Use the gasLimit of the canonical Chiado execution payload and validate it under the canonical Chiado execution chain configuration active at that block. EEZ applies no override or constant gas limit."
-      },
-      "source": "Gnosis Chain Chiado canonical execution configuration linked from https://docs.gnosischain.com/about/networks/chiado"
+      "status": "release-blocker",
+      "id": "GC-GENESIS",
+      "issue": "Pin the production genesis gas limit and its complete per-block transition rule."
+    },
+    "header_construction": {
+      "status": "release-blocker",
+      "id": "GC-HEADER",
+      "issue": "Pin every production Gnosis header field, parent-derived transition, fixed constant, fork-dependent presence rule, body commitment, execution-environment input, and complete validation procedure."
     },
     "fee_market": {
-      "status": "fixed",
-      "value": {
-        "transaction_fee_model": "Canonical Chiado EIP-1559 execution-header rules",
-        "base_fee_source": "baseFeePerGas in the canonical Chiado execution payload",
-        "gas_usage_source": "gasUsed and gasLimit in the canonical Chiado execution payload and its parent",
-        "blob_fee_model": "Canonical Chiado EIP-4844 rules active for the block",
-        "validation": "Validate transaction fees, base-fee transition, blob-gas fields, and blob fees using the canonical Chiado execution chain configuration active at the block. EEZ applies no independent fee rule."
-      },
-      "source": "Gnosis Chain EIP-1559 and Dencun specifications: https://docs.gnosischain.com/about/specs/hard-forks/eip-1559 and https://docs.gnosischain.com/about/specs/hard-forks/dencun"
+      "status": "release-blocker",
+      "id": "GC-ECONOMICS",
+      "issue": "Pin the production transaction and data fee markets, genesis parameters, accounting, and validation rules."
     },
     "fee_recipient": {
-      "status": "not-applicable",
-      "reason": "The EEZ host profile does not select the host consensus fee recipient."
+      "status": "release-blocker",
+      "id": "GC-ECONOMICS",
+      "issue": "Pin the production fee recipient and fee distribution or burn rules."
     },
     "eez_predeploys": {
-      "status": "not-applicable",
-      "reason": "EEZ is deployed as host contracts on Chiado; consumer L2 predeploys belong to each rollup profile."
+      "status": "release-blocker",
+      "id": "GC-EEZ-DEPLOYMENT",
+      "issue": "Pin every Gnosis EEZ predeploy address, runtime-code hash, initial storage commitment, and deployment rule."
     },
     "system_address": {
-      "status": "not-applicable",
-      "reason": "SYSTEM_ADDRESS is an L2 inbound-delivery choice."
+      "status": "release-blocker",
+      "id": "GC-SYSTEM-SAFETY",
+      "issue": "Pin the Gnosis system address, authorization mechanism, funding rule, and activation boundary."
+    },
+    "system_address_safety": {
+      "status": "release-blocker",
+      "id": "GC-SYSTEM-SAFETY",
+      "issue": "Pin and implement a system-address design that cannot execute user code, prevents reentrant table replacement, enforces one inbound call per transaction, and fails closed."
     },
     "system_transaction_envelope": {
-      "status": "not-applicable",
-      "reason": "System transactions execute on an EEZ rollup, not on the settlement host."
+      "status": "release-blocker",
+      "id": "GC-SYSTEM-SAFETY",
+      "issue": "Pin the exact deterministic system-transaction envelope and positive and negative vectors compatible with eez-evm@0.2-draft."
     }
   },
   "operation": {
-    "sequencing_model": {
+    "candidate_admission": {
       "status": "fixed",
-      "value": "Canonical Gnosis Chiado consensus and block production",
-      "source": "settlement-host role"
+      "value": {
+        "mode": "permissioned",
+        "acceptance_rule": "A candidate is accepted only when it extends the live settled parent, satisfies every Gnosis and EEZ validity rule, and carries the activated sequencer/composer authorization verified by the Gnosis authorization proof contract.",
+        "invalid_candidate_rule": "Reject an invalid candidate even when an authorized signer signed it; authorization never replaces validity."
+      },
+      "source": "Gnosis Chain EEZ Network Specification §§2.2-2.4"
     },
-    "sequencing_authority": {
+    "candidate_authentication": {
+      "mode": {
+        "status": "fixed",
+        "value": "signature",
+        "source": "Gnosis Chain EEZ Network Specification §§1.3 and 2.2-2.3"
+      },
+      "parameters": {
+        "status": "release-blocker",
+        "id": "GC-AUTH-SCHEME",
+        "issue": "Pin the signature envelope, canonical candidate encoding, digest, replay domain, accepted signature form, signer identity rule, verification algorithm, authorization-set rule, and vectors."
+      }
+    },
+    "competition_rule": {
       "status": "fixed",
-      "value": "Chiado consensus validators/builders; EEZ grants no host sequencing authority",
-      "source": "settlement-host role"
+      "value": {
+        "mode": "first-valid",
+        "ordering_rule": "Use canonical Ethereum contract-execution order, never mempool arrival, signature time, proof time, peer count, or candidate hash.",
+        "conflict_rule": "The first applicable candidate that passes full validity and active authorization wins even when another authorized signer signed a competing valid candidate.",
+        "stale_candidate_rule": "After a winner advances the settled cursor identity, reject every later candidate that names the old parent as inapplicable, including equal-root siblings."
+      },
+      "source": "Gnosis Chain EEZ Network Specification §2.5"
+    },
+    "settlement_relay": {
+      "status": "fixed",
+      "value": {
+        "mode": "permissionless",
+        "authorization_rule": "Authorization applies to the candidate signer, not to the Ethereum transaction sender.",
+        "submission_rule": "Any account or contract may submit the exact authorized and proven batch.",
+        "failure_rule": "Reject a modified, stale, invalid, unauthorized, or incompletely proven batch; do not reserve a conforming batch for a preferred relayer."
+      },
+      "source": "Gnosis Chain EEZ Network Specification §2.4"
     },
     "slot_construction": {
-      "status": "fixed",
-      "value": "Nominal 5-second Chiado slots",
-      "source": "Gnosis Chain Chiado network definition: https://docs.gnosischain.com/about/networks/chiado"
+      "settlement_interval_ms": {
+        "status": "fixed",
+        "value": 12000,
+        "source": "Gnosis Chain EEZ Network Specification §1.1"
+      },
+      "block_interval_ms": {
+        "status": "fixed",
+        "value": 2000,
+        "source": "Gnosis Chain EEZ Network Specification §1.1"
+      },
+      "blocks_per_settlement_interval": {
+        "status": "fixed",
+        "value": 6,
+        "source": "Gnosis Chain EEZ Network Specification §1.1"
+      },
+      "proof_budget_ms": {
+        "status": "release-blocker",
+        "id": "GC-TIMING",
+        "issue": "Pin the production candidate-construction and proof budget P in milliseconds."
+      },
+      "submission_slack_ms": {
+        "status": "release-blocker",
+        "id": "GC-TIMING",
+        "issue": "Pin the production submission lead time S in milliseconds."
+      },
+      "max_catch_up_blocks": {
+        "status": "release-blocker",
+        "id": "GC-TIMING",
+        "issue": "Pin C, the producer-side maximum blocks emitted at one catch-up trigger; C is not a candidate-range validity bound."
+      }
+    },
+    "l1_l2_lowering": {
+      "status": "release-blocker",
+      "id": "GC-LOWERING",
+      "issue": "Pin the deterministic field-by-field lowering from each supported settlement/execution action to its distinct L1 entry, L2 sidecar object, explicit inbound arguments, and exact system transaction, with rejection vectors."
+    },
+    "max_candidate_range_blocks": {
+      "status": "release-blocker",
+      "id": "GC-CAPACITY",
+      "issue": "Pin N_max, the positive maximum number of execution-network blocks allowed in any candidate range as a consensus validity bound."
+    },
+    "cursor_applicability": {
+      "status": "release-blocker",
+      "id": "GC-CURSOR-SAFETY",
+      "issue": "Pin an enforceable settlement mechanism that compares the candidate's exact parent height, block hash, and state root with the current settled cursor and atomically advances to the authenticated selected prefix endpoint identity, including when roots repeat."
+    },
+    "applied_prefix_safety": {
+      "status": "release-blocker",
+      "id": "GC-PREFIX-SAFETY",
+      "issue": "Pin an enforceable mechanism that prevents a non-applied anchor or effect from allowing a later effect to apply, including when consecutive effects have repeated or equal root values."
     },
     "atomic_inclusion": {
       "status": "release-blocker",
       "id": "GC-ATOMIC-INCLUSION",
-      "issue": "Pin a supported builder, relay, access, or wrapper mechanism that guarantees whole, ordered, same-block bundle inclusion and its failure semantics. For eez-evm@0.2-draft consumers that rely on this mechanism for routing integrity, it must authenticate the exact postAndVerifyBatch caller and calldata, including both transient prefix counts, and prevent modified proof reuse or front-running."
+      "issue": "Pin the Ethereum mechanism that provides the complete ordered settlement operation required by the imported execution rules, including exact failure and partial-inclusion detection."
     },
     "max_user_transactions_per_bundle": {
-      "status": "not-applicable",
-      "reason": "Bundle size is selected by each consuming rollup; it is not a Chiado protocol parameter."
+      "status": "release-blocker",
+      "id": "GC-CAPACITY",
+      "issue": "Pin the production bundle capacity after measuring proof, gas, DA, and relay limits."
     },
     "proof_routing_mitigation": {
-      "status": "not-applicable",
-      "reason": "Each consuming rollup profile must select how it binds the eez-evm@0.2-draft submitter and transient prefix counts. This host profile only identifies the required host capability under GC-ATOMIC-INCLUSION."
+      "status": "release-blocker",
+      "id": "GC-PROOF-ROUTING",
+      "issue": "Bind the relayer-independent candidate authorization to the exact effective batch, both transient prefix counts, settlement contracts, proofs, and all routing fields; prevent modified proof or signature reuse and front-running."
     }
   },
   "proof_policy": {
     "model": {
-      "status": "not-applicable",
-      "reason": "Each consuming rollup profile and manager select a proof model."
+      "status": "release-blocker",
+      "id": "GC-PROOF-CONTRACT",
+      "issue": "Pin the production validity proof model and the additional candidate-authorization statement verified on Ethereum."
     },
     "allowed_proof_systems_and_vkeys": {
-      "status": "not-applicable",
-      "reason": "Each rollup network profile and manager select these values."
+      "status": "release-blocker",
+      "id": "GC-PROOF-CONTRACT",
+      "issue": "Pin the allowed proof systems, verification keys, contract deployments, code hashes, and activation epochs."
     },
     "threshold": {
-      "status": "not-applicable",
-      "reason": "Each rollup network profile and manager select its threshold."
+      "status": "release-blocker",
+      "id": "GC-PROOF-CONTRACT",
+      "issue": "Pin the validity proof threshold independently of the candidate-signature threshold."
     }
   },
   "data_availability": {
     "requirement": {
-      "status": "not-applicable",
-      "reason": "Each consuming rollup profile owns its data-availability requirement."
+      "status": "fixed",
+      "value": "Publish all user transactions and canonical L2 execution sidecars required for independent replay under rollup0-common-execution@0.2-draft.",
+      "source": "Gnosis Chain EEZ Network Specification §1.2; rollup0-common-execution@0.2-draft §§3 and 6"
     },
     "channel": {
-      "status": "not-applicable",
-      "reason": "Each consuming rollup profile selects its data-availability channel."
+      "status": "fixed",
+      "value": {
+        "transport": "Ethereum calldata",
+        "batch_blob_indices": [],
+        "fallback": "none"
+      },
+      "source": "rollup0-common-execution@0.2-draft §3.1"
     },
     "codec": {
-      "status": "not-applicable",
-      "reason": "The rollup network profile selects the payload codec carried by host calldata."
+      "status": "fixed",
+      "value": {
+        "id": "rollup0-common-calldata-0x00",
+        "grammar": "0x00 || rlp([blockTxCounts, transactions, l2Entries])",
+        "strict_rules": "rollup0-common-execution@0.2-draft §3.1"
+      },
+      "source": "Gnosis Chain EEZ Network Specification §1.2"
     },
     "derivation_rule": {
-      "status": "not-applicable",
-      "reason": "Derivation is a rollup-network rule."
+      "status": "fixed",
+      "value": "Apply the complete canonical evidence, exact-prefix repair, replay, commit, reorganization, and safety-label rules in rollup0-common-execution@0.2-draft §6.",
+      "source": "rollup0-common-execution@0.2-draft §6"
     }
   },
   "governance_recovery": {
     "manager_authority": {
-      "status": "not-applicable",
-      "reason": "Each consuming rollup profile owns its manager authority and recovery policy."
+      "status": "release-blocker",
+      "id": "GC-AUTH-SET",
+      "issue": "Pin the initial authorized sequencer/composer set, its threshold and custody, and every manager or governance authority that can change admission or proof policy."
     },
     "upgrade_policy": {
       "status": "release-blocker",
-      "id": "GC-UPGRADES",
-      "issue": "Publish ownership, shared EEZ contract upgrade, and emergency procedures for the Chiado deployment."
+      "id": "GC-AUTH-ROTATION",
+      "issue": "Pin signer addition, removal, compromise, suspension, and rotation rules together with upgrade delays, activation boundaries, historical verification, and reorg behavior."
     },
     "reorg_and_emergency_rule": {
-      "status": "fixed",
-      "value": "Before finality, consumers rewind exact receipt and ordered-log occurrences removed or reordered by canonical Chiado reorgs, then apply their own network-profile recovery rule. Only the canonical Chiado finalized view is final.",
-      "source": "Gnosis Chain EEZ Network Specification §3.5"
+      "status": "release-blocker",
+      "id": "GC-GOVERNANCE",
+      "issue": "Pin Ethereum and Gnosis reorg bounds, emergency actions, authenticated recovery activations, authority thresholds, and the prohibition on reinterpreting finalized history."
     }
   },
   "release_blockers": [
-    "GC-DEPLOYMENT",
-    "GC-GENESIS",
+    "GC-ACTIVATION",
     "GC-ATOMIC-INCLUSION",
-    "GC-UPGRADES"
+    "GC-AUTH-ROTATION",
+    "GC-AUTH-SCHEME",
+    "GC-AUTH-SET",
+    "GC-CAPACITY",
+    "GC-CURSOR-SAFETY",
+    "GC-ECONOMICS",
+    "GC-EEZ-DEPLOYMENT",
+    "GC-GENESIS",
+    "GC-GOVERNANCE",
+    "GC-HEADER",
+    "GC-IDENTITY",
+    "GC-LOWERING",
+    "GC-PREFIX-SAFETY",
+    "GC-PROOF-CONTRACT",
+    "GC-PROOF-CONTEXT",
+    "GC-PROOF-ROUTING",
+    "GC-SYSTEM-SAFETY",
+    "GC-TIMING"
   ]
 }

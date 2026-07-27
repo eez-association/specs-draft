@@ -1,78 +1,109 @@
-# 3. Security & Trust Model
+# 3. Security and Trust Model
 
-## 3.1 Host guarantees
+## 3.1 Validity and Authorization
 
-Each profile relies on canonical Chiado consensus for transaction execution, receipt and log
-ordering, reorg handling, and finality. A consumer MAY call an EEZ result finalized only after the
-Chiado block that contains the result is finalized by the canonical consensus view.
+Gnosis candidate admission has two independent gates:
 
-The host guarantee is conditional on the authenticated, binding-specific deployment identity in
-§2. It does not apply to a contract at an unpinned address, runtime code that does not match the
-pinned hash, or a deployment selected by the other Gnosis host profile.
+1. full deterministic validity; and
+2. authorization by the active sequencer/composer set.
 
-## 3.2 Guarantees that the host does not provide
+The authorization set can censor, delay, or equivocate by signing several competing valid
+candidates. It cannot make an invalid candidate conforming. That guarantee depends on validators,
+provers, the Ethereum proof contract, and the EEZ settlement path enforcing the same complete
+validity statement.
 
-Chiado inclusion and finality do not establish:
+Users MUST NOT treat an authorization signature as a proof of execution validity, data
+availability, settlement, safety, or finality.
 
-- that a consumer rollup's state transition is valid;
-- that its manager or proof systems are honest;
-- that its data-availability payload is sufficient or correctly encoded;
-- that its operator, composer, or system-transaction signer is honest or available;
-- that its L1 and L2 value accounting is solvent; or
-- that users have a force-inclusion or exit path.
+## 3.2 Permissioned Liveness
 
-Each consumer network profile MUST specify those properties. Neither Gnosis profile inherits
-Rollup0's operator, manager, validator, system-key, DA, or fee assumptions.
+Only an authorized signer can make a candidate admissible. The active signers can halt the network
+by refusing to sign. There is no permissionless fallback, force-inclusion path, or automatic change
+to Rollup0 admission.
 
-## 3.3 Atomic inclusion
+Relaying is permissionless. Once an admissible candidate and its required data are available, an
+authorized signer cannot reserve submission for a preferred relayer. Permissionless relaying does
+not remove the signers' censorship power over candidate authorization.
 
-A consumer may require an ordered group containing an EEZ settlement transaction and one or more
-triggering transactions to appear in one Chiado block. That property requires the external
-builder or relay selected by `GC-ATOMIC-INCLUSION` for
-`gnosis-chain-eez-chiado@0.1-draft`, or by `GC-R0-ATOMIC-INCLUSION` for
-`gnosis-chain-eez-chiado-rollup0@0.1-draft`.
+## 3.3 Proof and Routing Integrity
 
-A conforming mechanism MUST either include the complete ordered group or include none of it.
-Submitting the transactions independently, or falling back to sequential public-mempool
-submission, is not conforming atomic inclusion. The authenticated profile MUST identify the
-mechanism, its ordering rule, its rejection behavior, and how clients detect partial inclusion.
+The selected proof policy is trusted to reject every invalid state transition. The Ethereum proof
+contract is also trusted to:
 
-Whole-bundle inclusion alone does not protect proof routing when the selected binding leaves
-caller or calldata fields outside the proof statement. For `eez-evm@0.2-draft`, the batch proof
-does not bind `msg.sender`, `transientExecutionEntryCount`, or `transientLookupCallCount`, and the
-EEZ entry point is permissionless. The Rollup0 compatibility profile has its own binding-specific
-routing statement and mitigation requirement.
+- validate the exact activated authorization scheme and active signer set;
+- bind authorization and validity to the same candidate;
+- bind the exact parent cursor and every selectable endpoint identity;
+- bind every execution, DA, range, value, and routing input that affects settlement;
+- prevent cross-network, cross-contract, cross-parent, cross-epoch, and modified-calldata replay;
+  and
+- reject stale, malformed, unauthorized, or incompletely proven candidates.
 
-If a consumer uses the host mechanism to mitigate such a limitation, the mechanism MUST
-authenticate the exact caller and calldata before execution and prevent a copied proof from being
-submitted first with altered routing inputs. The consuming rollup profile MUST select the exact
-mechanism and failure rule. Each Gnosis host profile exposes the corresponding required host
-capability but does not silently choose a consumer mitigation.
+`eez-evm@0.2-draft` does not by itself bind `msg.sender` or both transient prefix counts into its
+shared proof public input. Because any relayer may submit, the activated Gnosis candidate digest and
+proof-contract call path MUST authenticate the complete effective batch and both counts without
+requiring the relayer to be the signer. Otherwise a copied proof or signature could be front-run
+with different routing behavior.
 
-## 3.4 Shared deployment governance
+The exact mechanism is unresolved. A generic relay promise or a check of `msg.sender` alone does
+not satisfy this requirement.
 
-The selected EEZ deployment owner, upgrade authority, and emergency authority are trusted until
-the profile's binding-specific blocker is resolved: `GC-UPGRADES` for
-`gnosis-chain-eez-chiado@0.1-draft`, or `GC-R0-UPGRADES` for
-`gnosis-chain-eez-chiado-rollup0@0.1-draft`. These authorities can change behavior for every
-consumer that uses that deployment. A production profile MUST publish:
+## 3.4 Settlement, Data Availability, and Reorgs
 
-- the controlling addresses and threshold rules;
-- the operations each authority can perform;
-- activation delays and consumer notification requirements;
-- emergency actions and recovery rules; and
-- the new deployment or profile identity produced by a code or authority change.
+Production safety and finality derive from the authenticated canonical Ethereum settlement view.
+An unsafe Gnosis block can be replaced before its candidate is selected, and an Ethereum reorg can
+remove or reorder a selected candidate before finality.
 
-## 3.5 Reorgs and evidence
+Followers MUST identify the exact successful settlement call and ordered event occurrence from the
+activated contracts. Matching only a state root, proof, signature, or event topic elsewhere is
+insufficient. On a reorg, followers rewind every removed Gnosis endpoint and replay the new
+canonical Ethereum order.
 
-Clients MUST associate EEZ results with the exact canonical transaction receipt and ordered log
-occurrence. Matching only a state-root value within a block is insufficient when values repeat or
-multiple batches affect the same rollup.
+The activated cursor guard MUST compare a candidate's exact parent height, block hash, and state
+root with the current settled cursor and atomically commit the selected endpoint identity. The
+current EEZ binding's root-only state check does not reject an old-parent sibling after an
+equal-root transition. Gnosis production is blocked until an external settlement mechanism closes
+that gap.
 
-Before finality, a Chiado reorg may remove or reorder those receipts. A consumer MUST rewind its
-host-derived view and apply its own network-profile recovery rule. Neither host profile makes a
-claim that an unsafe or merely included consumer state is final.
+The activated applied-prefix mechanism MUST prevent a later effect from committing after a
+non-applied anchor or earlier effect, including when adjacent effect roots are equal. Follower
+detection after canonical inclusion is not prevention. Gnosis production is blocked until this
+mechanism is selected and enforced by the Ethereum settlement operation.
+
+The imported DA and derivation rules remain mandatory. Authorization does not cure missing,
+malformed, withheld, or unreplayable data. A signer can censor DA publication; it cannot make
+unavailable data conforming.
+
+Development uses Chiado consensus and finality but provides no production security claim.
+
+## 3.5 Governance and Upgrades
+
+The Gnosis governance authority can select signer rotations, proof policy, deployments, upgrades,
+emergency actions, and recovery activations only through the published mechanisms of an activated
+profile. These powers are separate from candidate-signing authority unless the activation record
+explicitly combines them.
+
+A production profile MUST identify every authority, operation, threshold, delay, and activation
+boundary. Contract code or authority changes require authenticated versioned records and MUST
+preserve historical verification. An emergency action MUST NOT silently reinterpret finalized
+history.
+
+All production governance and authority values are unresolved blockers.
+
+## 3.6 Trust Summary
+
+Gnosis users rely on:
+
+- Ethereum consensus, execution, data access, and finality for settlement;
+- the correctness and soundness of the selected EEZ and proof-contract deployments;
+- complete independent validation by validators and provers;
+- the active signer set for authorization availability and censorship resistance;
+- the selected DA mechanism for reconstructability;
+- governance for controlled activation and recovery; and
+- deterministic follower implementation of canonical selection and reorg handling.
+
+The permissioned signature intentionally adds authority risk. It does not remove any validity,
+proof, DA, settlement, or derivation requirement.
 
 ---
 
-*End of the Gnosis Chain EEZ Network Specification.*
+*Next: [§4 Implementation and Conformance Status](04-implementation-conformance-status.md).*
