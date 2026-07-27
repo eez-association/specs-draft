@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Construct and verify a Rollup0 Ethereum-format genesis header.
+"""Construct and verify a historical Rollup0 development genesis header.
 
-The default input is the normative development fixture copied from the
-implementation repository. The implementation is dependency-free: it includes
+The default input is an implementation-development fixture copied from the
+reviewed repository. It is neither normative nor a production profile. The
+implementation is dependency-free: it includes
 canonical RLP, Keccak-256, and the secure hexary Merkle-Patricia trie used for
 Ethereum state and storage roots.
 

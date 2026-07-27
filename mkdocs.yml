@@ -74,29 +74,31 @@ nav:
       - "Appendix A — Protocol Reference": eez-protocol-spec/A-reference.md
       - "Appendix B — Wire Formats & Vectors": eez-protocol-spec/B-wire-formats.md
       - "Appendix C — Protocol Open Questions": eez-protocol-spec/C-open-questions.md
-  - "Rollup0 v0 / eez-evm@0.1-rollup0":
+  - "Rollup0 / eez-evm@0.2-draft":
       - "Overview & Implementer Path": rollup0-network-spec/index.md
-      - "0. Protocol Version & Compatibility": rollup0-network-spec/00-protocol-version.md
+      - "0. Protocol Version": rollup0-network-spec/00-protocol-version.md
       - "1. Network Profile": rollup0-network-spec/01-profile.md
+      - "Common Execution Rules": rollup0-network-spec/common-execution.md
       - "2. Block Production & Headers": rollup0-network-spec/02-block-production.md
       - "3. The Composer": rollup0-network-spec/03-composer.md
       - "4. DA, Batches & Bundles": rollup0-network-spec/04-da-batches-bundles.md
-      - "5. Cross-Chain Flows": rollup0-network-spec/05-l1-to-l2.md
+      - "5. Cross-Network Flows": rollup0-network-spec/05-l1-to-l2.md
       - "6. Derivation & Following": rollup0-network-spec/06-derivation-following.md
       - "7. Gas & Economics": rollup0-network-spec/07-gas-economics.md
       - "8. Limitations & Release Blockers": rollup0-network-spec/08-limitations.md
       - "9. Security & Trust Model": rollup0-network-spec/09-security-trust-model.md
-      - "10. Future Design: Rollup1": rollup0-network-spec/10-future-design.md
+      - "10. Future Design": rollup0-network-spec/10-future-design.md
       - "Appendix A — Gas & Cost Analysis": rollup0-network-spec/A-gas-cost-analysis.md
       - "Appendix B — DA Codec Vector": rollup0-network-spec/B-da-codec.md
-      - "Appendix C — Signed System Transactions": rollup0-network-spec/C-system-transactions.md
+      - "Appendix C — System Transactions": rollup0-network-spec/C-system-transactions.md
       - "Appendix D — Genesis & Block Validity": rollup0-network-spec/D-genesis-validity.md
-      - "Appendix E — Compatibility Binding": rollup0-network-spec/E-compatibility-binding.md
-  - Gnosis Chiado Host Profiles:
-      - "Overview & Profile Selection": gnosis-chain-eez-spec/index.md
-      - "1. Host Profile": gnosis-chain-eez-spec/01-host-profile.md
-      - "2. Deployment & Release Blockers": gnosis-chain-eez-spec/02-deployment.md
+  - "Gnosis Chain EEZ / eez-evm@0.2-draft":
+      - "Overview & Implementer Path": gnosis-chain-eez-spec/index.md
+      - "0. Protocol Version": gnosis-chain-eez-spec/00-protocol-version.md
+      - "1. Profile & Imports": gnosis-chain-eez-spec/01-profile-imports.md
+      - "2. Candidate Admission": gnosis-chain-eez-spec/02-admission.md
       - "3. Security & Trust Model": gnosis-chain-eez-spec/03-security-trust-model.md
+      - "4. Implementation & Conformance": gnosis-chain-eez-spec/04-implementation-conformance-status.md
 
 plugins:
   - search

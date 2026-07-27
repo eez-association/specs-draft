@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Executable timing/header vectors for Rollup0 Network Specification §2."""
+"""Executable Rollup0 timing/header algorithm and development/example vectors.
+
+The production proof budget and submission slack are unresolved. Timing values
+that include those parameters are examples or implementation-development data,
+not production profile selections.
+"""
 
 from dataclasses import dataclass
 from hashlib import sha256
@@ -189,11 +194,12 @@ def invalid(timing: Timing) -> None:
 
 
 def main() -> None:
-    profile_12s = Timing(12_000, 2_000, 4_000, 1_500)
+    # D1 and D2 match the draft production cadence. P and S are illustrative.
+    production_cadence_example = Timing(12_000, 2_000, 4_000, 1_500)
     chiado = Timing(5_000, 1_000, 500, 1_300)
     exact_multiple = Timing(12_000, 2_000, 3_500, 500)
     smallest = Timing(4_000, 2_000, 1_500, 100)
-    for timing in (profile_12s, chiado, exact_multiple, smallest):
+    for timing in (production_cadence_example, chiado, exact_multiple, smallest):
         timing.validate()
 
     assert ceil_div(0, U64_MAX) == 0
@@ -201,8 +207,15 @@ def main() -> None:
     assert ceil_div(U64_MAX, 2) == 1 << 63
     assert ceil_div(U64_MAX, 1) == U64_MAX
 
-    assert (profile_12s.k, profile_12s.future, profile_12s.live) == (6, 2, 3)
-    assert (profile_12s.trigger_offset, profile_12s.deadline_offset) == (6_000, 10_500)
+    assert (
+        production_cadence_example.k,
+        production_cadence_example.future,
+        production_cadence_example.live,
+    ) == (6, 2, 3)
+    assert (
+        production_cadence_example.trigger_offset,
+        production_cadence_example.deadline_offset,
+    ) == (6_000, 10_500)
     assert (chiado.k, chiado.future, chiado.live, chiado.trigger_offset) == (5, 1, 3, 3_000)
     assert (exact_multiple.future, exact_multiple.live) == (1, 4)
     assert (smallest.k, smallest.future, smallest.live) == (2, 0, 1)
@@ -214,14 +227,19 @@ def main() -> None:
     invalid(Timing(4_000, 2_000, 3_000, 100))
     invalid(Timing(U32_MAX + 1, 1_000, 1, 0))
 
-    assert composition(profile_12s, 0, 6) == ("slot", 3, 2)
-    assert composition(profile_12s, 5, 6) == ("slot", 0, 0)
-    assert composition(profile_12s, 6, 6) == ("idle",)
-    assert composition(profile_12s, 0, 318) == ("catchup", 299)
+    assert composition(production_cadence_example, 0, 6) == ("slot", 3, 2)
+    assert composition(production_cadence_example, 5, 6) == ("slot", 0, 0)
+    assert composition(production_cadence_example, 6, 6) == ("idle",)
+    assert composition(production_cadence_example, 0, 318) == ("catchup", 299)
     terminal = 0 + 299 + 1
-    assert terminal == 300 and terminal % profile_12s.k == 0
+    assert terminal == 300 and terminal % production_cadence_example.k == 0
 
-    off_grid = anchor(profile_12s, genesis_ts=1000, l1_number=40, l1_ts=1013)
+    off_grid = anchor(
+        production_cadence_example,
+        genesis_ts=1000,
+        l1_number=40,
+        l1_ts=1013,
+    )
     assert off_grid == {
         "trigger_at": 1019,
         "proposed_sync_time": 1025,
@@ -230,33 +248,61 @@ def main() -> None:
         "batch_block_number": 40,
     }
     assert header_timestamp(1022, 1024) == 1024
-    actual_sync = rollup_header_timestamp(1022, profile_12s.d2 // 1000)
+    actual_sync = rollup_header_timestamp(
+        1022,
+        production_cadence_example.d2 // 1000,
+    )
     assert actual_sync == 1024
     assert off_grid["proposed_sync_time"] != actual_sync
     assert (off_grid["target_l1_block"], actual_sync) == (41, 1024)
     assert off_grid["batch_block_number"] == 40
     assert off_grid["batch_block_number"] != off_grid["target_l1_block"]
 
-    missed = anchor(profile_12s, genesis_ts=1000, l1_number=41, l1_ts=1036)
+    missed = anchor(
+        production_cadence_example,
+        genesis_ts=1000,
+        l1_number=41,
+        l1_ts=1036,
+    )
     assert missed["target_height"] == 24
-    assert composition(profile_12s, 12, missed["target_height"]) == ("catchup", 11)
+    assert composition(
+        production_cadence_example,
+        12,
+        missed["target_height"],
+    ) == ("catchup", 11)
 
     # A newer observation supersedes, rather than queues behind, an un-fired target.
-    pending = anchor(profile_12s, 1000, 40, 1013)
-    pending = anchor(profile_12s, 1000, 41, 1036)
+    pending = anchor(production_cadence_example, 1000, 40, 1013)
+    pending = anchor(production_cadence_example, 1000, 41, 1036)
     assert pending == missed
 
     sync_ms = 1024 * 1000
-    deadline_ready = sync_ms - profile_12s.slack
-    assert not is_late(deadline_ready - profile_12s.proof, profile_12s, 1024)
-    assert is_late(deadline_ready - profile_12s.proof + 1, profile_12s, 1024)
+    deadline_ready = sync_ms - production_cadence_example.slack
+    assert not is_late(
+        deadline_ready - production_cadence_example.proof,
+        production_cadence_example,
+        1024,
+    )
+    assert is_late(
+        deadline_ready - production_cadence_example.proof + 1,
+        production_cadence_example,
+        1024,
+    )
 
     # A later batch may span a missed/deferred nominal slot; K is not a range invariant.
     cursor, endpoint = 12, 24
-    assert endpoint - cursor == 12 and endpoint - cursor != profile_12s.k
+    assert (
+        endpoint - cursor == 12
+        and endpoint - cursor != production_cadence_example.k
+    )
 
     try:
-        anchor(profile_12s, genesis_ts=0, l1_number=0, l1_ts=U64_MAX)
+        anchor(
+            production_cadence_example,
+            genesis_ts=0,
+            l1_number=0,
+            l1_ts=U64_MAX,
+        )
     except OverflowError:
         pass
     else:
@@ -277,7 +323,7 @@ def main() -> None:
     # Request groups are ordered by the one-byte request type before hashing.
     assert requests_hash([b"\x02b", b"\x01a"]) == requests_hash([b"\x01a", b"\x02b"])
 
-    # Rollup0 v0 EIP-1559 parameters from §7.
+    # Historical implementation-development EIP-1559 values, not production selections.
     gas_limit, elasticity, denominator, parent_fee = 30_000_000, 2, 8, 1_000_000_000
     gas_target = gas_limit // elasticity
     assert next_base_fee(parent_fee, gas_target, gas_limit, elasticity, denominator) == parent_fee

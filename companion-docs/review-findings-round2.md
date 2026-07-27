@@ -1,12 +1,15 @@
 # Rollup0 Spec — Review Findings, Round 2
 
 > **Historical, informative review snapshot.** Findings describe a pre-correction draft and do
-> not state the active protocol. Current normative behavior is under `docs/`. A1, B1, B3, B5,
-> B6, B8, B10, B12, B13, the Sync-count/order minors, and the old wire-corpus conclusions are
-> superseded. Rollup0 v0 selects signed legacy system transactions, prefunded transfers, a
-> cursor-derived non-empty range, variable-cardinality ordered bundles, strict tag-`0x00`
-> calldata DA with empty `blobIndices`, canonical partial-settlement derivation, standard
-> EIP-1559 parameters, and a zero beneficiary. Type `0x7E` is future design material only.
+> not state the active protocol. Current normative behavior is under `docs/`.
+> Rollup0 and Gnosis Chain are separate EEZ networks that settle on Ethereum.
+> Rollup0 has open, validity-only candidate admission; Gnosis Chain additionally
+> requires an authorized composer signature. Both select
+> `eez-evm@0.2-draft`, and action-producing entries require exact per-effect
+> roots. Production identities, proof policy, system-transaction authorization,
+> and deployment values remain blockers. A1, B1, B3, B5, B6, B8, B10, B12,
+> B13, the old host/network model, and the old wire-corpus conclusions below
+> are superseded.
 
 Synthesis of a six-lens review (two second-client core devs — node and L1-contracts —, an
 adversarial consistency checker, a security critic, a byte-level wire-format reviewer, and a
@@ -85,9 +88,11 @@ rules, proxy auto-deploy).
 
 ### A5 — Resolved: network identity and settlement target were split
 *Former README/overview contradiction — hand-verified.*
-Rollup0 now pins `gnosis-chain-eez-chiado@0.1-draft` (`chainId = 10200`, nominal 5-second slots),
-while the Gnosis Chain EEZ Network Specification is a separate host profile. Production
-deployment values remain explicit release blockers.
+Rollup0 and Gnosis Chain are now specified as separate peer EEZ execution networks. Neither
+network hosts or settles the other. Both production targets settle on Ethereum; Chiado is a
+development environment only. The networks have independent profile identities and different
+candidate-admission rules. Their production identities and deployment values remain explicit
+release blockers.
 
 ---
 
@@ -125,8 +130,9 @@ deployment values remain explicit release blockers.
   `sharedPublicInput` (checked numerically; the with-offset reading reproduces Vector 5). One
   sentence, consensus-critical.
 - **B8 — Resolved: blob DA is outside this profile** *(hand-verified)*:
-  `rollup0-chiado@0.1-draft` fixes the tag-`0x00` calldata codec and empty `blobIndices`;
-  `blob-da-spec.md` is explicitly informative. Selecting blobs requires a later profile version.
+  `rollup0@0.2-draft` and `rollup0-ethereum@0.2-draft` select the tag-`0x00` calldata codec and
+  empty `blobIndices`. Production identity and activation values remain release blockers.
+  Selecting blobs requires a later profile version.
 - **B9 — The EEZ/manager ABI surface is incomplete** *(hand-verified)*: D.9 pins only
   `postAndVerifyBatch`; `executeCrossChainCall`, `executeL2TX`, `staticCallLookup`,
   `registerRollup`, and the manager functions the registry calls at settlement

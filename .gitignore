@@ -1,2 +1,4 @@
 __pycache__/
 *.py[cod]
+.venv/
+docs/rollup0-spec-site/

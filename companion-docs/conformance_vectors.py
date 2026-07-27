@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""Build the deterministic EEZ and Rollup0 companion conformance manifest.
+"""Build the deterministic EEZ and Rollup0 companion fixture manifest.
 
 The suites are deliberately separate:
 
-* ``eez-framework-current`` describes the current EEZ contract framework.
-* ``rollup0-v0-contract`` describes the older contract binding selected by
-  Rollup0 v0.
-* The Rollup0 codec, system-transaction, genesis, and timing suites describe
-  network-profile behavior that is not authored by either contract checkout.
+* ``eez-framework-current`` describes the normative EEZ contract binding.
+* ``rollup0-v0-contract`` preserves the older binding recorded by the reviewed
+  Rollup0 implementation. It is diagnostic, not a selected network binding.
+* The Rollup0 codec and system-transaction suites preserve historical,
+  reproducible implementation snapshots. Genesis and timing suites are
+  development fixtures, not production profile values.
 
 The executable Solidity fixtures remain the authority for compiler-output
 values such as ``type(CrossChainProxy).creationCode``. This module recomputes
@@ -24,6 +25,7 @@ from eth_utils import keccak
 
 
 EEZ_REVISION = "3a6ca65c4858792fc3a143d34c5484877ef8f68c"
+REVIEWED_ROLLUP0_REVISION = "0e07e97945ad7d33d7c52545207887b952333e2d"
 ROLLUP0_CONTRACT_REVISION = "5c51e02b0f965ee8c94e9ed2c7e0e9f924d41fba"
 ROLLUP0_EXECUTION_REVISION = "00b3e75872fcc0c374d3b12a01933d732d317e4c"
 
@@ -160,9 +162,14 @@ def fixture_document() -> dict[str, Any]:
     da_raw = bytes.fromhex(DA_PAYLOAD)
     return {
         "format": "eez-companion-conformance-v1",
+        "reviewed_rollup0_implementation": {
+            "repository": "https://github.com/eez-association/eez-rollup0",
+            "revision": REVIEWED_ROLLUP0_REVISION,
+        },
         "warning": (
-            "Suites have independent provenance. Do not substitute the EEZ "
-            "framework checkout for the Rollup0 v0 contract binding."
+            "Only eez-framework-current is the network-selected EEZ binding. "
+            "The Rollup0 contract, codec, and system-transaction suites are "
+            "historical implementation diagnostics and have independent provenance."
         ),
         "suites": {
             "eez-framework-current": {

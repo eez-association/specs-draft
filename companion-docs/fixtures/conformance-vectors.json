@@ -1,5 +1,9 @@
 {
   "format": "eez-companion-conformance-v1",
+  "reviewed_rollup0_implementation": {
+    "repository": "https://github.com/eez-association/eez-rollup0",
+    "revision": "0e07e97945ad7d33d7c52545207887b952333e2d"
+  },
   "suites": {
     "eez-framework-current": {
       "contract_derived": {
@@ -113,5 +117,5 @@
       "sync_composition_rule": "a Sync block is last and can contain a nonzero user-transaction count"
     }
   },
-  "warning": "Suites have independent provenance. Do not substitute the EEZ framework checkout for the Rollup0 v0 contract binding."
+  "warning": "Only eez-framework-current is the network-selected EEZ binding. The Rollup0 contract, codec, and system-transaction suites are historical implementation diagnostics and have independent provenance."
 }

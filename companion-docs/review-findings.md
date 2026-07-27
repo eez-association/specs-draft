@@ -1,11 +1,14 @@
 # Rollup0 Spec — Consolidated Review Findings
 
 > **Historical, informative review snapshot.** Findings describe a pre-correction draft and do
-> not state the active protocol. Current normative behavior is under `docs/`. In particular,
-> Rollup0 v0 selects signed legacy outbound-load and inbound-delivery transactions, prefunded
-> value transfers, mixed Sync-block ordering, strict tag-`0x00` calldata DA, empty
-> `blobIndices`, standard EIP-1559 parameters, and a zero beneficiary. Type `0x7E`, minting
-> claims, fee-policy blockers, and the old single-revision wire corpus below are superseded.
+> not state the active protocol. Current normative behavior is under `docs/`.
+> Rollup0 and Gnosis Chain are separate EEZ networks that settle on Ethereum.
+> Rollup0 has open, validity-only candidate admission; Gnosis Chain also
+> requires an authorized composer signature. Both select
+> `eez-evm@0.2-draft`. Production deployment identities, proof policy, and
+> system-transaction authorization remain explicit blockers. Statements below
+> about Chiado settlement, one authorized operator, the old binding, collapsed
+> entry roots, or fixed production credentials are superseded.
 
 Synthesis of four independent spec-only reviews (execution-client implementer, L1/prover/DA
 implementer, devil's advocate, spec editor), de-duplicated, with a disposition applied to each.

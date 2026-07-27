@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """
-Reproduce the Rollup0 v0 signed-system-transaction vectors from Appendix C.
+Reproduce historical Rollup0 signed-system-transaction development vectors.
+
+These vectors preserve behavior from the reviewed implementation. They do not
+select the production envelope or authorization mechanism.
 
 Requires:
 

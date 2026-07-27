@@ -1,28 +1,38 @@
 # Companion Material
 
-This directory contains review records, executable fixtures, and generated
-conformance data. It is informative. The normative specifications are:
+This directory contains informative implementation evidence, executable
+fixtures, historical reviews, and comparative material. It is not normative.
+The normative specifications are:
 
 - [EEZ Framework](../docs/eez-protocol-spec/index.md)
 - [Rollup0 Network](../docs/rollup0-network-spec/index.md)
-- [Gnosis Chain EEZ Profile](../docs/gnosis-chain-eez-spec/index.md)
+- [Gnosis Chain EEZ Network](../docs/gnosis-chain-eez-spec/index.md)
 
-## Conformance suites
+## Source categories
 
-The generated corpus keeps independently versioned sources separate:
+Do not combine the following categories:
 
-| Suite | Selected source | Executable cross-check |
+| Category | Selected source | Meaning |
 |---|---|---|
-| EEZ framework | `eez-core-protocol@3a6ca65c4858792fc3a143d34c5484877ef8f68c` | `wire-vectors-eez-current.s.sol` |
-| Rollup0 v0 contract binding | `sync-rollups-protocol@5c51e02b0f965ee8c94e9ed2c7e0e9f924d41fba` | `wire-vectors-rollup0-v0.s.sol` |
-| Rollup0 execution, codec, and system transactions | `eez-rollup0@00b3e75872fcc0c374d3b12a01933d732d317e4c` | Python and Rust fixtures |
-| Rollup0 genesis, timing, and header rules | Rollup0 network profile | Python fixtures |
+| Normative EEZ binding | `eez-core-protocol@3a6ca65c4858792fc3a143d34c5484877ef8f68c` | The `eez-evm@0.2-draft` ABI, wire formats, and compiler-derived vectors selected by both network specifications. |
+| Reviewed Rollup0 implementation | `eez-rollup0@0e07e97945ad7d33d7c52545207887b952333e2d` | Evidence for current node behavior and known deviations. It is not a protocol selector. |
+| Recorded Rollup0 contract submodule | `sync-rollups-protocol@5c51e02b0f965ee8c94e9ed2c7e0e9f924d41fba` | The older binding recorded by the reviewed Rollup0 implementation. Its difference from the selected binding is a release blocker. |
+| Historical execution fixtures | `eez-rollup0@00b3e75872fcc0c374d3b12a01933d732d317e4c` | Reproducible codec and signed-system-transaction snapshots retained for regression analysis. They do not define the current network profile. |
 
-The EEZ and Rollup0 Solidity fixtures are not interchangeable. Compiler-output
-values, struct layouts, and selectors differ between the two selected contract
-revisions.
+The active network specifications select the first row. The other rows document
+implementation history. In particular, the `rollup0-v0-contract` suite and
+`wire-vectors-rollup0-v0.s.sol` MUST NOT be used to implement
+`eez-evm@0.2-draft`.
 
-Create an isolated environment and run the complete companion check:
+Rollup0 and Gnosis Chain are separate EEZ execution networks. Both production
+networks settle on Ethereum. Chiado appears only in development profiles.
+Rollup0 uses validity-only, open candidate admission. Gnosis Chain additionally
+requires an authorized composer signature. No adjacent implementation reviewed
+for this edition implements the Gnosis Chain authorization rule.
+
+## Conformance checks
+
+Create an isolated environment and run the companion checks:
 
 ```console
 python3 -m venv .venv-conformance
@@ -31,23 +41,31 @@ python3 -m pip install -r companion-docs/conformance-requirements.txt
 python3 companion-docs/verify-conformance.py
 ```
 
-Regenerate the checked-in JSON corpus after an intentional fixture change:
+Regenerate the checked-in JSON corpus only after an intentional fixture change:
 
 ```console
 python3 companion-docs/verify-conformance.py --write
 python3 companion-docs/verify-conformance.py
 ```
 
-Cross-check compiler-authored vectors by copying the matching Solidity fixture
-to `script/WireVectors.s.sol` in its selected checkout:
+Cross-check compiler-authored vectors against the exact matching checkout:
 
 ```console
-# eez-core-protocol@3a6ca65c4858792fc3a143d34c5484877ef8f68c
-forge script script/WireVectors.s.sol --offline -vv
+# Run from the rollup0-spec repository root.
+test "$(git -C ../eez-core-protocol rev-parse HEAD)" = \
+  3a6ca65c4858792fc3a143d34c5484877ef8f68c
+cp companion-docs/wire-vectors-eez-current.s.sol \
+  ../eez-core-protocol/script/WireVectors.s.sol
+(cd ../eez-core-protocol && forge script script/WireVectors.s.sol --offline -vv)
 
-# sync-rollups-protocol@5c51e02b0f965ee8c94e9ed2c7e0e9f924d41fba
-forge script script/WireVectors.s.sol -vvv
+# Historical implementation-binding diagnostic only
+test "$(git -C ../eez-rollup0/sync-rollups-protocol rev-parse HEAD)" = \
+  5c51e02b0f965ee8c94e9ed2c7e0e9f924d41fba
+cp companion-docs/wire-vectors-rollup0-v0.s.sol \
+  ../eez-rollup0/sync-rollups-protocol/script/WireVectors.s.sol
+(cd ../eez-rollup0/sync-rollups-protocol && forge script script/WireVectors.s.sol -vvv)
 ```
 
-The active Rollup0 system transaction is a signed legacy EIP-155 transaction.
-Type `0x7E` is future design material only.
+The historical Rollup0 fixture uses a signed legacy EIP-155 system
+transaction. The production system-transaction authorization method is an
+unresolved network-profile blocker. Type `0x7E` remains future design material.
