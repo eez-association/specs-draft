@@ -1,9 +1,9 @@
-site_name: The Rollup0 Protocol Specification
+site_name: EEZ Specifications
 site_description: >-
-  A self-contained, client-agnostic, normative specification of Rollup0 — an EVM
-  rollup with synchronous L1↔L2 composability.
-docs_dir: docs/rollup0-spec
-site_dir: docs/rollup0-spec-site
+  The implementation-independent EEZ Framework Specification and separate Rollup0
+  and Gnosis Chain EEZ network specifications.
+docs_dir: docs
+site_dir: site
 use_directory_urls: false
 
 theme:
@@ -59,24 +59,42 @@ markdown_extensions:
   - pymdownx.smartsymbols
 
 nav:
-  - Home: README.md
-  - "1. Overview & Scope": 01-overview.md
-  - "2. Architecture": 02-architecture.md
-  - "3. EVM, Proxy & System Tx": 03-evm-proxy-systemtx.md
-  - "4. Block Production & Headers": 04-block-production.md
-  - "5. Execution Model": 05-execution-model.md
-  - "6. The Composer": 06-composer.md
-  - "7. DA, Batches & Bundles": 07-da-batches-bundles.md
-  - "8. Proving & Settlement": 08-proving-settlement.md
-  - "9. L1 → L2 Flow": 09-l1-to-l2.md
-  - "10. Derivation & Following": 10-derivation-following.md
-  - "11. Gas & Economics": 11-gas-economics.md
-  - "12. Open Issues & Limitations": 12-open-issues.md
-  - "13. Rollup1 & the General Model": 13-rollup1-general-model.md
-  - "Appendix A — Reference": A-reference.md
-  - "Appendix B — Gas & Cost Analysis": B-gas-cost-analysis.md
-  - "Appendix C — Open Questions": C-open-questions.md
-  - "Appendix D — Wire Formats & Vectors": D-wire-formats.md
+  - "Start Here: Specification Set": index.md
+  - "EEZ Framework / eez-evm@0.2-draft":
+      - "Overview & Edition Boundary": eez-protocol-spec/index.md
+      - "1. Scope & Conformance": eez-protocol-spec/01-scope-conformance.md
+      - "2. Architecture": eez-protocol-spec/02-architecture.md
+      - "3. EVM Binding": eez-protocol-spec/03-evm-binding.md
+      - "4. Execution Model": eez-protocol-spec/04-execution-model.md
+      - "5. Proving & Settlement": eez-protocol-spec/05-proving-settlement.md
+      - "6. Security & Trust Model": eez-protocol-spec/06-security-model.md
+      - "7. Required Network Profile": eez-protocol-spec/07-network-profile.md
+      - "Appendix A — Protocol Reference": eez-protocol-spec/A-reference.md
+      - "Appendix B — Wire Formats & Vectors": eez-protocol-spec/B-wire-formats.md
+      - "Appendix C — Protocol Open Questions": eez-protocol-spec/C-open-questions.md
+  - "Rollup0 v0 / eez-evm@0.1-rollup0":
+      - "Overview & Implementer Path": rollup0-network-spec/index.md
+      - "0. Protocol Version & Compatibility": rollup0-network-spec/00-protocol-version.md
+      - "1. Network Profile": rollup0-network-spec/01-profile.md
+      - "2. Block Production & Headers": rollup0-network-spec/02-block-production.md
+      - "3. The Composer": rollup0-network-spec/03-composer.md
+      - "4. DA, Batches & Bundles": rollup0-network-spec/04-da-batches-bundles.md
+      - "5. Cross-Chain Flows": rollup0-network-spec/05-l1-to-l2.md
+      - "6. Derivation & Following": rollup0-network-spec/06-derivation-following.md
+      - "7. Gas & Economics": rollup0-network-spec/07-gas-economics.md
+      - "8. Limitations & Release Blockers": rollup0-network-spec/08-limitations.md
+      - "9. Security & Trust Model": rollup0-network-spec/09-security-trust-model.md
+      - "10. Future Design: Rollup1": rollup0-network-spec/10-future-design.md
+      - "Appendix A — Gas & Cost Analysis": rollup0-network-spec/A-gas-cost-analysis.md
+      - "Appendix B — DA Codec Vector": rollup0-network-spec/B-da-codec.md
+      - "Appendix C — Signed System Transactions": rollup0-network-spec/C-system-transactions.md
+      - "Appendix D — Genesis & Block Validity": rollup0-network-spec/D-genesis-validity.md
+      - "Appendix E — Compatibility Binding": rollup0-network-spec/E-compatibility-binding.md
+  - Gnosis Chiado Host Profiles:
+      - "Overview & Profile Selection": gnosis-chain-eez-spec/index.md
+      - "1. Host Profile": gnosis-chain-eez-spec/01-host-profile.md
+      - "2. Deployment & Release Blockers": gnosis-chain-eez-spec/02-deployment.md
+      - "3. Security & Trust Model": gnosis-chain-eez-spec/03-security-trust-model.md
 
 plugins:
   - search
