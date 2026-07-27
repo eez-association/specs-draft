@@ -1,103 +1,136 @@
 # 1. Network Profile
 
-## 1.1 Dependency and identity
+## 1.1 Ownership
 
-This profile normatively selects:
+Rollup0 selects:
 
 ```text
-Rollup0 protocol:     rollup0-v0
-Rollup0 profile:      rollup0-chiado@0.1-draft
-EEZ framework:        eez-framework@0.1-draft
-EVM binding:          eez-evm@0.1-rollup0
-Settlement host:      gnosis-chain-eez-chiado-rollup0@0.1-draft
+Rollup0 protocol:       rollup0@0.2-draft
+Rollup0 profile:        rollup0-ethereum@0.2-draft
+EEZ framework:          eez-framework@0.1-draft
+EVM binding:            eez-evm@0.2-draft
+Settlement network:     Ethereum
+Development network:    Gnosis Chiado
 ```
 
-The EVM compatibility binding is pinned to
-`sync-rollups-protocol@5c51e02b0f965ee8c94e9ed2c7e0e9f924d41fba` by
-[§0](00-protocol-version.md). It is not wire-compatible with the current
-`eez-evm@0.2-draft` binding sourced from `eez-core-protocol@3a6ca65`. A client implementing the
-0.2 ABI does not implement Rollup0 v0.
+The [EEZ Framework](../eez-protocol-spec/index.md) owns reusable execution, proof, settlement,
+proxy, ABI, and hash behavior. Rollup0 owns the choices in this chapter. Gnosis Chain owns its own
+peer-network profile and is not referenced as Rollup0's host.
 
-`Rollup0` identifies the L2. `Gnosis Chiado` identifies its settlement network.
-`MAINNET_ROLLUP_ID = 0` is the compatibility binding's label for that settlement-host execution
-domain. It is not an EIP-155 chain ID and does not mean Ethereum mainnet.
+## 1.2 Production Choices
 
-Ownership is disjoint:
-
-| Owner | Normative choices |
+| Surface | Rollup0 0.2 rule |
 |---|---|
-| [EEZ Framework](../eez-protocol-spec/index.md) | Reusable execution and settlement concepts and the network-profile contract |
-| Rollup0 v0 compatibility binding | Exact `5c51e02` ABI, selectors, hashes, proxy code, and manager context call |
-| Rollup0 Chiado profile | L2 identity, genesis, timing, headers, sequencing, DA, system transactions, derivation, fees, and proof policy |
-| [Gnosis Chiado host](../gnosis-chain-eez-spec/index.md) | Host identity, consensus/finality, shared `EEZ` deployment, and atomic-inclusion capability |
+| Settlement | Canonical Ethereum |
+| Cadence | nominal `D1 = 12,000 ms`, `D2 = 2,000 ms`, `K = 6` |
+| Candidate production | open; no composer allowlist |
+| Candidate validation | producer-blind; evaluate and sign every supported valid candidate |
+| Sibling candidates | permitted; a validator MAY sign several valid siblings |
+| Winner | first applicable transition in canonical Ethereum transaction order |
+| Stale sibling | does not advance Rollup0 |
+| Settlement relay | permissionless; no producer or relayer allowlist |
+| Headers | deterministic parent-derived construction in §2 |
+| DA | complete tag-`0x00` Ethereum calldata; `blobIndices = []` |
+| State deltas | exact per-effect prefix roots with enforceable prefix safety; collapsed final roots are invalid |
+| Proof systems | permissioned set selected by the activation record |
+| Cross-network scope | one flat, non-static, successful top-level call per interaction |
+| System transactions | deterministic Rollup0 envelopes selected in Appendix C |
+| Fees | EIP-1559 execution fees; no Rollup0 L1-data fee mechanism in this draft |
 
-## 1.2 Selected behavior
+The production proof budget, submission slack, maximum candidate range, maximum bundle size, chain
+ID, rollup ID, genesis, contract deployments, system authorization, validator set, proof threshold,
+exact-cursor guard, applied-prefix guard, builder mechanism, fee funding, and upgrade authorities
+are not yet selected. They are release blockers, not local defaults.
 
-- **Cross-chain scope:** one flat call per accepted entry in either direction. An inbound entry
-  delivers one L1→L2 call. An outbound entry loads one precomputed L2→L1 result immediately before
-  its consuming L2 user transaction. Multi-call, nesting, and cross-chain reentrancy are disabled.
-- **Settlement host:** Gnosis Chiado, EIP-155 chain ID `10200`, nominal block interval `5,000 ms`.
-- **Timing:** `D1=5,000 ms`, `D2=1,000 ms`, proof budget `P=500 ms`, and submission slack
-  `S=1,300 ms`. Thus `K=5`, with 3 Live, 1 Future, and 1 Sync block in a steady slot.
-- **Headers:** `gasLimit=30,000,000`, zero beneficiary, zero `prev_randao`, empty `extraData`, and
-  deterministic parent-derived timestamps. The complete 23-field rules are in §2.
-- **Fees:** EIP-1559 elasticity `2`, change denominator `8`, genesis base fee `1 gwei`; base fees
-  burn, tips accrue to the zero beneficiary, and v0 has no fee vault, oracle, or L1-data surcharge.
-- **System transactions:** signed legacy EIP-155, RPC type `0x0`, from the prefunded
-  `SYSTEM_ADDRESS`; `gasPrice=1,000,000,000 wei`, `gasLimit=2,000,000`
-  ([Appendix C](C-system-transactions.md)).
-- **Sequencing:** one centralized, permissioned operator. The default maximum speculative depth is
-  64; zero disables that operational bound. One catch-up chunk contains at most 300 blocks.
-- **Proof policy:** a manager-enforced threshold of independent single-signer ECDSA proof-system
-  contracts; `crossProofSystemInteractions = bytes32(0)`.
-- **Data availability:** full tag-`0x00` calldata with the user transactions and L1-shape
-  derivation entries required for replay; `blobIndices` is empty.
-- **Atomic inclusion:** `postAndVerifyBatch` and all inbound trigger transactions land whole and in
-  order in one Chiado block, or none land. An outbound-only batch may contain only
-  `postAndVerifyBatch`; at most three inbound user transactions may follow it.
+## 1.3 Open Composer and Validator Rule
 
-## 1.3 Development genesis
+A candidate is identified by its exact parent height, block hash, and state root, ordered Rollup0
+block range, complete EEZ batch, proof context, DA, and intended Ethereum transaction bundle.
+Producer identity is not included.
 
-This profile is machine-resolved as a development profile. It fixes EIP-155 chain ID `1`, EEZ
-rollup ID `1`, the public development `SYSTEM_ADDRESS`, the byte-exact genesis template, and the
-Appendix D deployment-derivation procedure. Those values are pinned in
-[`network-profile.json`](network-profile.json) and [Appendix D](D-genesis-validity.md). They are
-not production choices.
+Every active validator/prover MUST:
 
-The Chiado development procedure replaces the template timestamp with a selected Chiado block
-timestamp and retains the development chain ID and public keys. Its activation record supplies the
-timestamp-source block and the resulting artifact and header commitments. Production requires a
-separate profile version. A conforming production client MUST fail closed until that profile and
-an authenticated activation record publish a production chain ID, genesis artifact and hashes,
-contract addresses and code hashes, system identity, proof policy, and activation boundary.
+1. authenticate the selected profile and candidate inputs;
+2. independently execute the complete candidate;
+3. validate DA, system transactions, headers, per-effect prefix roots, and intended Ethereum
+   bundle;
+4. sign when and only when the candidate is valid and supported;
+5. apply the same decision to identical candidate bytes from every producer; and
+6. continue evaluating valid siblings after signing one candidate.
 
-## 1.4 Completion status
+A validator MUST NOT impose first-seen exclusivity, a producer allowlist, or a one-signature-per-
+height rule. Signing siblings is not equivocation in Rollup0. Ethereum ordering resolves them.
 
-The machine-readable profile is [`network-profile.json`](network-profile.json). Production
-activation remains blocked by:
+The settlement transition is applicable only when the candidate's exact parent height, block hash,
+and state root equal the current settled Rollup0 cursor identity. The activated cursor guard MUST
+enforce this comparison and atomically advance the identity; the EEZ contract's state-root check is
+not sufficient when different blocks have equal roots. Within one canonical Ethereum block,
+candidates are processed in transaction order. The first applicable valid candidate advances the
+cursor. A later candidate can advance only if it starts from the cursor left by earlier canonical
+execution. A stale sibling is not reinterpreted against another parent and does not consume an L2
+range.
 
-- a unique L2 chain ID and authenticated genesis;
-- canonical Chiado `EEZ`, Rollup0 manager, proof-system, and rollup-ID deployments;
-- production native-asset custody and backing;
-- production `SYSTEM_ADDRESS`, private-key custody/distribution, reserve, and top-up rules;
-- validator identities, verification keys, threshold, and resolution of
-  `R0-PROOF-ROUTING` with a versioned mitigation for the `5c51e02` proof digest's omission of both
-  transient routing counts;
-- sequencing authority, exact atomic relay, and upgrade/recovery procedures;
-- production system/host funding and custody backing; and
-- full implementation of the validation and recovery requirements in §§2, 4, 6, and 9.
+## 1.4 Timing Profiles
 
-The transaction envelope itself is not unresolved: Appendix C fixes the current signed legacy
-format.
-The blocker is the security and operational consequence of sharing its signing key.
+Production fixes:
 
-## 1.5 Conventions
+```text
+D1 = 12,000 ms
+D2 =  2,000 ms
+K  = 6
+```
 
-Normative key words have the meaning defined by the
-[EEZ Framework conformance chapter](../eez-protocol-spec/01-scope-conformance.md). A profile value
-change requires a versioned Rollup0 activation. An ABI, hash, selector, proxy-code, envelope, DA
-grammar, or validation change requires a new protocol identifier under §0.4.
+Each nominal Ethereum interval has six Rollup0 timestamp positions. The activated proof budget
+and submission slack determine how many positions are built live and how many are prebuilt, but do
+not change `K`.
+
+The implementation-development Chiado profile uses:
+
+```text
+D1 = 5,000 ms
+D2 = 1,000 ms
+P  =   500 ms
+S  = 1,300 ms
+K  = 5
+```
+
+These Chiado values are not production fallback values.
+
+## 1.5 Data and System Transactions
+
+Rollup0 publishes every transported user transaction and every Rollup0 derivation sidecar required
+to reconstruct the range. The outer codec is specified in §4 and Appendix B. The exact
+`eez-evm@0.2-draft` objects embedded in that sidecar come from EEZ Appendix B.
+
+Version 0.2 retains signed deterministic system transactions as a network choice, but the
+production authorization is unresolved. A private EOA key conflicts with permissionless
+independent reconstruction: withholding it prevents open following, while distributing it permits
+forgery. Production activation MUST select and specify a design that resolves this conflict.
+
+## 1.6 Proof Policy States
+
+Three states must remain distinct:
+
+- **Current default development path:** one threshold-1 mock verifier that ignores the batch
+  public-input hash. It is unsafe and nonconforming.
+- **Current optional implementation path:** one remote ECDSA attester that independently
+  re-executes a window and signs a batch-bound public-input hash. It is evidence for a future
+  implementation, not the production policy.
+- **Production Rollup0 policy:** an authenticated validator/prover set, accepted proof-system
+  contracts, verification keys, threshold, authorization, and rotation rules. All are unresolved.
+
+An activation record MUST also define how validators bind their decision to every submitted field
+that the selected EEZ public-input hash omits.
+
+## 1.7 Development Genesis
+
+Appendix D retains the reviewed implementation-development genesis template and its Chiado
+timestamp-derivation procedure. It has EIP-155 chain ID `1`, a public system key, and test
+allocations. It MUST NOT be used as a production identity.
+
+Production requires a separate byte-exact genesis and manifest. No production chain ID, genesis,
+native-asset policy, or deployment tuple is specified by this draft.
 
 ---
 
-*Next: [§2 Timing, Slot Production & Header Rules](02-block-production.md).*
+*Next: [§2 Timing, Production, and Header Rules](02-block-production.md).*

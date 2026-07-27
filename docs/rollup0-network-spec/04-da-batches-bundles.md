@@ -1,306 +1,279 @@
-# 4. Data Availability, Batches, and Gnosis Bundles
+# 4. Data Availability, Batches, and Ethereum Bundles
 
-This chapter defines the Rollup0 v0 DA payload, batch selection, settlement evidence, and Chiado
-bundle. EEZ defines reusable execution and proof concepts. Rollup0 owns the rules in this chapter.
-Appendix E pins the historical `5c51e02` ABI and hashes.
+This chapter defines Rollup0 rules layered on `eez-evm@0.2-draft`. It does not redefine EEZ tuple
+layouts or hashes.
 
-## 4.1 Active DA channel
+## 4.1 Calldata DA
 
-Rollup0 v0 publishes the complete payload in `postAndVerifyBatch.callData`:
+Rollup0 publishes one complete calldata payload:
 
 ```text
-payload := 0x00 || rlp([blockTxCounts, transactions, l2_entries])
+payload = 0x00 || rlp([blockTxCounts, transactions, l2Entries])
 ```
 
-Tag `0x00` calldata is the only active channel. `batch.blobIndices` MUST be empty. Producers,
-validators, live followers, and catch-up followers MUST reject a v0 batch with a nonempty
-`blobIndices` list before decoding `callData`. No blob tag, packing rule, sidecar rule, or
-calldata-versus-blob selector is active. Adding one requires a new profile version.
+`batch.blobIndices` MUST be empty. Producers, validators, and followers MUST reject a nonempty list
+before decoding `callData`. Version 0.2 defines no Rollup0 blob codec or fallback DA channel.
 
 | Field | RLP shape | Meaning |
 |---|---|---|
-| `blockTxCounts` | list of byte strings | one canonical-minimal `uint16` user-transaction count for each produced L2 block |
-| `transactions` | list of byte strings | complete signed EIP-2718 user-transaction envelopes in block-major order |
-| `l2_entries` | list of byte strings | complete ABI encodings of producing derivation-form L1-shape `ExecutionEntry` values: outbound entries first, then inbound entries; §4.1.2 defines their exact relation to `batch.entries` |
+| `blockTxCounts` | list of canonical unsigned integers | one user-transaction count per Rollup0 block |
+| `transactions` | list of byte strings | complete signed EIP-2718 user envelopes in block-major order |
+| `l2Entries` | list of byte strings | complete ABI encodings of the selected `eez-evm@0.2-draft` L2 execution objects needed to reconstruct system transactions |
 
-### 4.1.1 Strict decoding
+The `l2Entries` objects use the L2 tuple family in
+[EEZ Appendix B](../eez-protocol-spec/B-wire-formats.md). A decoder MUST NOT decode them as the L1
+`ExecutionEntry` tuple family. The two sides have different layouts.
 
-A decoder MUST enforce all of the following:
+### Strict Decoder
 
-1. The payload is nonempty and starts with `0x00`.
-2. The bytes after the tag contain exactly one canonical RLP item and no trailing bytes.
-3. The item is a three-element list, and each element is itself a list.
-4. `blockTxCounts` is nonempty. Each item is a canonical-minimal unsigned integer with no leading
-   zero and a value at most `65535`. Integer zero is the empty RLP string.
-5. `sum(blockTxCounts) == len(transactions)`.
-6. Every transaction item is a byte string. During replay it MUST decode as exactly one complete
-   supported signed envelope with no trailing bytes.
-7. Every entry item is a byte string. It MUST decode from the entire item as exactly one
-   `5c51e02` L1-shape `ExecutionEntry`.
-8. `l2_entries` contains exactly one item for every producing entry in `batch.entries`, in the
-   same order and with the transformation in §4.1.2. The state-anchor entry is absent.
-9. `l2_entries` MUST be empty if and only if `batch.entries` contains only the state anchor.
-   A follower MUST NOT reconstruct a missing sidecar from `batch.entries`.
+A decoder MUST enforce:
 
-The codec treats transaction and entry bytes as opaque only at the outer RLP layer. Signature,
-chain, nonce, fee, balance, ABI, execution, and reserved-sender checks remain mandatory during
-derivation. Appendix B separates the outer-codec vector from the strict end-to-end decoder vector.
+1. The payload is nonempty and starts with tag `0x00`.
+2. The bytes after the tag contain exactly one canonical RLP item and no trailing byte.
+3. The item is exactly a three-element list and each element is a list.
+4. `blockTxCounts` is nonempty.
+5. Each count is canonical-minimal, has no leading zero, and is at most `65535`.
+6. The checked sum of counts equals `len(transactions)`.
+7. Every transaction item is a byte string containing exactly one complete supported signed
+   EIP-2718 envelope and no trailing byte.
+8. Every `l2Entries` item is a byte string containing exactly one complete canonical ABI value of
+   the expected L2 tuple type.
+9. The exact sidecar count and order match the effects and system transactions selected under
+   Appendix C.
+10. Missing, extra, reordered, duplicated, or field-mismatched sidecar entries invalidate the
+    candidate.
 
-### 4.1.2 Sidecar correspondence
+The outer decoder may initially expose opaque transaction and entry bytes. Candidate validation
+MUST complete every inner check before proving, signing, submission, or derivation.
 
-Let `r` be the selected Rollup0 rollup ID, let `B = batch.entries`, and let `S` be the decoded
-`l2_entries` sequence. A valid v0 batch has:
+### Sidecar Correspondence
 
-```text
-B = [anchor, O_chain[0], ..., O_chain[o-1], I_chain[0], ..., I_chain[i-1]]
-S = [        O_da[0],    ..., O_da[o-1],    I_da[0],    ..., I_da[i-1]]
+For each supported cross-network effect, the sidecar contains the exact L2 execution object used by
+the deterministic system-transaction builder. The following data MUST match the corresponding EEZ
+candidate data:
 
-transientExecutionEntryCount = 1 + o
-transientLookupCallCount      = 0
-l1ToL2lookupCalls             = []
-len(S)                        = len(B) - 1 = o + i
-```
+- call hash and direction;
+- static/failed mode, which are both fixed to `false` by this profile;
+- target, value, calldata, source, and source rollup ID;
+- call and lookup arrays;
+- call counts and ordering;
+- return data and rolling hash; and
+- every nested table, which MUST be empty in the Rollup0 flat-call profile.
 
-`B` MUST be nonempty. The anchor has no sidecar counterpart. It has
-`proxyEntryHash = bytes32(0)`, `destinationRollupId = r`, empty call and expected-call arrays,
-`callCount = 0`, empty `returnData`, `rollingHash = bytes32(0)`, and exactly one state delta for
-`r`. With producing entries, that delta is
-`(r, header(cursor).stateRoot, header(sync-1).stateRoot, 0)`. In an anchor-only batch, its
-`newState` is instead `header(sync).stateRoot`.
+The sidecar does not carry Rollup0 `StateDelta` values. Those values belong to the L1 batch and are
+validated separately under §4.3.
 
-Every `S[k]` has empty `stateDeltas`, `destinationRollupId = r`, empty
-`expectedL1ToL2Calls`, and empty `expectedLookups`. Every `B[k+1]` has exactly one state delta for
-`r`. The first producing delta starts at the anchor's `newState`; later deltas start at the
-preceding producing delta's `newState`. Every producing delta ends at
-`header(sync).stateRoot`.
+A validator MUST derive both the L1 batch object and L2 sidecar object from the same independently
+executed effect. Equality of hashes supplied by a composer is insufficient.
 
-The paired fields MUST satisfy this table. "Equal" means byte-for-byte equality of the decoded
-field, including array order and multiplicity.
+## 4.2 Cursor-Derived Range
 
-| Field | Outbound pair `O_da[k]`, `O_chain[k]` | Inbound pair `I_da[k]`, `I_chain[k]` |
-|---|---|---|
-| `stateDeltas` | DA empty; chain has the delta above | DA empty; chain has the delta above |
-| `proxyEntryHash` | zero in both | the same nonzero `H_in` in both |
-| `destinationRollupId` | `r` in both | `r` in both |
-| `l2ToL1Calls` | equal, exactly one `outer` | DA is exactly `[outer]`; chain is empty |
-| `expectedL1ToL2Calls` | empty in both | empty in both |
-| `expectedLookups` | empty in both | empty in both |
-| `callCount` | `1` in both | DA is `1`; chain is `0` |
-| `returnData` | equal | equal |
-| `rollingHash` | equal to the successful one-call fold | DA has the successful one-call fold; chain is zero |
-| producing `etherDelta` | `-int256(outer.value)` | `+int256(outer.value)` |
-
-For every `outer`, `revertSpan = 0` and `outer.value <= type(int256).max`. An outbound `outer` has
-`sourceRollupId = r`. An inbound `outer` has `sourceRollupId = MAINNET_ROLLUP_ID = 0`, and:
+Let `cursor_block` be the last Rollup0 block accepted from preceding canonical Ethereum history, or
+the activated genesis block before the first candidate. The candidate MUST name its exact height,
+block hash, and state root. In the arithmetic below, `cursor = cursor_block.number`. Let
+`E = (e_number, e_hash, e_timestamp)` be the authenticated Ethereum proof-context header selected
+under §2.3, and let:
 
 ```text
-H_in = keccak256(abi.encode(
-    r,
-    outer.targetAddress,
-    outer.value,
-    outer.data,
-    outer.sourceAddress,
-    outer.sourceRollupId
-))
+T       = target_height(E)
+n       = len(blockTxCounts)
+first   = cursor + 1
+sync    = cursor + n
+range   = (cursor, sync]
 ```
 
-The successful one-call fold is
-`CALL_END(CALL_BEGIN(bytes32(0), 1), 1, true, returnData)` under the compatibility binding.
-Zero-value producing deltas use `etherDelta = 0`.
-
-The sidecar and on-chain entry are deliberately not ABI-equal. In particular, the populated
-inbound DA entry carries the call parameters needed for L2 delivery, while the on-chain deferred
-entry is lean and commits those parameters through `H_in`. A validator or follower MUST perform
-the field-by-field comparison above before it uses an entry or interprets an applied prefix.
-Missing, extra, reordered, duplicate-lost, or mismatched entries invalidate the whole range. The
-`callData` commitment alone does not establish this correspondence.
-
-### 4.1.3 Sync-block count
-
-The final count belongs to the Sync block and MAY be nonzero. It counts transported user
-transactions, not reconstructed system transactions. For `O` outbound entries and `U` remaining
-Sync users, the final count is `O + U`.
-
-The canonical fixture uses:
+All arithmetic MUST be checked. A candidate range is admissible only when:
 
 ```text
-blockTxCounts = [2, 1]
+n = sync - cursor = len(blockTxCounts)
+cursor < sync <= T
+(T - sync) mod K = 0
+1 <= n <= N_max
 ```
 
-It covers two blocks, and the final Sync block has one user transaction. A client that requires a
-trailing zero does not implement Rollup0 v0.
+`sync = T` selects the current target. `sync < T` selects a catch-up endpoint stepped back from
+`T` by whole `K` intervals. If `T <= cursor`, no positive candidate is admissible for `E`.
+`N_max` is the activated consensus range bound. The producer-side catch-up value `C` does not
+replace it.
 
-## 4.2 Cursor-derived range
+The first count belongs to `first`; the last belongs to `sync`. Counts include transported user
+transactions only. Reconstructed system transactions are not counted.
 
-Let `cursor` be the highest L2 block accepted from preceding canonical settlement history, or the
-configured genesis block before the first batch. Let `n = len(blockTxCounts)`. Because `n > 0`:
+For a rich candidate, the final Sync count MUST equal the number of outbound effect groups. The
+corresponding final-block items in `transactions` MUST be exactly the consuming user transaction
+from each outbound group, in effect-group order. An inbound-only rich candidate therefore has a
+zero final count. No unrelated Sync user transaction is permitted.
+
+For an anchor-only candidate, the final Sync count MAY be nonzero. Its final-block items are the
+complete ordered ordinary user body `U` defined in §3.3.
+
+The batch does not obtain authority over this range merely by carrying `n` counts. Its exact named
+parent MUST equal `cursor_block`, its first Rollup0 state precondition MUST equal
+`cursor_block.stateRoot`, replay MUST cover exactly `n`
+blocks, and the final applicable state delta MUST equal the replayed Sync root.
+
+Candidates in one Ethereum block are processed in canonical transaction order. Each applicable
+candidate starts from the cursor left by preceding applicable candidates. A stale sibling does not
+consume a range.
+
+## 4.3 Per-Effect State Deltas
+
+The EEZ binding defines the L1 `ExecutionEntry` and `StateDelta` encodings. Rollup0 uses the
+symbols and prefix construction from §3.3:
 
 ```text
-range_parent = cursor
-first_block  = cursor + 1
-sync_block   = cursor + n
-range        = (cursor, sync_block]
+A    = header(cursor).stateRoot
+Z    = root([])
+R[k] = root(G[0] || ... || G[k])
 ```
 
-Compatibility code and older prose may call `cursor` `fromBlock` and `sync_block` `toBlock`.
-Under that notation, `blockTxCounts[i]` belongs to `fromBlock + 1 + i` and
-`len(blockTxCounts) == toBlock - fromBlock`.
+`Z` is the state after all nonterminal blocks and the terminal Sync block's mandatory
+pre-execution changes, with no Sync transaction executed. It MUST NOT be replaced by the
+pre-Sync parent root.
 
-Neither height is encoded in the DA payload, and the `5c51e02` proof fold does not independently
-commit to L2 block numbers. Position is established operationally by the settled cursor and state
-chain: the first relevant `currentState` MUST equal `header(cursor).stateRoot`, replay MUST cover
-exactly `n` blocks, and the selected applied endpoint MUST equal the replayed Sync root. A losing,
-unsettled, malformed, or ambiguous post does not advance the cursor.
-
-Batches in one Chiado block are processed in canonical transaction and log order. Each advancing
-batch starts from the cursor left by the previous accepted batch. Nominal slot width `K` is not a
-range validity condition; deferred posting and catch-up can cover another positive length.
-
-## 4.3 Batch fields
-
-`postAndVerifyBatch` receives one compatibility-bound batch:
-
-```solidity
-struct ProofSystemBatchPerVerificationEntries {
-    ExecutionEntry[]           entries;
-    LookupCall[]               l1ToL2lookupCalls;
-    uint256                    transientExecutionEntryCount;
-    uint256                    transientLookupCallCount;
-    address[]                  proofSystems;
-    RollupIdWithProofSystems[] rollupIdsWithProofSystems;
-    bytes32                    crossProofSystemInteractions;
-    uint256[]                  blobIndices;       // MUST be empty in v0
-    bytes                      callData;          // §4.1 payload
-    bytes[]                    proofs;
-    uint64                     blockNumber;       // explicit past Chiado proof context
-}
-```
-
-The contract treats `callData` as opaque and folds its hash into the proof public inputs.
-Validators and followers enforce the codec.
-
-Rollup0 v0 fixes `crossProofSystemInteractions = bytes32(0)`. The compatibility contract accepts
-an arbitrary `bytes32` and commits it to the shared public input, but Rollup0 does not define any
-cross-proof-system interaction or another value for this field. Producers MUST set it to zero;
-validators and followers MUST reject a nonzero value. Defining another value requires a new
-Rollup0 protocol version.
-
-The compatibility public-input hash commits to the entry and lookup hashes but omits
-`transientExecutionEntryCount` and `transientLookupCallCount`. Those counts affect which prefixes
-use transient routing and which state is published or retained. A proof over the remaining fields
-does not authenticate either count. Validators MUST bind their attestation decision to the exact
-submitted batch calldata, including both counts, and deployments MUST apply the restrictions in
-§9.4. A proof cannot be treated as reusable across count variants.
-
-For a rich attempt scheduled from observed Chiado head `(N, H, T)`, `batch.blockNumber` MUST be
-`N`. It MUST NOT be zero, `uint64.max`, or the future inclusion target. The operator and validators
-MUST authenticate `H`, and the manager MUST return the compatibility-bound context for N.
-
-The v0 entry order is:
+A rich candidate with `m > 0` effects MUST carry this Rollup0 chain:
 
 ```text
-[state anchor, outbound entries..., inbound entries...]
+anchor          = (rollupId, A,      Z,    0)
+effect[0]       = (rollupId, Z,      R[0], etherDelta[0])
+effect[k], k>0  = (rollupId, R[k-1], R[k], etherDelta[k])
 ```
 
-`transientExecutionEntryCount` is one plus the outbound-entry count. Partial settlement is
-interpreted only against this order and exact event occurrences under §4.5.
+The anchor MUST precede every effect entry. Each effect entry has exactly one Rollup0 delta at its
+execution position. Each `etherDelta[k]` MUST match only that effect's exact cross-network value
+movement. The last `R[m-1]` MUST equal the full rich Sync root.
 
-## 4.4 Bundle construction
-
-The producer admits at most three Chiado source transactions per attempt. After decoding,
-ordinary source-chain validation, and sequential simulation against the state established by the
-preceding bundle elements, it constructs:
+An anchor-only candidate has no effect entry. For its complete ordinary Sync user body `U`, let
+`F = root(U)`. It MUST carry exactly one Rollup0 delta:
 
 ```text
-bundle = [postAndVerifyBatch_tx, inbound_user_tx[0], ..., inbound_user_tx[P-1]]
-P = i
-0 <= P <= 3
+anchor-only = (rollupId, A, F, 0)
 ```
 
-There is exactly one rider for each inbound batch/sidecar entry and no rider without an inbound
-entry. Rider `j` corresponds to `I_chain[j]` and `I_da[j]`. The batch transaction is first. In the
-canonical Chiado block, rider `j` MUST be the transaction at
-`transactionIndex(postAndVerifyBatch_tx) + 1 + j`. Riders are the surviving inbound source
-transactions in their original FIFO and deferred-entry order, with no unrelated transaction
-inserted. Outbound L2 users are in the Sync block and DA payload, never in the Chiado bundle. The
-one-element form (`P = i = 0`) is valid for empty, outbound-only, catch-up, or fully filtered work.
+An empty anchor-only Sync body has `F = Z`. A nonempty anchor-only body is allowed, but none of its
+transactions can require an EEZ effect entry.
 
-Every rider MUST pass signature, chain, nonce, intrinsic-gas, fee, maximum-balance, and sequential
-simulation checks. A deterministic invalid rider is excluded with its dependent higher-nonce
-suffix. A transient validation failure cannot authorize an unvalidated rich bundle.
+Every validator MUST recompute `Z` and every `R[k]` by sequentially executing the corresponding
+body prefix on the same pre-Sync parent and with the same terminal block environment. It MUST NOT
+execute one prefix as a child block of another prefix. It MUST reject a candidate that copies the
+final Sync root into an earlier delta. That historical construction is unsafe because it can
+commit state from a later effect before the corresponding Ethereum-side action has occurred.
 
-## 4.5 Atomicity and canonical settlement evidence
+### Rollup0 Batch Restrictions
 
-A conforming production relay MUST include the submitted raw transactions all or none, in their
-exact order, in one Chiado block at the requested block number and Sync timestamp. It MUST NOT use
-an allowed-revert or droppable-rider list. Sequential public-mempool submission and the development
-bundle shim do not provide this property and MUST fail closed outside explicit development mode.
+In addition to all EEZ structural rules:
 
-The EVM does not roll back `postAndVerifyBatch` when a later transaction fails. Relay atomicity is
-therefore a trust assumption, not an EEZ contract guarantee. The proof digest also does not commit
-to the rider transaction hashes or bundle membership. Validators MUST inspect the intended raw
-transaction list and order before attesting.
+- `blobIndices` is empty;
+- top-level and nested lookup arrays are empty;
+- static, failed, nested, reentrant, and multi-call effects are absent;
+- every participating Rollup0 proof-system assignment satisfies the activated membership and
+  threshold;
+- `blockNumber` is the explicit recent Ethereum proof-context block selected under §2.3; and
+- transient execution and lookup counts equal the exact activated routing construction.
 
-Settlement is determined from canonical receipts, not from `BatchPosted` alone and not from a set
-of roots observed somewhere in the inclusion block:
+`eez-evm@0.2-draft` does not include the transient routing counts or submitter identity in its proof
+public-input hash. A validator MUST authenticate the complete submitted batch bytes, including
+those counts, and the activation MUST select an external mitigation that prevents proof reuse
+across another routing choice or submitter context. The mitigation is unresolved and blocks
+production.
 
-1. Authenticate the canonical Chiado block, requested number, hash, and timestamp.
-2. Let `p` be the post transaction index. Require enough transactions to exist in the same block
-   and identify rider `j` as canonical transaction `p + 1 + j` for every `0 <= j < i`.
-   Authenticate the post and those riders by hash and index. An interposed transaction, a missing
-   rider, or an additional claimed rider is invalid.
-3. Read each receipt in that order and require the post receipt to have status `1`. Within a
-   receipt, preserve `logIndex`.
-4. Accept only logs emitted by the selected EEZ address and, where indexed, the selected rollup ID.
-5. Require exactly one `BatchPosted` occurrence in the post receipt. It MUST follow all immediate
-   outcome logs, and its indexed `rollupCount` MUST equal
-   `len(batch.rollupIdsWithProofSystems)`.
-6. Let `m = transientExecutionEntryCount = 1 + o`. Classify immediate indices `0..m-1` from the
-   post receipt. After filtering by emitter and selected rollup, the next relevant log for each
-   index MUST be exactly one of:
-   - `L2ExecutionPerformed(r, expectedNewState)`, which classifies that index as applied; or
-   - `ImmediateEntrySkipped(index, revertData)`, which classifies that index as not applied.
-   A skip index MUST equal the next unclassified index. Missing, duplicate, out-of-range, or
-   reordered classifications are invalid. The revert payload is diagnostic and MUST NOT be used
-   to change this classification.
-7. Classify inbound index `j` from the receipt of rider `j`. An applied rider has status `1` and
-   exactly one ordered pair
-   `ExecutionConsumed(H_in[j], r, queueIndex)` then
-   `L2ExecutionPerformed(r, expectedNewState[j])`, with no extra selected-rollup consumption or
-   state-delta occurrence. A rider with no retained pair is not applied. A partial pair, a
-   mismatched hash or rollup ID, reversed order, or extra pair is invalid. `queueIndex` is the
-   contract's persistent per-rollup queue cursor, not a batch-relative index. Let `q` be the
-   authenticated next cursor after the post receipt and before the first rider. An applied rider
-   MUST report `queueIndex = q`, and queue item `q` MUST be that rider's `I_chain[j]`; then set
-   `q = q + 1`. A not-applied rider leaves `q` unchanged. A reused or jumped cursor is invalid.
-8. Concatenate the classified outcomes in batch order
-   `[anchor, outbound..., inbound...]`. Every applied outcome MUST precede every not-applied
-   outcome. An applied outcome after the first not-applied outcome is a non-prefix hole and
-   invalidates the range, even when all emitted roots have the same value. The applied prefix
-   length is the number of leading applied outcomes.
+## 4.4 Ethereum Bundle
 
-Appendix E.9 fixes the event topic hashes, indexed fields, and data encodings. Receipt status,
-transaction boundary, `logIndex`, event kind, and indexed skip/consumption data are consensus
-inputs to attribution. Counting `L2ExecutionPerformed` logs alone is invalid because Rollup0
-entries can deliberately repeat the Sync root.
+The candidate identifies an exact ordered list:
 
-The full batch settles only when the final attributable occurrence equals the intended Sync root.
-If no state delta applied, the cursor does not advance. An unambiguous proper prefix selects the
-deterministic repaired Sync block in §6.3. Ambiguous evidence halts derivation at the previous safe
-head. A follower MUST NOT infer a prefix by root membership, deepest matching value, or a
-per-Chiado-block `HashSet`.
+```text
+bundle = [postAndVerifyBatch, trigger[0], ..., trigger[i-1]]
+```
 
-## 4.6 Observation and failure
+For the `i` inbound effects in the candidate, `trigger[j]` is the one exact Ethereum transaction
+that attempts to consume inbound effect `j`. Each inbound effect MUST have a distinct trigger, and
+one trigger MUST NOT produce more than one inbound effect for the candidate. The transactions
+appear in inbound-effect order. A candidate with no inbound effect uses the one-transaction bundle.
 
-A submitted attempt remains pending until canonical evidence proves settlement or proves that the
-exact target cannot contain it. Receipt success alone is insufficient. Observation MUST validate
-the inclusion number, canonical hash, target timestamp, transaction order, EEZ address, events,
-and selected endpoint.
+Production candidate-range `N_max`, effect-count, total bundle-byte, and gas limits are unresolved.
+The current composer drains at most three held transactions into a candidate bundle by default;
+`EEZ_MAX_USER_TXS_PER_BUNDLE` can change that limit. The held pool itself has no three-transaction
+admission cap. This implementation default is not a production capacity selection.
 
-If the attempt does not land, §2.5 governs optimistic rollback and held-transaction recovery. A
-stale failure verdict cannot undo a Sync height already reached by canonical derivation. Final
-safe/finalized advancement and Chiado reorg handling are in §6.
+Every transaction MUST pass:
+
+- canonical envelope and signature validation;
+- Ethereum chain ID and replay-protection checks;
+- nonce, intrinsic gas, fee, balance, and block-gas checks;
+- sequential simulation after every preceding bundle element; and
+- exact correspondence to the candidate's EEZ effects.
+
+The activated relay/builder MUST include all transactions in exact order at consecutive transaction
+indices in one selected canonical Ethereum block, or include none. No transaction or call that can
+replace or consume the selected queue may be interleaved. The mechanism MUST NOT allow a trigger
+transaction to be dropped. A validly included trigger whose EEZ consumption call reverts is a
+non-applied effect under §4.5; its status-`0` receipt is sufficient evidence after the exact trigger
+is authenticated. Internal revert data and reverted logs are not required. The failed receipt does
+not excuse a missing, reordered, or unrelated trigger. The selected inclusion mechanism MUST bind
+this behavior explicitly. Public-mempool sequential submission does not meet this rule.
+
+The production builder or atomic-inclusion mechanism, target semantics, fee
+funding, and failure behavior are release blockers. Candidate submission and
+relay remain permissionless: the inclusion mechanism cannot create a composer
+or relayer allowlist.
+
+## 4.5 Canonical Settlement Evidence
+
+Settlement is derived from canonical Ethereum blocks, transactions, receipts, and ordered log
+occurrences. A follower MUST NOT infer settlement from `BatchPosted` alone or from a set of state
+root values found somewhere in a block.
+
+For each included candidate:
+
+1. Authenticate the canonical Ethereum header, block number, hash, and required timestamp
+   constraints.
+2. Locate the exact post transaction by hash and transaction index.
+3. Locate every claimed trigger at the next exact index in bundle order.
+4. Require the post receipt to succeed.
+5. Within each receipt, preserve log order and duplicate occurrences.
+6. Accept only logs from the activated EEZ address and selected rollup ID.
+7. Require the exact `BatchPosted` occurrence defined by the EEZ binding.
+8. Classify the anchor from the ordered success or skip event that belongs to its exact index.
+9. Classify every immediate effect by the ordered success or skip event that belongs to its exact
+   index.
+10. Classify every deferred effect from the exact trigger receipt and ordered consumption and
+    state events that identify its queue item. An authenticated status-`0` receipt classifies that
+    exact trigger as non-applied; a successful receipt requires the exact surviving consumption and
+    state events to classify it as applied.
+11. Require a rich result to be either no applied anchor and no applied effect, or the applied
+    anchor followed by exactly the first `q` effects, for one `0 <= q <= m`.
+12. Require the final applied occurrence to equal `Z` when `q = 0`, or `R[q-1]` when `q > 0`.
+13. Require an anchor-only result to be either unapplied or its sole `A -> F` delta applied.
+
+Receipt boundaries, transaction indices, log indices, event kind, effect index, queue cursor, and
+duplicate multiplicity are consensus inputs. Root equality is not a substitute.
+
+### Competing Candidates
+
+After evidence is authenticated, process candidate posts in canonical Ethereum transaction order:
+
+- if the candidate's exact parent height, block hash, and state root equal the current cursor
+  identity, validate and apply its unique selected endpoint;
+- if any parent-identity field differs, classify the candidate as stale and do not advance, even
+  when its state root equals the current root;
+- after an applicable candidate advances, use the selected endpoint height, hash, and root as the
+  cursor for the next transaction; and
+- never choose a candidate by composer identity, local arrival time, or proof arrival time.
+
+If the rich anchor does not apply, no part of the range advances. If it applies, `q = 0` is a
+valid zero-effect settlement and `0 < q < m` is a proper effect prefix. Either case selects the
+deterministic repaired Sync block under §6. A hole, ambiguous occurrence, wrong transaction, or
+reused event invalidates the candidate.
+
+## 4.6 Failure
+
+A submitted candidate remains pending until canonical evidence proves it applicable, stale,
+expired, or invalid. A local timeout cannot manufacture a canonical verdict.
+
+On failure, the composer MAY roll back its local unsafe candidate and requeue transactions.
+It MUST first re-read the canonical cursor so that a stale local verdict cannot undo a competing
+candidate already accepted by Ethereum ordering.
 
 ---
 
-*Next: [§5 Cross-Chain Flows](05-l1-to-l2.md).*
+*Next: [§5 Cross-Network Flows](05-l1-to-l2.md).*

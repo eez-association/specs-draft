@@ -1,92 +1,169 @@
-# 3. The Composer
+# 3. Composer and Candidate Competition
 
-The composer is the permissioned Rollup0 operator function that turns held cross-chain intents
-and ordinary L2 transactions into a candidate Sync block and a Gnosis Chain settlement bundle.
-The reusable execution and settlement semantics are defined by the
-[EEZ Framework](../eez-protocol-spec/index.md). This chapter defines Rollup0's orchestration.
+The composer is an open Rollup0 function. It constructs a candidate Rollup0 range and the
+corresponding Ethereum settlement bundle. It is not an authority role.
 
 ## 3.1 Inputs
 
-For an observed canonical Chiado head `A = (n, hash, t)`, the composer receives:
+For a candidate attempt, a composer uses one consistent snapshot of:
 
-- the canonical unsafe L2 parent selected under §2;
-- the last L1-confirmed L2 cursor;
-- ordered held intents for a flat, single call in either the L1-to-L2 or L2-to-L1 direction;
-- an ordered candidate list of L2 user transactions;
-- the `rollup0-v0` chain, contract, timing, and signer configuration; and
-- the exact target `(n + 1, sync_time)` derived under §2.4.
+- the selected Rollup0 profile and activation;
+- a canonical Ethereum anchor;
+- the applicable Rollup0 parent and last settled cursor;
+- ordered user transactions and cross-network intents;
+- the exact `eez-evm@0.2-draft` binding;
+- the validator/prover policy; and
+- the intended Ethereum inclusion target and bundle.
 
-The composer MUST use one consistent snapshot of those inputs. A changed L2 parent, confirmed
-cursor, Chiado anchor, protocol version, or deployment identity makes the attempt stale.
+A changed parent, cursor, anchor, activation, or deployment tuple makes the attempt stale.
 
-## 3.2 Lifecycle
+## 3.2 Candidate Construction
 
-For each eligible, caught-up, non-late steady Sync trigger, the composer MUST:
+A composer MUST:
 
-1. Simulate every admitted flat interaction across both chains under the EEZ execution rules.
-   Feed each destination return value back to its source execution and record the call, return
-   data, state deltas, ether delta, and rolling-hash contribution. An attempt can admit at most
-   three Chiado source transactions under §4.4.
-2. Reject an interaction that requires nesting, reentrancy, more than one cross-chain call within
-   that interaction, or another behavior outside the Rollup0 profile.
-3. Build the exact L2 transaction sequence in Appendix C. Each outbound call contributes a
-   signed load transaction immediately before its paired L2 user transaction. Inbound calls
-   contribute signed delivery transactions after all outbound pairs. Remaining user transactions
-   follow the inbound deliveries.
-4. Execute that sequence against the selected parent and construct all 23 header fields under
-   §2.6. Commit only if the parent is still canonical.
-5. Encode the full positive range from the L1-confirmed cursor to the new endpoint under §4.
-   `blockTxCounts` partitions transported user transactions; it does not count reconstructed
-   system transactions.
-6. Build the EEZ batch and proofs using the exact ABI and hashes in Appendix E. Set
-   `batch.blockNumber = n` and `batch.crossProofSystemInteractions = bytes32(0)`, so the proof
-   context binds `blockhash(n)` and the Rollup0 proof-domain field is deterministic. Do not use
-   either legacy context sentinel, and do not accept a nonzero cross-proof-system field.
-7. Submit the exact ordered bundle
-   `[postAndVerifyBatch, inbound source transactions...]` for Chiado block `n + 1`, with minimum
-   and maximum timestamp equal to `sync_time`. Include zero to three riders in their surviving FIFO
-   and deferred-entry order, exactly one rider for every inbound batch entry. The one-element
-   `[postAndVerifyBatch]` form is valid for empty, outbound-only, catch-up, or fully filtered work.
-8. Authenticate the canonical block and every submitted transaction and receipt. Attribute
-   settlement only from the per-index immediate outcomes and receipt-bound deferred-consumption
-   pairs in §4.5. Preserve transaction boundaries, order, and multiplicity. Keep the batch in
-   flight until derivation reaches its uniquely selected endpoint.
-9. On failure, use the rollback, requeue, poison-attempt, and retry state machine in §2.5.
+1. Decode and validate every input transaction before simulation.
+2. Simulate admitted interactions sequentially against the state left by preceding candidate
+   elements.
+3. Reject unsupported static, failed, nested, reentrant, or multi-call interactions.
+4. Build the nonterminal blocks and one of the two terminal Sync forms in Appendix C.
+5. Execute the complete L2 range and construct every header field under §2.
+6. Compute the settled root, zero-effect Sync root, and every effect-prefix root under §3.3.
+7. Build one anchor delta and, for a rich candidate, one additional `StateDelta` per effect.
+8. Require the delta chain to end at the exact terminal Sync root.
+9. Encode the complete positive DA range under §4.
+10. Build the EEZ batch using the selected binding, recent Ethereum proof context, empty
+    `blobIndices`, and the activated routing mitigation.
+11. Obtain every proof required by the activated threshold.
+12. Submit the exact intended Ethereum transaction bundle.
 
-A late trigger, catch-up trigger, stale parent, or unresolved earlier submission MUST NOT drain
-held intents. It can still produce a cross-chain-empty structural or ordinary Sync block as
-specified in §2.
+A rich candidate has one or more cross-network effects. Its terminal Sync body consists only of
+the corresponding effect groups. It MUST NOT contain an unrelated user transaction before,
+between, or after those groups. All claimed cross-network effects in the candidate range MUST
+occur in those terminal groups.
 
-## 3.3 Conformance requirements
+An anchor-only candidate has no cross-network effect. Its terminal Sync body MAY contain ordered
+ordinary user transactions that produce no claimed EEZ effect. Its sole Rollup0 delta starts at
+the settled cursor root and ends at the final Sync root.
 
-A conforming composer MUST satisfy:
+## 3.3 Exact Prefix Roots
 
-- **Faithful execution.** Every recorded result, state delta, ether delta, and rolling hash MUST
-  equal an independent replay under the EEZ Framework.
-- **Simulation equivalence.** Simulation MUST use the same fork rules, gas accounting, contract
-  bytecode, call context, and value accounting as settlement and L2 replay.
-- **Determinism.** The same authenticated genesis, parent, DA input, sidecar entries, and system
-  signer MUST produce byte-identical transactions, receipts, and headers.
-- **Atomic inclusion.** The complete conditional list
-  `[postAndVerifyBatch, inbound source transactions...]` MUST land in its exact order at the target
-  or none of its transactions can count as the intended atomic bundle. An attempt with no riders
-  still requires the post transaction to land at that target.
-- **Serialized settlement.** At most one submitted batch can exist above the confirmed cursor.
-- **Published derivation data.** The DA payload MUST contain every user transaction and L1-shape
-  execution-entry sidecar needed by a configured follower. The signed system envelopes are
-  reconstructed, not transported.
+Let:
 
-The last requirement is a Rollup0 network choice, not an EEZ Framework requirement. Because v0
-followers need the shared system private key to reconstruct valid signatures, it does not provide
-permissionless derivation.
+- `A = header(cursor).stateRoot`, the root accepted before this candidate;
+- `S_pre` be the state after executing all nonterminal blocks in the candidate range; and
+- `root(B)` be the state root obtained by building the terminal Sync block on `S_pre` with its
+  exact environment, applying all mandatory pre-execution changes, and executing transaction body
+  `B`.
 
-## 3.4 Non-guarantees
+The zero-effect Sync prefix is:
 
-`rollup0-v0` has one centralized, permissioned operator. It provides no censorship-resistance or
-transaction-ordering guarantee. Operator failure can halt progress. The shared signing key,
-prefunded signer, atomic-relay dependency, and optimistic rollback path are explicit limitations
-in §8.
+```text
+Z = root([])
+```
+
+`Z` includes the terminal Sync block's mandatory pre-execution state changes. It is not the
+pre-Sync parent root `S_pre`.
+
+For a rich candidate with ordered effects `E[0..m-1]`, let `G[k]` be the complete transaction
+group for `E[k]`:
+
+- an outbound group is `loadExecutionTable` followed immediately by its consuming user
+  transaction; and
+- an inbound group is one `executeIncomingCrossChainCall` system transaction.
+
+The rich Sync body and effect-prefix roots are:
+
+```text
+body = G[0] || G[1] || ... || G[m-1]
+R[k] = root(G[0] || G[1] || ... || G[k])
+```
+
+Each `root(...)` computation starts from the same pre-Sync parent `S_pre` and uses the same Sync
+environment. A client MUST NOT build one prefix as a child block of another prefix.
+
+The Rollup0 state-delta chain MUST be:
+
+```text
+anchor          = (rollupId, A,      Z,    0)
+effect[0]       = (rollupId, Z,      R[0], etherDelta[0])
+effect[k], k>0  = (rollupId, R[k-1], R[k], etherDelta[k])
+```
+
+The anchor covers every nonterminal block and the zero-effect Sync prefix. The final `R[m-1]`
+MUST equal the rich candidate's Sync root. An intermediate effect MUST NOT jump directly to that
+final root.
+
+For an anchor-only candidate, let `U` be its complete ordered Sync user body and let
+`F = root(U)`. Its only delta MUST be:
+
+```text
+anchor-only = (rollupId, A, F, 0)
+```
+
+When `U` is empty, `F = Z`. An anchor-only candidate does not expose separately settleable effect
+prefixes.
+
+Historical code assigned the final Sync root to every producing entry. In a mixed-value batch,
+that can make an earlier Ethereum-side effect appear to commit state that includes a later
+Rollup0-side effect. This enables unsafe value ordering and is invalid in version 0.2.
+
+## 3.4 Validator/Prover Interface
+
+A composer MAY send the same candidate to several validators and MAY send competing siblings.
+Validators MUST decide from candidate content and activated policy, never composer identity.
+
+A composer MUST NOT request or rely on:
+
+- exclusive signing rights;
+- first-seen locking;
+- a validator promise not to sign siblings;
+- a privileged poster address; or
+- acceptance of a field that the validator did not authenticate.
+
+The proof response MUST identify the candidate and proof-system public input that was evaluated.
+The composer MUST reject a response for another candidate, profile, activation, or proof context.
+
+## 3.5 Competition and Ethereum Ordering
+
+Several composers can build from the same parent and can obtain valid proofs. A local composer MAY
+serialize its own submissions, but that is not a network rule.
+
+For canonical Ethereum transactions `T[0], T[1], ...`:
+
+1. process candidates in transaction order;
+2. apply a candidate only if its first Rollup0 state precondition matches the current registered
+   state at that point;
+3. update the state and queue according to the selected EEZ binding; and
+4. treat a mismatching sibling as stale.
+
+A follower applies the same order. It does not choose by producer, proof arrival time, highest fee,
+largest range, or locally preferred candidate.
+
+Two candidates in the same Ethereum block can both advance only when the later candidate starts
+from the state produced by the earlier one. Same-parent siblings cannot both advance.
+
+## 3.6 Publication and Observation
+
+The composer MUST publish every byte required for independent validation and derivation. It MUST
+authenticate canonical Ethereum receipts before treating its candidate as accepted.
+
+Receipt success alone is insufficient. The composer MUST verify:
+
+- the requested canonical Ethereum block and timestamp constraints;
+- exact transaction hashes, indices, order, and receipt status;
+- the selected EEZ emitter and event occurrences;
+- exact immediate and deferred effect attribution; and
+- the uniquely applicable Rollup0 endpoint.
+
+Failure recovery is local. It cannot override a different candidate that canonical Ethereum
+ordered first.
+
+## 3.7 Non-Guarantees
+
+Open composition does not guarantee inclusion. Validators can censor by refusing delivery or
+proofs, builders can censor Ethereum transactions, and the proof threshold can halt. Rollup0 has
+no force-inclusion inbox or trustless exit in this draft.
 
 ---
 
-*Next: [§4 Data Availability, Batches & Gnosis Bundles](04-da-batches-bundles.md).*
+*Next: [§4 Data Availability, Batches, and Ethereum Bundles](04-da-batches-bundles.md).*

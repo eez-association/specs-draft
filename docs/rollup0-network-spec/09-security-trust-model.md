@@ -1,268 +1,167 @@
 # 9. Security and Trust Model
 
-This chapter is normative for Rollup0 v0. It identifies trusted authorities, security claims,
-non-guarantees, and release conditions. The reusable EEZ threat boundaries are in the
-[EEZ security model](../eez-protocol-spec/06-security-model.md). This chapter adds the Rollup0
-network choices and implementation risks.
+This chapter adds Rollup0's network choices to the
+[EEZ security model](../eez-protocol-spec/06-security-model.md). Rollup0 has open candidate
+production and permissioned validity attestations. Gnosis Chain is a separate peer network with a
+different admission policy.
 
-Rollup0 is a centralized, permissioned development profile. It is not trustless. A conforming
-deployment MUST publish the complete authority and deployment tuple in its activation record.
+## 9.1 Security-relevant states
 
-## 9.1 Views and evidence
+- **Candidate-valid** means a candidate passes the active Rollup0 execution, DA, and construction
+  rules.
+- **Attested** means the configured proof threshold accepted the candidate.
+- **EEZ-accepted** means an Ethereum transaction applied the transition under the selected EEZ
+  contracts.
+- **Safe** means a local follower reconstructed the transition from canonical Ethereum data and
+  exact per-effect evidence.
+- **Finalized** means safe and contained in finalized Ethereum history.
 
-Rollup0 distinguishes:
+These terms are not interchangeable. An attestation does not select among valid siblings.
+Canonical Ethereum transaction order selects the first candidate whose exact named parent is still
+the current settled cursor.
 
-- **unsafe L2 state**: operator-produced state not yet accepted by canonical derivation;
-- **EEZ-accepted state**: a root accepted by the selected Chiado EEZ and manager policy;
-- **safe L2 state**: state reconstructed locally from canonical Chiado data and exact settlement
-  evidence under §6; and
-- **finalized L2 state**: safe state whose containing Chiado block is finalized.
+## 9.2 Open candidate production
 
-These states provide different evidence. Operator output is equivocable. EEZ acceptance proves
-only that configured contract checks and proof policy accepted the transition. Local replay can
-detect inconsistency but cannot reverse an EEZ root. Chiado finality protects an accepted history
-from ordinary Chiado reorganization; it does not make a malicious manager or verifier honest.
+Any party MAY produce a Rollup0 candidate. Producer identity is not a validity input. A validator
+or prover:
 
-## 9.2 Trusted authorities
+- MUST evaluate every candidate it receives through a supported candidate interface;
+- MUST apply the same checks regardless of producer;
+- MUST sign or prove every candidate that is valid under its declared service policy;
+- MAY sign several valid siblings from the same parent; and
+- MUST NOT claim that its signature gives a sibling priority.
 
-| Authority | Power or dependency | Failure consequence |
+The protocol does not require a validator to support every transport or proof backend. Its
+supported interface and availability policy MUST be public and producer-neutral. Selective
+service, private allowlists disguised as validity checks, or producer-dependent ordering violates
+the Rollup0 admission rule.
+
+Open production improves censorship resistance only when candidates can reach enough validators
+and an Ethereum submitter. It does not remove proof-threshold, relay, or Ethereum fee dependencies.
+
+## 9.3 Trusted authorities and dependencies
+
+| Actor | Authority or dependency | Main failure |
 |---|---|---|
-| **Rollup manager owner/governance** | Selects proof systems, verification keys, and threshold; the compatibility manager can replace the registered root through its administrative path. | Can weaken or remove validity policy, install an arbitrary commitment, or halt settlement. A follower can detect an underivable result but cannot stop or reverse it. |
-| **Accepted proof systems and their administrators** | Decide whether each `publicInputsHash` is accepted. The ECDSA verifier administrator can rotate its signer. | A malicious threshold, non-binding verifier, compromised signer, or verifier upgrade can authorize invalid state or value movement that passes the remaining local checks. |
-| **Operator/sequencer/composer** | Produces and orders unsafe blocks, constructs DA and batches, selects riders, obtains proofs, and submits bundles. | Can censor, equivocate, withhold future data, manipulate unsafe ordering within profile limits, and halt production. |
-| **Relay/builder** | Provides exact-target, all-or-none, ordered inclusion for separately signed Chiado transactions. | A subset can remain on Chiado because the EVM does not roll earlier transactions back. Non-atomic submission breaks the synchronous bundle claim. |
-| **Gnosis Chiado** | Supplies canonical execution, calldata availability, transaction/log ordering, receipts, and finality. | Reorganizations move the safe view. Consensus failure or finalized-history displacement is outside automatic recovery. |
-| **`SYSTEM_ADDRESS` key holders** | Sign deterministic outbound-load and inbound-delivery legacy transactions from a prefunded L2 EOA. | Can forge system operations, sign arbitrary transactions from the EOA, and drain or reallocate its reserve. Key sharing extends the compromise domain to every composing/following node. |
-| **Follower/deriver implementation** | Authenticates Chiado history and reconstructs the local safe/finalized chain. | A correct follower halts on invalid or ambiguous history. It cannot submit a fraud proof, revert EEZ, or provide an exit. |
-| **Deployment and upgrade administrators** | Choose contract addresses/code, genesis, keys, operator, relay, and activation boundaries. | A wrong or mutable tuple can redirect every trust assumption above. |
+| Manager governance | Selects proof policy and exercises any binding-defined administrative state authority. | Can weaken validity, install an underivable state, or halt settlement. |
+| Accepted validators and provers | Attest candidate validity under the selected threshold. | A malicious or compromised threshold can accept invalid state. |
+| Candidate producers | Construct unsafe blocks, DA, proofs, and settlement candidates. | Can censor their own feed, equivocate, or withhold data before publication, but have no identity-based priority. |
+| Ethereum submitter or builder | Places candidates and companion transactions on Ethereum. | Can censor, reorder, split, front-run, or fail exact-target inclusion unless the activated mechanism prevents it. |
+| Ethereum | Supplies canonical execution, ordering, calldata availability, receipts, and finality. | Reorganizations move the safe view; consensus failure is outside Rollup0 recovery. |
+| System-transaction authority | Authorizes Rollup0 calls to `EEZL2` and may supply inbound value. | Compromise can forge system actions, drain reserves, or violate deterministic derivation. |
+| Follower implementation | Reconstructs the safe and finalized L2 views. | A bug can accept the wrong chain or halt; a correct follower still cannot reverse Ethereum state. |
+| Upgrade and recovery governance | Changes deployments, code, profiles, and exceptional recovery points. | A bad activation can replace every assumption above. |
 
-The activation record MUST identify each authority, its current address or key, its rotation rule,
-and any delay or threshold. A public source repository or profile name is not a deployment
-identity.
+Production MUST identify these authorities, separate compromise domains where practical, and
+publish rotation, delay, threshold, and emergency rules.
 
-## 9.3 Guarantees and non-guarantees
+## 9.4 Proof-policy boundary
 
-Subject to the published authority assumptions and correct clients, Rollup0 provides:
+The selected EEZ contracts check the configured proof policy; they do not independently execute
+the Rollup0 state transition. Security therefore requires a threshold of accepted validators or
+provers to bind their attestations to:
 
-- deterministic EVM execution and header construction;
-- full tag-`0x00` calldata publication for every accepted range;
-- proof-policy checks over the compatibility-bound public-input digest;
-- EEZ pre-state, call-order, rolling-hash, and implemented value-accounting checks;
-- canonical receipt and ordered-log selection;
-- byte-identical replay for full or uniquely attributable prefix settlement;
-- safe/finalized labels derived from Chiado rather than the operator feed; and
-- fail-closed behavior on malformed, unavailable, ambiguous, or mismatching derivation input.
+- the exact parent height, block hash, and state root, and every selectable endpoint identity;
+- the complete batch calldata;
+- every execution entry and lookup;
+- transient routing counts and their semantics;
+- the Rollup0 profile and binding version;
+- the intended Ethereum contract and chain domain; and
+- any companion-transaction construction on which settlement depends.
 
-Rollup0 v0 does not provide:
+In `eez-evm@0.2-draft`, transient prefix counts and `msg.sender` are absent from the core proof
+public inputs. A production Rollup0 deployment MUST add an external, binding mitigation that
+authenticates the submitter-controlled fields, caller, domain, replay, and front-running behavior.
+Validator inspection of raw calldata is necessary but is not by itself a cryptographic repair.
 
-- permissionless sequencing or force inclusion;
-- a trustless withdrawal or escape hatch;
-- a fraud-proof path that can challenge an accepted root;
-- protection from malicious manager governance or a malicious proof threshold;
-- contract-enforced membership of separately submitted transactions in one atomic bundle;
-- permissionless key-free reconstruction of cross-chain Sync blocks;
-- automatic recovery from finalized Chiado displacement or an arbitrarily deep reorg;
-- blob DA, an alternate DA fallback, or an L2 data-fee reimbursement mechanism; or
-- a general guarantee that pooled EEZ custody remains solvent for unsupported nested value flows.
+Mock proof mode provides no validity security. Remote binding prover mode provides only the
+guarantees of its authenticated implementation and selected keys.
 
-Follower disagreement is detection, not prevention or recovery. Documentation and user interfaces
-MUST NOT turn “an honest follower halts” into a claim that an invalid EEZ root or value transfer
-cannot occur.
+## 9.5 Competition and stale siblings
 
-## 9.4 Manager and proof-policy risk
+Two valid candidates may extend the same parent, and a validator may attest both. The winner is
+the first applicable transition in canonical Ethereum transaction order. Once it changes the
+settled cursor identity, a later sibling is stale and MUST NOT advance Rollup0. Applicability
+compares the exact parent height, block hash, and state root. Root equality alone does not keep an
+old sibling applicable.
 
-The proof-policy gate verifies the proof systems selected by the manager. Security requires:
+Clients MUST NOT choose a winner by:
 
-1. the manager configuration is authentic and not malicious;
-2. at least the configured threshold of accepted proof systems binds its proof to the exact
-   compatibility `publicInputsHash`;
-3. verifier contracts and signer/admin keys are uncompromised;
-4. validators independently reconstruct the batch, DA, proof context, and intended raw bundle
-   before signing; and
-5. the mock proof system is forbidden for any value-bearing or production deployment.
+- first network receipt;
+- validator signature time;
+- producer identity;
+- highest fee observed off chain;
+- a lexicographic hash rule; or
+- a root found anywhere in the Ethereum block.
 
-The remaining EEZ checks do not execute the L2 STF, decode `callData`, prove correspondence to a
-real host-chain deposit, or turn a non-binding verifier into a binding one. They can reject local
-inconsistency but cannot validate an arbitrary self-consistent root.
+Those rules would fork followers that observe messages or RPC results in different orders.
 
-The manager's root-replacement authority is a direct validity authority. A deployment MUST treat
-that key or governance threshold as capable of changing accepted state. Production SHOULD separate
-manager, verifier, system-key, operator, and upgrade compromise domains and SHOULD apply an
-observable delay to policy or root changes. Any emergency exception MUST be published.
+The current EEZ binding stores only the state root. Production therefore needs the separate
+cursor-applicability mechanism selected by the profile. It must reject old-parent siblings and
+atomically commit the selected endpoint identity, including for `A -> A` transitions.
 
-### 9.4.1 Unhashed transient routing counts
+## 9.6 Per-effect settlement evidence
 
-In the `5c51e02` binding, `transientExecutionEntryCount` and
-`transientLookupCallCount` affect immediate/transient execution routing, dropping, and published
-table state. The `publicInputsHash` commits to the entry and lookup hashes but does not include
-either count. A valid proof for one pair of count values can therefore remain cryptographically
-valid after a submitter changes those fields, subject to contract range checks, while the
-execution/publication path changes.
+Every potential state-changing effect needs occurrence-preserving evidence bound to its exact
+transaction and receipt. The applied effects MUST form one prefix of the candidate's ordered
+effects.
 
-Validator software MUST inspect and approve the complete raw `postAndVerifyBatch` calldata and
-MUST reject any count that differs from the value used during simulation. The operator MUST NOT
-reuse a proof across count variants. Activation records MUST pin the allowed construction rule and
-test it end to end.
+A final-root set is unsafe because:
 
-These operational checks do not repair the missing cryptographic commitment. Production use of
-the generic count flexibility remains an unresolved proof-routing risk. A binding protocol fix
-must add both counts to the committed digest or remove submitter choice under a new compatibility
-binding and protocol version. Documentation MUST NOT claim that the current proof authenticates
-the counts.
+- equal roots can occur at several positions;
+- an immediate entry can be skipped;
+- a later companion transaction can consume or fail independently;
+- two sibling candidates can advertise equal endpoints; and
+- roots alone lose transaction, log, and receipt boundaries.
 
-## 9.5 Operator censorship, equivocation, and liveness
+Followers MUST use the §4.5 classification, including the relevant skip and consumption events,
+then replay the selected prefix. Historical behavior that collapsed roots into a set is not
+conforming and can attribute the wrong transition.
 
-The operator controls the unsafe view and can omit, delay, or reorder user transactions within the
-ordinary validity rules. There is no Rollup0 v0 force-inclusion inbox. If the operator, proof
-threshold, relay, or system signer stops, cross-chain settlement can stop indefinitely.
+Follower classification does not prevent an invalid settlement outcome. The activated
+applied-prefix mechanism MUST stop the Ethereum operation from completing if the anchor or an
+earlier effect does not apply but a later effect does. The mechanism must remain sound when state
+roots at adjacent effect positions are equal. Without that enforcement, production activation is
+blocked.
 
-Users with funds dependent on operator-mediated transitions have no protocol-defined trustless
-exit. A safe/finalized follower can refuse an invalid head, but refusal does not return funds.
-Applications MUST treat unsafe state as reversible and MUST NOT represent it as safe settlement.
+## 9.7 System-address risk
 
-The one-rich-attempt rule, deterministic rollback, and canonical derivation limit accidental
-equivocation. They do not prevent deliberate censorship or an operator from ceasing publication.
+The selected EVM binding authorizes `EEZL2` system calls by `SYSTEM_ADDRESS`, but a network must
+also prevent that authority from executing arbitrary code paths that can reenter `EEZL2`, replace
+tables, or deliver several inbound calls in one transaction.
 
-## 9.6 Relay and receipt risk
+A production profile MUST select either:
 
-The ordered transaction list in §4.4 consists of separately signed Chiado transactions. EEZ does
-not bind their hashes into the proof digest and Chiado does not make them one EVM transaction.
-Synchronous atomicity therefore depends on a relay that includes all transactions, in order, in
-one exact target block, or none.
+- contract-enforced guards; or
+- a node-enforced, non-reentrant system transaction mechanism whose validity is checked by every
+  producer, validator, prover, and follower.
 
-A production deployment MUST:
+An ordinary shared EOA key is problematic: permissionless followers need deterministic
+reconstruction data, while publishing the private key destroys authorization. The current public
+development key resolves neither production requirement.
 
-- name and authenticate the relay/builder;
-- validate its all-or-none, no-droppable-transaction behavior;
-- disable sequential mempool fallback;
-- pin the exact target number and timestamp;
-- validate canonical inclusion number, block hash, timestamp, transaction hashes, and indices;
-  and
-- derive settlement only from exact receipts and ordered EEZ log occurrences.
+## 9.8 DA, relay, and recovery risk
 
-`BatchPosted` alone does not mean the intended batch applied. Immediate entries can be skipped and
-deferred entries can remain unconsumed. A later immediate execution can follow a skipped index,
-and multiple entries can emit the same Sync root. Root-set membership and a bare event count are
-therefore not valid attribution. A follower MUST combine the indexed `ImmediateEntrySkipped`
-outcomes in the post receipt with each rider's `ExecutionConsumed` and
-`L2ExecutionPerformed` pair as specified in §4.5. It accepts a partial result only when that
-receipt-bound evidence identifies one unique entry prefix and deterministic replay reaches its
-last actual root. Otherwise it halts at the preceding safe head.
+Ethereum calldata gives post-inclusion availability but does not force timely publication. The
+EEZ contract treats Rollup0 DA bytes as opaque, so validators and followers must enforce strict
+RLP, complete transaction and ABI decoding, entry correspondence, reserved-sender rules, and
+execution validity.
 
-A non-atomic relay can leave earlier state or value effects on Chiado. Follower repair cannot undo
-them.
+Separately signed Ethereum transactions are not atomic merely because a composer calls them a
+bundle. Production needs a specified builder, contract, or protocol rule that enforces the
+required consecutive ordering, one distinct trigger per inbound effect, failure behavior, and
+applied-prefix safety.
 
-## 9.7 DA and derivation risk
+Follower disagreement is detection, not prevention. A follower halts on invalid or ambiguous
+canonical data. It cannot submit a fraud proof, undo an accepted EEZ transition, or guarantee a
+trustless exit.
 
-Rollup0 v0 requires complete tag-`0x00` calldata and `blobIndices == []`. Calldata prevents
-operator data withholding after canonical publication, but it does not guarantee timely
-publication. An operator can stop posting.
+## 9.9 Production claim boundary
 
-The EEZ contract treats `callData` as opaque. Validators and followers must enforce strict RLP,
-full transaction/entry consumption, count cardinality, reserved-sender rules, and execution
-validity. A contract-accepted but malformed payload can therefore halt derivation.
-
-Live and catch-up paths MUST apply identical channel, codec, receipt, and replay rules. A client
-must not accept nonempty `blobIndices`, trailing RLP, an empty count list, or ambiguous settlement
-because one path omits a check.
-
-The signed system envelope makes cross-chain replay permissioned. A follower without the system key
-cannot reconstruct exact transaction bytes and MUST halt. Publishing the private key would remove
-this availability restriction only by destroying the system-only authorization boundary.
-
-## 9.8 System key, reserve, and value
-
-The active system transactions are signed legacy EIP-155 transactions. Inbound envelope value is
-debited from the prefunded `SYSTEM_ADDRESS`; it is not minted. The `msg.value == value` check binds
-the transfer to calldata but does not prove that a corresponding value was locked on Chiado.
-
-Production MUST pin:
-
-- the signer address and custody/distribution policy;
-- the initial system reserve and its commitment in genesis;
-- the native-asset and Chiado custody/backing relationship;
-- permitted top-up and recovery operations;
-- minimum balance and base-fee monitoring thresholds; and
-- an accounting procedure that reconciles EEZ recorded liabilities, physical custody, and system
-  reserve movements.
-
-A compromised key can forge table loads, deliveries, and ordinary EOA transfers. A depleted
-reserve or block base fee above the fixed 1 gwei system gas price halts system delivery.
-
-The selected EEZ compatibility contract accounts outer value flow, but the reviewed implementation
-can discard value returned by recursively processed nested calls. A successful nested outflow can
-therefore reduce physical EEZ custody without entering the checked aggregate. Rollup0 v0 disables
-nested/reentrant cross-chain calls. Validators and posting paths MUST reject every such
-value-bearing shape until the contract uses entry-scoped, revert-safe accounting at all nesting
-depths. Deployments SHOULD monitor:
-
-```text
-address(EEZ).balance >= sum(rollups[r].etherBalance)
-```
-
-Monitoring detects a breach; it does not repair one.
-
-## 9.9 Proof context and replay domain
-
-A rich batch MUST use the explicit recent Chiado block N selected under §§2 and 4. N is distinct
-from the future inclusion target. The operator, validators, and production manager MUST reject
-zero and `uint64.max` context sentinels and MUST require a nonzero canonical `blockhash(N)` that is
-still available at settlement.
-
-The compatibility digest does not by itself include every desirable deployment-domain value,
-such as the Chiado chain ID, EEZ address, protocol identifier, trigger transaction hashes, or a
-batch nonce. A zero context would make replay across time or compatible deployments easier when
-the remaining inputs and pre-root coincide. A binding verifier authenticates the digest it is
-given; it does not add omitted domains.
-
-If N reorgs, expires from the contract's block-hash window, or differs between validators and the
-manager, the attempt MUST be discarded and rebuilt. Production remains blocked while the live
-composer leaves `blockNumber = 0`.
-
-## 9.10 Reorganizations and finality
-
-Chiado canonical history owns safe and finalized state. On a shallow reorg, §6.7 removes orphaned
-attempts, rewinds L2 to the last surviving endpoint, restores eligible source transactions only
-after canonical receipt checks, and replays the replacement branch.
-
-The implementation's automatic common-ancestor history is bounded. A deeper reorg must halt rather
-than claim recovery. Finalized Chiado displacement, corrupted index/database state, or disagreement
-about the recovery ancestor requires an authenticated operator/governance procedure and a published
-recovery activation.
-
-Recovery races use one reconciliation lock. A stale dropped verdict cannot roll back a Sync height
-already reached by canonical derivation. An orphaned event, receipt, root, or payload has no
-continuing authority.
-
-## 9.11 Fees and economic liveness
-
-V0 uses standard EIP-1559 parameters, a 30,000,000 block gas limit, and the zero beneficiary.
-Base fees burn, priority fees are economically inaccessible, and no fee vault, oracle, or L1-data
-surcharge reimburses Chiado posting cost. The operator funds DA and settlement.
-
-This is a liveness and sustainability risk. Sustained Chiado costs can make the operator stop
-posting. System delivery also depends on the prefunded account and fixed-price envelopes.
-Changing the beneficiary, fee parameters, system gas rule, or L1-cost recovery changes consensus
-or signed bytes and requires a new activated profile.
-
-## 9.12 Production security checklist
-
-A production activation is nonconforming until it publishes and verifies:
-
-- unique L2 identity, genesis commitment, activation boundary, and complete fork schedule;
-- Chiado EEZ, manager, rollup, proof-system, and verifier code/address hashes;
-- manager, verifier, upgrade, operator, relay, and emergency authorities;
-- validator identities, verification keys, threshold, and proof-binding tests;
-- non-public system key custody plus reserve, top-up, and backing policy;
-- atomic relay behavior and exact-target canonical receipt validation;
-- tag-`0x00`/empty-`blobIndices` enforcement on every producer and follower path;
-- transactional range replay, complete header/body comparison, and exact log attribution;
-- shallow and deep reorg operating procedures;
-- value/custody and system-fee monitoring; and
-- removal of mock proof and public development keys.
-
-Known implementation deviations are listed in §8.3. An activation record cannot waive a normative
-protocol rule while retaining the same `rollup0-v0` identifier.
+No production security claim is valid until every blocker in §8.2 is resolved and the resulting
+profile validates against the EEZ profile schema. In particular, the current mock prover,
+development genesis, public system key, historical binding submodule, and non-atomic submission
+fallback MUST NOT be used to describe a production deployment.
 
 ---
 

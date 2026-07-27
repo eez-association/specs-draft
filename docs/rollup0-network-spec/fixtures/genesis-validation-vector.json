@@ -60,7 +60,7 @@
     }
   },
   "emptyChild": {
-    "description": "First empty block above the exact development genesis, using the normative Rollup0 v0 1-second block time and applying the EIP-2935 pre-block write.",
+    "description": "First empty block above the historical development genesis, using the Chiado-development 1-second block time and applying the EIP-2935 pre-block write.",
     "blockTime": "0x1",
     "number": "0x1",
     "timestamp": "0x6490fdd3",

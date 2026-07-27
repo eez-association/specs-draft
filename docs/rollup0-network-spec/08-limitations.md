@@ -1,85 +1,136 @@
-# 8. Open Issues and Limitations
+# 8. Limitations and Release Blockers
 
-This chapter separates behavior that `rollup0-v0` deliberately accepts from missing production
-parameters and known client conformance defects.
+`rollup0@0.2-draft` defines intended protocol behavior. It is not a production activation record.
+This chapter distinguishes design limitations, unresolved production choices, and known
+implementation deviations.
 
-## 8.1 Accepted v0 limitations
+## 8.1 Draft limitations
 
-- **Centralized sequencing.** One permissioned operator controls inclusion and ordering. There is
-  no force-inclusion inbox or trustless exit; operator failure can halt the network.
-- **Trusted management and proof policy.** The selected manager controls the proof-system policy
-  and retains state-root authority defined by the compatibility contracts.
-- **Flat calls only.** Rollup0 supports one L1-to-L2 or L2-to-L1 call. It does not support nested,
-  reentrant, or multiple cross-chain calls in one interaction.
-- **Key-gated derivation.** Followers need the shared `SYSTEM_ADDRESS` private key to reproduce
-  signed legacy system transactions byte for byte.
-- **Prefunded value delivery.** Inbound value debits the system account. There is no mint, native
-  reserve replenishment, or protocol-enforced backing mechanism.
-- **Constant randomness field.** Every L2 header has `prev_randao = bytes32(0)`;
-  `PREVRANDAO` is not a randomness source.
-- **Relay dependency.** Inbound atomicity needs a relay or builder that includes the complete,
-  ordered bundle at the exact Chiado block and timestamp.
-- **Optimistic unsafe state.** A rich endpoint is committed before its bundle resolves and can be
-  rolled back with all unsafe descendants.
-- **Manual deep-reorg response.** A reorg deeper than finalized Gnosis history has no automatic
-  recovery rule.
-- **No v0 blob codec or data-fee mechanism.** The only protocol DA format is tag-`0x00` calldata,
-  paid by the operator.
-- **Immediate governance authority.** Manager and verifier administrators can change accepted
-  proof policy or roots under the selected contracts; follower detection cannot reverse those
-  effects.
+- **No force inclusion.** Anyone may produce a candidate, but the draft has no protocol that
+  guarantees Ethereum inclusion.
+- **Permissioned validity attestations.** Candidate production is open. The accepted prover or
+  validator set and its threshold are selected by governance.
+- **Sibling signatures are not consensus.** Validators may sign several valid candidates from the
+  same parent. Canonical Ethereum transaction order selects the first still-applicable transition.
+- **No trustless exit.** A correct follower can halt on an invalid or ambiguous history but cannot
+  reverse EEZ settlement or force a withdrawal.
+- **Flat cross-network calls.** The selected profile does not support nested or reentrant
+  cross-network actions.
+- **Calldata-only DA.** Tag `0x00` is the only selected channel. No blob codec or alternate DA
+  fallback is defined.
+- **Optimistic unsafe state.** Locally produced state can be replaced when canonical settlement
+  selects a sibling or only a prefix applies.
+- **No protocol fee reimbursement.** Candidate production, proofs, DA, and Ethereum submission can
+  cost more than any application payment.
+- **Manual exceptional recovery.** Finalized-settlement displacement or a reorganization beyond
+  local history requires an authenticated operational decision.
+- **Unresolved system mechanism.** A production authorization and value-supply design for L2
+  system transactions has not been selected.
 
-## 8.2 Production activation blockers
+## 8.2 Production release blockers
 
-No production activation record currently satisfies §0.4. At minimum, it MUST pin:
+Production activation MUST resolve and publish:
 
-- a unique EIP-155 chain ID, EEZ rollup ID, native asset, production genesis commitment, and
-  activation point;
-- Chiado deployment addresses, runtime bytecode hashes, manager, proof-system contracts,
-  verification keys, validator membership, and threshold;
-- a versioned proof binding that commits both transient routing counts, or removes submitter choice
-  over them; complete-calldata validator checks do not repair the `5c51e02` digest;
-- the operator identity and rotation/emergency procedure;
-- a non-public system key, signer address, initial reserve, custody/backing relationship, and
-  top-up policy;
-- the complete production fork schedule and operator/Chiado funding plan;
-- relay atomicity and exact-target support, including canonical receipt/event observation;
-- upgrade and compatibility-change governance; and
-- capacity limits derived from measured Chiado gas and relay behavior.
+- the Rollup0 EIP-155 chain ID, EEZ rollup ID, native asset, genesis commitment, and fork schedule;
+- the Ethereum activation block and the EEZ, manager, and proof-system deployments with bytecode
+  commitments;
+- the exact manager proof-context encoding and authentication rule;
+- deterministic field-by-field lowering from each supported action to its L1 entry, L2 sidecar,
+  explicit inbound arguments, and system transaction;
+- accepted proof systems, verification keys, validator or prover identities, threshold, and key
+  rotation;
+- proof-routing protection for caller-controlled transient counts, replay, and front-running;
+- an atomic or equivalently binding Ethereum submission construction;
+- an enforceable exact-cursor mechanism that rejects stale siblings and advances the selected
+  height, block hash, and root atomically even when roots repeat;
+- an enforceable applied-prefix mechanism that remains sound for caught immediate failures and
+  equal consecutive roots;
+- the proof budget, submission slack, maximum candidate range, maximum bundle size, and capacity
+  limits;
+- the production system address, authorization rule, non-reentrancy enforcement, envelope, gas
+  policy, reserve or value source, and backing rules;
+- the production base fee and complete economic configuration;
+- manager, upgrade, emergency, and recovery authorities; and
+- an activation procedure that makes every selection unambiguous before the first production
+  block.
 
-The development genesis in Appendix D uses chain ID `1`, a public test key, and test allocations.
-It MUST NOT be presented as a production identity.
+The release-blocker IDs and machine-readable state are in
+[`network-profile.json`](network-profile.json).
 
-## 8.3 Current client conformance blockers
+Production release also requires candidate-dissemination interfaces, proof-service availability,
+and accepted conformance vectors for `A`, `Z`, every `R[k]`, and deterministic repaired Sync
+headers at every proper effect prefix. These are software and test-artifact gates over fixed
+rules, not unresolved profile values.
 
-- Multi-block derivation is not transactional; a late failure can leave a replayed prefix.
-- The local-block fast path does not compare every intermediate sealed header and body.
-- Receipt observation does not fully enforce the exact target block number, canonical hash, and
-  timestamp.
-- Settlement attribution reduces applied roots to per-Chiado-block set membership, losing exact
-  transaction/log order and duplicate multiplicity.
-- Live and catch-up followers do not independently reject nonempty `blobIndices`.
-- The public-mempool fallback cannot guarantee bundle atomicity or exact targeting.
-- Rich composition leaves `batch.blockNumber = 0` instead of binding the observed pre-target
-  Chiado block.
-- A permanently unavailable target-tip RPC can hold the one-in-flight gate indefinitely.
-- Boundary additions and timestamp arithmetic do not consistently use checked errors.
-- A zero-length `blockTxCounts` range can be treated as a no-op instead of being rejected.
-- The deriver can fall back from a missing sidecar to call-empty on-chain entries and does not
-  enforce the one-to-one sidecar transformation; that path cannot reconstruct inbound calls.
-- An inbound sidecar value above `type(int256).max` can be omitted from the composer's value map
-  and recorded as zero instead of causing the required rejection.
-- The configured public development system key and absence of a production reserve policy are not
-  suitable for production activation.
+The corpus MUST also cover two siblings with one exact parent when the first selected endpoint has
+the same state-root value as that parent. The second sibling must be rejected by cursor identity.
 
-These are implementation defects relative to §§2-7 and §9, not alternative protocol behavior.
+## 8.3 Binding and implementation status
 
-## 8.4 Future variants
+The normative EVM binding is `eez-evm@0.2-draft`, with evidence from
+`eez-core-protocol@3a6ca65c4858792fc3a143d34c5484877ef8f68c`.
 
-Changing the proof budget changes the Live/Future/Sync partition and requires a new timing
-activation. Open sequencing, overlapping batches, state-root chaining, a typed key-free system
-envelope, blob DA, fee vaults, or L1-derived `prev_randao` each require their own versioned rules.
-Appendix C describes type `0x7E` only as an informative design direction.
+The current Rollup0 implementation evidence is
+`eez-rollup0@0e07e97945ad7d33d7c52545207887b952333e2d`. Its checked-in
+contract gitlink is `5c51e02b0f965ee8c94e9ed2c7e0e9f924d41fba`, not the selected evidence. Until that dependency
+is updated and all ABI, selector, tuple, hash, and state-machine tests pass, the implementation is
+not evidence of `eez-evm@0.2-draft` conformance.
+
+The client also has these known deviations:
+
+- no authenticated production activation record;
+- no producer-neutral candidate validation interface that enforces evaluation of every supported
+  valid candidate;
+- timeless `blockNumber = 0` batches with no authenticated Ethereum proof-context hash;
+- incomplete canonical log ordering and transaction-hash authentication;
+- collapsed per-block root sets instead of per-effect prefix evidence;
+- no on-chain commitment to the settled Rollup0 cursor height and block hash, so a stale sibling
+  can still pass the EEZ state-root check after an equal-root transition;
+- no enforceable applied-prefix guard, allowing a later effect to apply after an earlier caught
+  failure when the root preconditions happen to be equal;
+- a rich-candidate anchor that ends at the pre-Sync parent root instead of zero-effect Sync root
+  `Z`, causing the first effect delta to absorb mandatory Sync pre-execution changes;
+- acceptance of domain-separated synthetic interior roots and value-based membership for generic
+  interior-root provenance in the remote settlement gate; its exact indexed effect-prefix check
+  does not remove that broader provenance gap;
+- partial derivation that truncates effect entries but appends the omitted outbound users as a
+  terminal tail instead of rebuilding exactly the selected effect-group prefix;
+- permissive outer RLP and incomplete ABI or transaction consumption checks;
+- incomplete `blobIndices`, sidecar correspondence, and tuple-version checks;
+- collection of several inbound effects from one held Ethereum transaction while transporting that
+  trigger only once;
+- non-transactional multi-block replay;
+- a transaction-only local fast path;
+- unchecked or saturating timestamp and height arithmetic in scheduler, sequencer, and derivation
+  paths where this profile requires checked arithmetic and failure on overflow;
+- optional system-key and pure-user fallback behavior;
+- incomplete reserved-sender enforcement;
+- non-atomic public-mempool submission fallback;
+- bounded unsafe ancestry forwarding; and
+- automatic common-ancestor search limited to 62 settlement blocks by default.
+
+The exact derivation deviations are listed in §6.8. These are defects relative to this draft, not
+alternate network rules.
+
+The composer at that revision emits an empty Sync body for anchor-only candidates. The protocol
+also permits an anchor-only candidate to carry an effect-free user body; emitting only the empty
+form is a supported subset, not a prohibition on the nonempty form.
+
+## 8.4 Proof modes and production target
+
+Current software exposes two materially different modes:
+
+- **mock proof mode:** the default development path; it provides no production validity claim;
+- **remote binding prover mode:** optional integration bound to the retired 0.1 ABI selected by the
+  reviewed client; its endpoints, authentication, supported inputs, and operational failure
+  behavior are not a production policy.
+
+The required production mode is not implemented. It must use the selected `eez-evm@0.2-draft`
+binding and the activated membership, verification keys, threshold, binding tests, and governance
+listed above.
+
+Documentation and clients MUST label these modes distinctly. A mock acceptance result MUST NOT be
+presented as a proof.
 
 ---
 

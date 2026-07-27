@@ -189,6 +189,8 @@ def invalid(timing: Timing) -> None:
 
 
 def main() -> None:
+    # Production fixes only D1/D2. This budget is an illustrative valid vector;
+    # production P/S remain release blockers.
     profile_12s = Timing(12_000, 2_000, 4_000, 1_500)
     chiado = Timing(5_000, 1_000, 500, 1_300)
     exact_multiple = Timing(12_000, 2_000, 3_500, 500)
@@ -277,7 +279,7 @@ def main() -> None:
     # Request groups are ordered by the one-byte request type before hashing.
     assert requests_hash([b"\x02b", b"\x01a"]) == requests_hash([b"\x01a", b"\x02b"])
 
-    # Rollup0 v0 EIP-1559 parameters from §7.
+    # Historical development EIP-1559 parameters; production remains blocked.
     gas_limit, elasticity, denominator, parent_fee = 30_000_000, 2, 8, 1_000_000_000
     gas_target = gas_limit // elasticity
     assert next_base_fee(parent_fee, gas_target, gas_limit, elasticity, denominator) == parent_fee

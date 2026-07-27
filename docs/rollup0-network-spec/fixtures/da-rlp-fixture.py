@@ -2,14 +2,9 @@
 """
 DA tag-0x00 outer-RLP round-trip fixture for Rollup0 Appendix B.
 
-CODEC-AUTHORED (not contract-authored): the DA payload codec is an off-chain /
-execution-layer artifact pinned by
-`eez-rollup0@00b3e75872fcc0c374d3b12a01933d732d317e4c`
-(`crates/eez-payload-codec/src/lib.rs`, blob
-`533d978b2e3dd2e91c1d29f3416ffe3da04314a5`). Neither the Rollup0
-`5c51e02` binding nor the current EEZ `3a6ca65` binding implements this RLP
-grammar. These bytes are produced by a self-contained canonical-minimal RLP
-encoder as a cross-language fixture for Rollup0 Appendix B.
+The DA payload codec is a Rollup0 execution-network rule, not an EEZ contract
+ABI. These bytes are produced by a self-contained canonical-minimal RLP encoder
+as a cross-language fixture for the outer codec only.
 
 Grammar:  payload := 0x00 || rlp([ blockTxCounts, transactions, l2_entries ])
   - blockTxCounts : list of canonical-minimal RLP integers (one per L2 block in
