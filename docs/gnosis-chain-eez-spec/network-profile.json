@@ -1,0 +1,231 @@
+{
+  "$schema": "../eez-protocol-spec/network-profile.schema.json",
+  "schema_version": "1",
+  "profile": {
+    "id": "gnosis-chain-eez-chiado",
+    "name": "Gnosis Chain EEZ Network Specification",
+    "version": "0.1-draft",
+    "status": "development",
+    "role": "settlement-host",
+    "network_name": "Gnosis Chiado",
+    "environment": "testnet"
+  },
+  "eez_dependency": {
+    "framework": {
+      "id": "eez-framework",
+      "version": "0.1-draft"
+    },
+    "evm_binding": {
+      "id": "eez-evm",
+      "version": "0.2-draft",
+      "specification": "eez-protocol-spec/index.md"
+    }
+  },
+  "chain_identity": {
+    "eip155_chain_id": {
+      "status": "fixed",
+      "value": 10200,
+      "source": "Gnosis Chain Chiado network definition: https://docs.gnosischain.com/about/networks/chiado"
+    },
+    "eez_rollup_id": {
+      "status": "not-applicable",
+      "reason": "A settlement host is reserved as MAINNET_ROLLUP_ID 0 in the EEZ binding and is not a registered rollup."
+    },
+    "native_asset": {
+      "status": "fixed",
+      "value": "Chiado xDAI",
+      "source": "Gnosis Chain Chiado network definition: https://docs.gnosischain.com/about/networks/chiado"
+    },
+    "genesis_commitment": {
+      "status": "release-blocker",
+      "id": "GC-GENESIS",
+      "issue": "Pin the Chiado chain-spec or genesis commitment used by conforming settlement clients."
+    },
+    "evm_fork": {
+      "status": "fixed",
+      "value": {
+        "minimum_execution_fork": "Dencun/Cancun",
+        "activation": {
+          "kind": "timestamp",
+          "value": 1706724940
+        },
+        "opcode_semantics": {
+          "transient_storage": "EIP-1153",
+          "blobhash": "EIP-4844",
+          "mcopy": "EIP-5656"
+        },
+        "validation": "The EEZ deployment and every transaction that invokes eez-evm@0.2-draft must execute in a canonical Chiado block at or after this timestamp. A later canonical Chiado fork is valid only while it retains these opcode semantics."
+      },
+      "source": "Gnosis Chain Dencun specification: https://docs.gnosischain.com/about/specs/hard-forks/dencun"
+    }
+  },
+  "settlement_binding": {
+    "host_profile": {
+      "status": "not-applicable",
+      "reason": "This profile is the settlement host."
+    },
+    "host_network": {
+      "status": "not-applicable",
+      "reason": "This profile is the settlement host and makes no recursive EEZ settlement claim."
+    },
+    "host_chain_id": {
+      "status": "not-applicable",
+      "reason": "The host chain ID is chain_identity.eip155_chain_id."
+    },
+    "eez_contract": {
+      "status": "release-blocker",
+      "id": "GC-DEPLOYMENT",
+      "issue": "Pin the canonical Chiado EEZ address, runtime-bytecode hash, deployment transaction, and authenticated deployment record."
+    },
+    "manager_contract": {
+      "status": "not-applicable",
+      "reason": "Each consuming rollup profile owns its manager deployment identity."
+    },
+    "proof_system_contracts": {
+      "status": "not-applicable",
+      "reason": "Each consuming rollup profile owns its proof-system deployments and verification policy."
+    },
+    "deployment_block": {
+      "status": "release-blocker",
+      "id": "GC-DEPLOYMENT",
+      "issue": "Pin the canonical Chiado deployment block number and hash."
+    },
+    "settlement_rule": {
+      "status": "fixed",
+      "value": "Chiado executes eez-evm@0.2-draft. Host evidence is the exact canonical transaction receipt and ordered log occurrence from the profile-pinned EEZ deployment; matching only a root value or event signature elsewhere in the block is insufficient. Each consuming rollup separately defines which genuine occurrence establishes its network endpoint.",
+      "source": "Gnosis Chain EEZ Network Specification §3.1 and §3.5"
+    },
+    "finality_rule": {
+      "status": "fixed",
+      "value": "Use the canonical Chiado finalized consensus view; EEZ adds no independent host finality.",
+      "source": "Gnosis Chain EEZ Network Specification §3.1 and §3.5"
+    }
+  },
+  "execution_binding": {
+    "block_time_ms": {
+      "status": "fixed",
+      "value": 5000,
+      "source": "Gnosis Chain Chiado network definition: https://docs.gnosischain.com/about/networks/chiado"
+    },
+    "block_gas_limit": {
+      "status": "fixed",
+      "value": {
+        "source": "canonical_execution_header",
+        "field": "gasLimit",
+        "validation": "Use the gasLimit of the canonical Chiado execution payload and validate it under the canonical Chiado execution chain configuration active at that block. EEZ applies no override or constant gas limit."
+      },
+      "source": "Gnosis Chain Chiado canonical execution configuration linked from https://docs.gnosischain.com/about/networks/chiado"
+    },
+    "fee_market": {
+      "status": "fixed",
+      "value": {
+        "transaction_fee_model": "Canonical Chiado EIP-1559 execution-header rules",
+        "base_fee_source": "baseFeePerGas in the canonical Chiado execution payload",
+        "gas_usage_source": "gasUsed and gasLimit in the canonical Chiado execution payload and its parent",
+        "blob_fee_model": "Canonical Chiado EIP-4844 rules active for the block",
+        "validation": "Validate transaction fees, base-fee transition, blob-gas fields, and blob fees using the canonical Chiado execution chain configuration active at the block. EEZ applies no independent fee rule."
+      },
+      "source": "Gnosis Chain EIP-1559 and Dencun specifications: https://docs.gnosischain.com/about/specs/hard-forks/eip-1559 and https://docs.gnosischain.com/about/specs/hard-forks/dencun"
+    },
+    "fee_recipient": {
+      "status": "not-applicable",
+      "reason": "The EEZ host profile does not select the host consensus fee recipient."
+    },
+    "eez_predeploys": {
+      "status": "not-applicable",
+      "reason": "EEZ is deployed as host contracts on Chiado; consumer L2 predeploys belong to each rollup profile."
+    },
+    "system_address": {
+      "status": "not-applicable",
+      "reason": "SYSTEM_ADDRESS is an L2 inbound-delivery choice."
+    },
+    "system_transaction_envelope": {
+      "status": "not-applicable",
+      "reason": "System transactions execute on an EEZ rollup, not on the settlement host."
+    }
+  },
+  "operation": {
+    "sequencing_model": {
+      "status": "fixed",
+      "value": "Canonical Gnosis Chiado consensus and block production",
+      "source": "settlement-host role"
+    },
+    "sequencing_authority": {
+      "status": "fixed",
+      "value": "Chiado consensus validators/builders; EEZ grants no host sequencing authority",
+      "source": "settlement-host role"
+    },
+    "slot_construction": {
+      "status": "fixed",
+      "value": "Nominal 5-second Chiado slots",
+      "source": "Gnosis Chain Chiado network definition: https://docs.gnosischain.com/about/networks/chiado"
+    },
+    "atomic_inclusion": {
+      "status": "release-blocker",
+      "id": "GC-ATOMIC-INCLUSION",
+      "issue": "Pin a supported builder, relay, access, or wrapper mechanism that guarantees whole, ordered, same-block bundle inclusion and its failure semantics. For eez-evm@0.2-draft consumers that rely on this mechanism for routing integrity, it must authenticate the exact postAndVerifyBatch caller and calldata, including both transient prefix counts, and prevent modified proof reuse or front-running."
+    },
+    "max_user_transactions_per_bundle": {
+      "status": "not-applicable",
+      "reason": "Bundle size is selected by each consuming rollup; it is not a Chiado protocol parameter."
+    },
+    "proof_routing_mitigation": {
+      "status": "not-applicable",
+      "reason": "Each consuming rollup profile must select how it binds the eez-evm@0.2-draft submitter and transient prefix counts. This host profile only identifies the required host capability under GC-ATOMIC-INCLUSION."
+    }
+  },
+  "proof_policy": {
+    "model": {
+      "status": "not-applicable",
+      "reason": "Each consuming rollup profile and manager select a proof model."
+    },
+    "allowed_proof_systems_and_vkeys": {
+      "status": "not-applicable",
+      "reason": "Each rollup network profile and manager select these values."
+    },
+    "threshold": {
+      "status": "not-applicable",
+      "reason": "Each rollup network profile and manager select its threshold."
+    }
+  },
+  "data_availability": {
+    "requirement": {
+      "status": "not-applicable",
+      "reason": "Each consuming rollup profile owns its data-availability requirement."
+    },
+    "channel": {
+      "status": "not-applicable",
+      "reason": "Each consuming rollup profile selects its data-availability channel."
+    },
+    "codec": {
+      "status": "not-applicable",
+      "reason": "The rollup network profile selects the payload codec carried by host calldata."
+    },
+    "derivation_rule": {
+      "status": "not-applicable",
+      "reason": "Derivation is a rollup-network rule."
+    }
+  },
+  "governance_recovery": {
+    "manager_authority": {
+      "status": "not-applicable",
+      "reason": "Each consuming rollup profile owns its manager authority and recovery policy."
+    },
+    "upgrade_policy": {
+      "status": "release-blocker",
+      "id": "GC-UPGRADES",
+      "issue": "Publish ownership, shared EEZ contract upgrade, and emergency procedures for the Chiado deployment."
+    },
+    "reorg_and_emergency_rule": {
+      "status": "fixed",
+      "value": "Before finality, consumers rewind exact receipt and ordered-log occurrences removed or reordered by canonical Chiado reorgs, then apply their own network-profile recovery rule. Only the canonical Chiado finalized view is final.",
+      "source": "Gnosis Chain EEZ Network Specification §3.5"
+    }
+  },
+  "release_blockers": [
+    "GC-DEPLOYMENT",
+    "GC-GENESIS",
+    "GC-ATOMIC-INCLUSION",
+    "GC-UPGRADES"
+  ]
+}
