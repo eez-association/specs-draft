@@ -5,6 +5,8 @@ site_description: >-
 docs_dir: docs
 site_dir: site
 use_directory_urls: false
+exclude_docs: |
+  rollup0-spec-site/
 
 theme:
   name: material
