@@ -1,26 +1,30 @@
 # Rollup0 Network Specification
 
-Rollup0 is an EEZ execution network that settles on Ethereum.
+Rollup0 is an experimental EEZ network that settles on Ethereum. Users are strongly discouraged
+from putting significant value on it.
 
 | Item | Rollup0 choice |
 |---|---|
 | Status | Draft |
 | Settlement network | Ethereum |
-| Execution interval | 2 seconds |
-| Nominal settlement interval | 12 seconds |
-| Positions per nominal interval | 6: five Live positions followed by one Sync position |
-| Candidate production | Open |
-| Candidate validation | Permissioned validators/provers sign every valid candidate they receive |
+| L2 block interval | 2 seconds |
+| Ethereum alignment | Six L2 block positions per Ethereum slot, including missed slots |
+| Anchoring | For a synchronous transaction, or after a maximum interval that is **to be defined** |
+| Block production and composition | Open; no composer allowlist |
+| Block syncing, P2P, and RPC | Open; no sequencer allowlist |
+| Candidate validation | Permissioned validators provide a best-effort validation service |
 | Candidate selection | The first applicable candidate in canonical Ethereum order wins |
-| Data availability | Complete calldata payload |
+| Data availability | Ethereum blobs; the exact format is **to be defined** |
 
-This specification imports the [EEZ specification](../eez-protocol-spec/index.md). EEZ defines the
-generic contracts, cross-network execution model, proof interface, settlement operations, proxy
-behavior, and EVM wire formats. This document defines only Rollup0 choices.
+Composers build the continuous L2 chain. Sequencers sync and distribute those blocks. Blocks do not
+have to be posted every Ethereum slot. An anchor includes every L2 block since the previous anchor.
 
-Rollup0 is not ready for production. Several values and mechanisms are intentionally left open in
-[Chapter 12](12-open-issues.md). A client can implement the draft behavior, but independent
-production clients cannot interoperate until those questions have exact answers.
+This specification uses the [EEZ specification](../eez-protocol-spec/index.md) for the shared
+contracts, cross-chain execution, proofs, settlement, proxies, and wire formats. This document
+defines the choices made by Rollup0.
+
+Unfinished parts are marked **To be defined** and collected in
+[Chapter 12](12-open-issues.md).
 
 ## Reading Order
 
