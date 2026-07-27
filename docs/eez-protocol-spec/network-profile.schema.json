@@ -1,0 +1,1251 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specs.eez.network/eez/0.1-draft/network-profile.schema.json",
+  "title": "EEZ network profile",
+  "description": "Required configuration surface for an EEZ rollup or settlement-host profile. Specification identity is independent of source-repository revisions.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "profile",
+    "eez_dependency",
+    "chain_identity",
+    "settlement_binding",
+    "execution_binding",
+    "operation",
+    "proof_policy",
+    "data_availability",
+    "governance_recovery",
+    "release_blockers"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "../eez-protocol-spec/network-profile.schema.json"
+    },
+    "schema_version": {
+      "const": "1"
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "version",
+        "status",
+        "role",
+        "network_name",
+        "environment"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "status": {
+          "enum": [
+            "draft",
+            "development",
+            "production"
+          ]
+        },
+        "role": {
+          "enum": [
+            "rollup",
+            "settlement-host"
+          ]
+        },
+        "network_name": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "environment": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        }
+      }
+    },
+    "eez_dependency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "framework",
+        "evm_binding"
+      ],
+      "properties": {
+        "framework": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "version"
+          ],
+          "properties": {
+            "id": {
+              "const": "eez-framework"
+            },
+            "version": {
+              "const": "0.1-draft"
+            }
+          }
+        },
+        "evm_binding": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "version",
+            "specification"
+          ],
+          "properties": {
+            "id": {
+              "const": "eez-evm"
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+            },
+            "specification": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._/-]+\\.md$"
+            }
+          }
+        }
+      }
+    },
+    "chain_identity": {
+      "$ref": "#/$defs/chain_identity"
+    },
+    "settlement_binding": {
+      "$ref": "#/$defs/settlement_binding"
+    },
+    "execution_binding": {
+      "$ref": "#/$defs/execution_binding"
+    },
+    "operation": {
+      "$ref": "#/$defs/operation"
+    },
+    "proof_policy": {
+      "$ref": "#/$defs/proof_policy"
+    },
+    "data_availability": {
+      "$ref": "#/$defs/data_availability"
+    },
+    "governance_recovery": {
+      "$ref": "#/$defs/governance_recovery"
+    },
+    "release_blockers": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+$"
+      },
+      "uniqueItems": true,
+      "description": "The unique set of every nested release-blocker selection ID. Semantic equality is checked by validate_profiles.py."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "production"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "profile"
+        ]
+      },
+      "then": {
+        "type": "object",
+        "properties": {
+          "release_blockers": {
+            "type": "array",
+            "maxItems": 0
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "type": "object",
+            "properties": {
+              "role": {
+                "const": "settlement-host"
+              }
+            },
+            "required": [
+              "role"
+            ]
+          }
+        },
+        "required": [
+          "profile"
+        ]
+      },
+      "then": {
+        "type": "object",
+        "properties": {
+          "chain_identity": {
+            "type": "object",
+            "properties": {
+              "eez_rollup_id": {
+                "$ref": "#/$defs/not_applicable_selection"
+              }
+            }
+          },
+          "settlement_binding": {
+            "type": "object",
+            "properties": {
+              "host_profile": {
+                "$ref": "#/$defs/not_applicable_selection"
+              },
+              "host_network": {
+                "$ref": "#/$defs/not_applicable_selection"
+              },
+              "host_chain_id": {
+                "$ref": "#/$defs/not_applicable_selection"
+              },
+              "manager_contract": {
+                "$ref": "#/$defs/not_applicable_selection"
+              },
+              "proof_system_contracts": {
+                "$ref": "#/$defs/not_applicable_selection"
+              }
+            }
+          },
+          "execution_binding": {
+            "type": "object",
+            "properties": {
+              "fee_recipient": {
+                "$ref": "#/$defs/not_applicable_selection"
+              },
+              "eez_predeploys": {
+                "$ref": "#/$defs/not_applicable_selection"
+              },
+              "system_address": {
+                "$ref": "#/$defs/not_applicable_selection"
+              },
+              "system_transaction_envelope": {
+                "$ref": "#/$defs/not_applicable_selection"
+              }
+            }
+          },
+          "operation": {
+            "type": "object",
+            "properties": {
+              "max_user_transactions_per_bundle": {
+                "$ref": "#/$defs/not_applicable_selection"
+              },
+              "proof_routing_mitigation": {
+                "$ref": "#/$defs/not_applicable_selection"
+              }
+            }
+          },
+          "proof_policy": {
+            "type": "object",
+            "properties": {
+              "model": {
+                "$ref": "#/$defs/not_applicable_selection"
+              },
+              "allowed_proof_systems_and_vkeys": {
+                "$ref": "#/$defs/not_applicable_selection"
+              },
+              "threshold": {
+                "$ref": "#/$defs/not_applicable_selection"
+              }
+            }
+          },
+          "data_availability": {
+            "type": "object",
+            "properties": {
+              "requirement": {
+                "$ref": "#/$defs/not_applicable_selection"
+              },
+              "channel": {
+                "$ref": "#/$defs/not_applicable_selection"
+              },
+              "codec": {
+                "$ref": "#/$defs/not_applicable_selection"
+              },
+              "derivation_rule": {
+                "$ref": "#/$defs/not_applicable_selection"
+              }
+            }
+          },
+          "governance_recovery": {
+            "type": "object",
+            "properties": {
+              "manager_authority": {
+                "$ref": "#/$defs/not_applicable_selection"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "type": "object",
+            "properties": {
+              "role": {
+                "const": "rollup"
+              }
+            },
+            "required": [
+              "role"
+            ]
+          }
+        },
+        "required": [
+          "profile"
+        ]
+      },
+      "then": {
+        "type": "object",
+        "properties": {
+          "operation": {
+            "type": "object",
+            "required": [
+              "proof_routing_mitigation"
+            ],
+            "properties": {
+              "proof_routing_mitigation": {
+                "$ref": "#/$defs/selection_proof_routing_mitigation"
+              }
+            }
+          },
+          "settlement_binding": {
+            "type": "object",
+            "properties": {
+              "eez_contract": {
+                "$ref": "#/$defs/not_applicable_selection"
+              },
+              "deployment_block": {
+                "$ref": "#/$defs/not_applicable_selection"
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "selection": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "value",
+            "source"
+          ],
+          "properties": {
+            "status": {
+              "const": "fixed"
+            },
+            "value": {
+              "not": {
+                "type": "null"
+              }
+            },
+            "source": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "\\S"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "id",
+            "issue"
+          ],
+          "properties": {
+            "status": {
+              "const": "release-blocker"
+            },
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+$"
+            },
+            "issue": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "\\S"
+            },
+            "source": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "\\S"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "reason"
+          ],
+          "properties": {
+            "status": {
+              "const": "not-applicable"
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "\\S"
+            }
+          }
+        }
+      ]
+    },
+    "not_applicable_selection": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "const": "not-applicable"
+        }
+      },
+      "required": [
+        "status"
+      ]
+    },
+    "fixed_selection": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "const": "fixed"
+        }
+      },
+      "required": [
+        "status"
+      ]
+    },
+    "nonempty_string": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "nonnegative_integer": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "positive_integer": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "address": {
+      "type": "string",
+      "pattern": "^0x[0-9a-fA-F]{40}$"
+    },
+    "bytes32": {
+      "type": "string",
+      "pattern": "^0x[0-9a-fA-F]{64}$"
+    },
+    "nonzero_address": {
+      "type": "string",
+      "pattern": "^0x(?!0{40}$)[0-9a-fA-F]{40}$"
+    },
+    "nonzero_bytes32": {
+      "type": "string",
+      "pattern": "^0x(?!0{64}$)[0-9a-fA-F]{64}$"
+    },
+    "string_or_object": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        {
+          "type": "object",
+          "minProperties": 1
+        }
+      ]
+    },
+    "evm_fork_rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "minimum_execution_fork",
+        "activation",
+        "opcode_semantics",
+        "validation"
+      ],
+      "properties": {
+        "minimum_execution_fork": {
+          "enum": [
+            "Cancun",
+            "Dencun/Cancun",
+            "Prague",
+            "Prague/Pectra",
+            "Pectra",
+            "Osaka"
+          ]
+        },
+        "activation": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "genesis"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "value"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "block"
+                },
+                "value": {
+                  "$ref": "#/$defs/nonnegative_integer"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "value"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "timestamp"
+                },
+                "value": {
+                  "$ref": "#/$defs/nonnegative_integer"
+                }
+              }
+            }
+          ]
+        },
+        "opcode_semantics": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "transient_storage",
+            "blobhash",
+            "mcopy"
+          ],
+          "properties": {
+            "transient_storage": {
+              "const": "EIP-1153"
+            },
+            "blobhash": {
+              "const": "EIP-4844"
+            },
+            "mcopy": {
+              "const": "EIP-5656"
+            }
+          }
+        },
+        "validation": {
+          "$ref": "#/$defs/nonempty_string"
+        }
+      }
+    },
+    "proof_routing_mitigation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mechanism",
+        "binding_evidence",
+        "authenticates_caller",
+        "authenticated_calldata_fields",
+        "prevents_replay",
+        "prevents_front_running",
+        "failure_rule"
+      ],
+      "properties": {
+        "mechanism": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "binding_evidence": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "authenticates_caller": {
+          "const": true
+        },
+        "authenticated_calldata_fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nonempty_string"
+          },
+          "uniqueItems": true
+        },
+        "prevents_replay": {
+          "const": true
+        },
+        "prevents_front_running": {
+          "const": true
+        },
+        "failure_rule": {
+          "$ref": "#/$defs/nonempty_string"
+        }
+      }
+    },
+    "host_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_id",
+        "profile_version"
+      ],
+      "properties": {
+        "profile_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "profile_version": {
+          "$ref": "#/$defs/nonempty_string"
+        }
+      }
+    },
+    "deployment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "address",
+        "runtime_bytecode_hash",
+        "deployment_transaction"
+      ],
+      "properties": {
+        "address": {
+          "$ref": "#/$defs/nonzero_address"
+        },
+        "runtime_bytecode_hash": {
+          "$ref": "#/$defs/nonzero_bytes32"
+        },
+        "deployment_transaction": {
+          "$ref": "#/$defs/nonzero_bytes32"
+        }
+      }
+    },
+    "deployment_block": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "number",
+        "hash"
+      ],
+      "properties": {
+        "number": {
+          "$ref": "#/$defs/positive_integer"
+        },
+        "hash": {
+          "$ref": "#/$defs/nonzero_bytes32"
+        }
+      }
+    },
+    "deployment_array": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/deployment"
+      }
+    },
+    "address_map": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "#/$defs/address"
+      }
+    },
+    "canonical_header_integer_rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "field",
+        "validation"
+      ],
+      "properties": {
+        "source": {
+          "const": "canonical_execution_header"
+        },
+        "field": {
+          "const": "gasLimit"
+        },
+        "validation": {
+          "$ref": "#/$defs/nonempty_string"
+        }
+      }
+    },
+    "proof_system_policy": {
+      "oneOf": [
+        {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "minProperties": 1
+          }
+        },
+        {
+          "type": "object",
+          "minProperties": 1
+        }
+      ]
+    },
+    "selection_nonempty_string": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/selection"
+        },
+        {
+          "if": {
+            "$ref": "#/$defs/fixed_selection"
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/nonempty_string"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "selection_string_or_object": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/selection"
+        },
+        {
+          "if": {
+            "$ref": "#/$defs/fixed_selection"
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/string_or_object"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "selection_evm_fork": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/selection"
+        },
+        {
+          "if": {
+            "$ref": "#/$defs/fixed_selection"
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/evm_fork_rule"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "selection_proof_routing_mitigation": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/selection"
+        },
+        {
+          "if": {
+            "$ref": "#/$defs/fixed_selection"
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/proof_routing_mitigation"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "selection_nonnegative_integer": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/selection"
+        },
+        {
+          "if": {
+            "$ref": "#/$defs/fixed_selection"
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/nonnegative_integer"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "selection_positive_integer": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/selection"
+        },
+        {
+          "if": {
+            "$ref": "#/$defs/fixed_selection"
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/positive_integer"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "selection_address": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/selection"
+        },
+        {
+          "if": {
+            "$ref": "#/$defs/fixed_selection"
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/address"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "selection_object": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/selection"
+        },
+        {
+          "if": {
+            "$ref": "#/$defs/fixed_selection"
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": "object",
+                "minProperties": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "selection_host_profile": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/selection"
+        },
+        {
+          "if": {
+            "$ref": "#/$defs/fixed_selection"
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/host_profile"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "selection_deployment": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/selection"
+        },
+        {
+          "if": {
+            "$ref": "#/$defs/fixed_selection"
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/deployment"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "selection_deployment_block": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/selection"
+        },
+        {
+          "if": {
+            "$ref": "#/$defs/fixed_selection"
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/deployment_block"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "selection_deployment_array": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/selection"
+        },
+        {
+          "if": {
+            "$ref": "#/$defs/fixed_selection"
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/deployment_array"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "selection_address_map": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/selection"
+        },
+        {
+          "if": {
+            "$ref": "#/$defs/fixed_selection"
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/address_map"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "selection_block_gas_limit": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/selection"
+        },
+        {
+          "if": {
+            "$ref": "#/$defs/fixed_selection"
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/nonnegative_integer"
+                  },
+                  {
+                    "$ref": "#/$defs/canonical_header_integer_rule"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "selection_proof_system_policy": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/selection"
+        },
+        {
+          "if": {
+            "$ref": "#/$defs/fixed_selection"
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/proof_system_policy"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "chain_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "eip155_chain_id",
+        "eez_rollup_id",
+        "native_asset",
+        "genesis_commitment",
+        "evm_fork"
+      ],
+      "properties": {
+        "eip155_chain_id": {
+          "$ref": "#/$defs/selection_nonnegative_integer"
+        },
+        "eez_rollup_id": {
+          "$ref": "#/$defs/selection_positive_integer"
+        },
+        "native_asset": {
+          "$ref": "#/$defs/selection_nonempty_string"
+        },
+        "genesis_commitment": {
+          "$ref": "#/$defs/selection_string_or_object"
+        },
+        "evm_fork": {
+          "$ref": "#/$defs/selection_evm_fork"
+        }
+      }
+    },
+    "settlement_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "host_profile",
+        "host_network",
+        "host_chain_id",
+        "eez_contract",
+        "manager_contract",
+        "proof_system_contracts",
+        "deployment_block",
+        "settlement_rule",
+        "finality_rule"
+      ],
+      "properties": {
+        "host_profile": {
+          "$ref": "#/$defs/selection_host_profile"
+        },
+        "host_network": {
+          "$ref": "#/$defs/selection_nonempty_string"
+        },
+        "host_chain_id": {
+          "$ref": "#/$defs/selection_nonnegative_integer"
+        },
+        "eez_contract": {
+          "$ref": "#/$defs/selection_deployment"
+        },
+        "manager_contract": {
+          "$ref": "#/$defs/selection_deployment"
+        },
+        "proof_system_contracts": {
+          "$ref": "#/$defs/selection_deployment_array"
+        },
+        "deployment_block": {
+          "$ref": "#/$defs/selection_deployment_block"
+        },
+        "settlement_rule": {
+          "$ref": "#/$defs/selection_string_or_object"
+        },
+        "finality_rule": {
+          "$ref": "#/$defs/selection_string_or_object"
+        }
+      }
+    },
+    "execution_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "block_time_ms",
+        "block_gas_limit",
+        "fee_market",
+        "fee_recipient",
+        "eez_predeploys",
+        "system_address",
+        "system_transaction_envelope"
+      ],
+      "properties": {
+        "block_time_ms": {
+          "$ref": "#/$defs/selection_nonnegative_integer"
+        },
+        "block_gas_limit": {
+          "$ref": "#/$defs/selection_block_gas_limit"
+        },
+        "fee_market": {
+          "$ref": "#/$defs/selection_object"
+        },
+        "fee_recipient": {
+          "$ref": "#/$defs/selection_address"
+        },
+        "eez_predeploys": {
+          "$ref": "#/$defs/selection_address_map"
+        },
+        "system_address": {
+          "$ref": "#/$defs/selection_address"
+        },
+        "system_transaction_envelope": {
+          "$ref": "#/$defs/selection_object"
+        }
+      }
+    },
+    "operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sequencing_model",
+        "sequencing_authority",
+        "slot_construction",
+        "atomic_inclusion",
+        "max_user_transactions_per_bundle",
+        "proof_routing_mitigation"
+      ],
+      "properties": {
+        "sequencing_model": {
+          "$ref": "#/$defs/selection_string_or_object"
+        },
+        "sequencing_authority": {
+          "$ref": "#/$defs/selection_string_or_object"
+        },
+        "slot_construction": {
+          "$ref": "#/$defs/selection_string_or_object"
+        },
+        "atomic_inclusion": {
+          "$ref": "#/$defs/selection_string_or_object"
+        },
+        "max_user_transactions_per_bundle": {
+          "$ref": "#/$defs/selection_nonnegative_integer"
+        },
+        "proof_routing_mitigation": {
+          "$ref": "#/$defs/selection_proof_routing_mitigation"
+        }
+      }
+    },
+    "proof_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model",
+        "allowed_proof_systems_and_vkeys",
+        "threshold"
+      ],
+      "properties": {
+        "model": {
+          "$ref": "#/$defs/selection_string_or_object"
+        },
+        "allowed_proof_systems_and_vkeys": {
+          "$ref": "#/$defs/selection_proof_system_policy"
+        },
+        "threshold": {
+          "$ref": "#/$defs/selection_positive_integer"
+        }
+      }
+    },
+    "data_availability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requirement",
+        "channel",
+        "codec",
+        "derivation_rule"
+      ],
+      "properties": {
+        "requirement": {
+          "$ref": "#/$defs/selection_string_or_object"
+        },
+        "channel": {
+          "$ref": "#/$defs/selection_string_or_object"
+        },
+        "codec": {
+          "$ref": "#/$defs/selection_string_or_object"
+        },
+        "derivation_rule": {
+          "$ref": "#/$defs/selection_string_or_object"
+        }
+      }
+    },
+    "governance_recovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "manager_authority",
+        "upgrade_policy",
+        "reorg_and_emergency_rule"
+      ],
+      "properties": {
+        "manager_authority": {
+          "$ref": "#/$defs/selection_string_or_object"
+        },
+        "upgrade_policy": {
+          "$ref": "#/$defs/selection_string_or_object"
+        },
+        "reorg_and_emergency_rule": {
+          "$ref": "#/$defs/selection_string_or_object"
+        }
+      }
+    }
+  }
+}
