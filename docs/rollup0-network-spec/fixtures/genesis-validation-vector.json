@@ -1,0 +1,78 @@
+{
+  "schema": "rollup0-genesis-validation-vector-v1",
+  "developmentGenesis": {
+    "artifactSha256": "0xfb1ca15108f3fa320471d344ac24c55925bd88d2ce57cdbfd2d069ced2e94ef6",
+    "artifactBytes": 30442,
+    "chainId": "0x1",
+    "allocationAccounts": 24,
+    "stateRoot": "0xd381d828f650845aa890778c74ad2de245f5b3f2a24763f243e19a6bafb4fec5",
+    "genesisHash": "0xcc2334a5f46d86829de4f761b295ee171731bdde1dcb20be6e2ccb6d504a0b56",
+    "headerRlpLength": 610,
+    "predeploys": {
+      "0x4200000000000000000000000000000000000007": {
+        "codeLength": 13406,
+        "codeHash": "0xb443cc3f745ada484c302b9ba255b44e85bf04b1c14ba486e2498640934fcdb6",
+        "nonce": "0x0",
+        "balance": "0x0"
+      },
+      "0x4200000000000000000000000000000000000008": {
+        "codeLength": 64,
+        "codeHash": "0x2867570fb0a81631762d16010f1afeb0dc2aace809800dd110b78c0ad460639a",
+        "nonce": "0x0",
+        "balance": "0x0"
+      },
+      "0x0000f90827f1c53a10cb7a02335b175320002935": {
+        "codeLength": 83,
+        "codeHash": "0x6e49e66782037c0555897870e29fa5e552daf4719552131a0abce779daec0a5d",
+        "nonce": "0x1",
+        "balance": "0x0"
+      }
+    }
+  },
+  "deploymentDerivation": {
+    "description": "Exact development deployment transformation: retain chainId 1, add the omitted zero fork keys, and replace only the timestamp.",
+    "template": "genesis-dev.json",
+    "inputs": {
+      "timestamp": "0x65000000"
+    },
+    "expected": {
+      "artifactSha256": "0xa39005f2e006210a92b7939788b1e01d666fb0449bd6b37e17dad3b9238f917f",
+      "artifactBytes": 30524,
+      "chainId": "0x1",
+      "stateRoot": "0xd381d828f650845aa890778c74ad2de245f5b3f2a24763f243e19a6bafb4fec5",
+      "genesisHash": "0xccfdebd1c48bd59d66a65cd49b622de8df9697e35a84828e2b5fb9c53f6f2cb9",
+      "headerRlpLength": 610
+    }
+  },
+  "chainIdOverrideDemonstration": {
+    "description": "Synthetic test-only override showing that chainId changes the artifact and signature domain but not this genesis header or state root. It does not identify a live network.",
+    "inputs": {
+      "chainId": "0x3039",
+      "timestamp": "0x65000000"
+    },
+    "expected": {
+      "artifactSha256": "0x3527d619c2a48657e671f875a6c89d2dab315bd34a8ff852b1ad8a32f9905d02",
+      "artifactBytes": 30528,
+      "chainId": "0x3039",
+      "stateRoot": "0xd381d828f650845aa890778c74ad2de245f5b3f2a24763f243e19a6bafb4fec5",
+      "genesisHash": "0xccfdebd1c48bd59d66a65cd49b622de8df9697e35a84828e2b5fb9c53f6f2cb9",
+      "headerRlpLength": 610
+    }
+  },
+  "emptyChild": {
+    "description": "First empty block above the exact development genesis, using the normative Rollup0 v0 1-second block time and applying the EIP-2935 pre-block write.",
+    "blockTime": "0x1",
+    "number": "0x1",
+    "timestamp": "0x6490fdd3",
+    "baseFeePerGas": "0x342770c0",
+    "historyStorage": {
+      "address": "0x0000f90827f1c53a10cb7a02335b175320002935",
+      "slot": "0x0",
+      "value": "0xcc2334a5f46d86829de4f761b295ee171731bdde1dcb20be6e2ccb6d504a0b56",
+      "storageRoot": "0xc999055097d38a22d00765ecaa6f33abc21adaa90a51bfcc54fccb56ee3c1335"
+    },
+    "stateRoot": "0xfd75dc8a45e5f8ed14c051b2477fc288c4978a4ac204bf0799da22413ffba3c3",
+    "blockHash": "0xf3dc1444419145cfbf018cccdb7e85fc92db53194e1d20c79420d85683126653",
+    "headerRlpLength": 610
+  }
+}

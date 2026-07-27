@@ -1,0 +1,301 @@
+{
+  "$schema": "../eez-protocol-spec/network-profile.schema.json",
+  "schema_version": "1",
+  "profile": {
+    "id": "rollup0-chiado",
+    "name": "Rollup0 Network Specification",
+    "version": "0.1-draft",
+    "status": "development",
+    "role": "rollup",
+    "network_name": "Rollup0",
+    "environment": "Chiado development deployment"
+  },
+  "eez_dependency": {
+    "framework": {
+      "id": "eez-framework",
+      "version": "0.1-draft"
+    },
+    "evm_binding": {
+      "id": "eez-evm",
+      "version": "0.1-rollup0",
+      "specification": "rollup0-network-spec/E-compatibility-binding.md"
+    }
+  },
+  "chain_identity": {
+    "eip155_chain_id": {
+      "status": "fixed",
+      "value": 1,
+      "source": "Rollup0 Network Specification Appendix D; development profile only"
+    },
+    "eez_rollup_id": {
+      "status": "fixed",
+      "value": 1,
+      "source": "Rollup0 Network Specification Appendix D; EEZL2 immutable ROLLUP_ID"
+    },
+    "native_asset": {
+      "status": "fixed",
+      "value": "Rollup0 development test asset; no production backing claim",
+      "source": "Rollup0 Network Specification Appendix D and §7.5"
+    },
+    "genesis_commitment": {
+      "status": "fixed",
+      "value": {
+        "template": "fixtures/genesis-dev.json",
+        "template_sha256": "0xfb1ca15108f3fa320471d344ac24c55925bd88d2ce57cdbfd2d069ced2e94ef6",
+        "template_state_root": "0xd381d828f650845aa890778c74ad2de245f5b3f2a24763f243e19a6bafb4fec5",
+        "template_block_hash": "0xcc2334a5f46d86829de4f761b295ee171731bdde1dcb20be6e2ccb6d504a0b56",
+        "chiado_derivation": "Apply Appendix D.6 to an activation-record Chiado timestamp-source block and publish the resulting artifact SHA-256, state root, and block hash."
+      },
+      "source": "Rollup0 Network Specification Appendix D"
+    },
+    "evm_fork": {
+      "status": "fixed",
+      "value": {
+        "minimum_execution_fork": "Osaka",
+        "activation": {
+          "kind": "genesis"
+        },
+        "opcode_semantics": {
+          "transient_storage": "EIP-1153",
+          "blobhash": "EIP-4844",
+          "mcopy": "EIP-5656"
+        },
+        "validation": "The pinned development chain activates these semantics from genesis. A production profile must publish its own complete fork schedule."
+      },
+      "source": "Rollup0 Network Specification Appendix D"
+    }
+  },
+  "settlement_binding": {
+    "host_profile": {
+      "status": "fixed",
+      "value": {
+        "profile_id": "gnosis-chain-eez-chiado-rollup0",
+        "profile_version": "0.1-draft"
+      },
+      "source": "Rollup0 Network Specification §1"
+    },
+    "host_network": {
+      "status": "fixed",
+      "value": "Gnosis Chiado",
+      "source": "Gnosis host profile gnosis-chain-eez-chiado-rollup0@0.1-draft"
+    },
+    "host_chain_id": {
+      "status": "fixed",
+      "value": 10200,
+      "source": "Gnosis host profile gnosis-chain-eez-chiado-rollup0@0.1-draft"
+    },
+    "eez_contract": {
+      "status": "not-applicable",
+      "reason": "The selected settlement-host profile owns the shared EEZ deployment identity."
+    },
+    "manager_contract": {
+      "status": "release-blocker",
+      "id": "R0-DEPLOYMENT",
+      "issue": "Pin the production Rollup0 manager address and bytecode hash."
+    },
+    "proof_system_contracts": {
+      "status": "release-blocker",
+      "id": "R0-PROOF-POLICY",
+      "issue": "Replace the development mock and pin every production ECDSA proof-system address and bytecode hash."
+    },
+    "deployment_block": {
+      "status": "not-applicable",
+      "reason": "The selected settlement-host profile owns the shared EEZ deployment block."
+    },
+    "settlement_rule": {
+      "status": "fixed",
+      "value": "A batch endpoint is settled only from exact canonical receipts for its post and transaction-indexed riders. Classify every transient index from ordered ImmediateEntrySkipped or L2ExecutionPerformed logs and every inbound index from its rider's ordered ExecutionConsumed plus L2ExecutionPerformed pair; preserve transaction boundaries, log order, indices, and multiplicity, then require one applied prefix. Root values or event counts alone are insufficient.",
+      "source": "Rollup0 Network Specification §4.5, §6, and Appendix E.9"
+    },
+    "finality_rule": {
+      "status": "fixed",
+      "value": "An L2 block is safe after its matching Chiado settlement and finalized when that Chiado block is finalized.",
+      "source": "Rollup0 Network Specification §6"
+    }
+  },
+  "execution_binding": {
+    "block_time_ms": {
+      "status": "fixed",
+      "value": 1000,
+      "source": "eez-rollup0/docker-compose.chiado-node.yml EEZ_L2_BLOCK_TIME_MS"
+    },
+    "block_gas_limit": {
+      "status": "fixed",
+      "value": 30000000,
+      "source": "eez-rollup0/crates/eez-driver/src/lib.rs BUILDER_GAS_LIMIT"
+    },
+    "fee_market": {
+      "status": "fixed",
+      "value": {
+        "elasticity_multiplier": 2,
+        "base_fee_change_denominator": 8,
+        "genesis_base_fee_wei": 1000000000,
+        "beneficiary": "0x0000000000000000000000000000000000000000",
+        "base_fee_treatment": "burned",
+        "priority_fee_treatment": "credited to the zero beneficiary and economically inaccessible",
+        "fee_vault": false,
+        "fee_oracle": false,
+        "l1_data_surcharge": false
+      },
+      "source": "Rollup0 Network Specification §§2.6 and 7"
+    },
+    "fee_recipient": {
+      "status": "fixed",
+      "value": "0x0000000000000000000000000000000000000000",
+      "source": "Rollup0 Network Specification §§2.6 and 7.2"
+    },
+    "eez_predeploys": {
+      "status": "fixed",
+      "value": {
+        "EEZL2": "0x4200000000000000000000000000000000000007",
+        "BridgeReceiver": "0x4200000000000000000000000000000000000008"
+      },
+      "source": "eez-rollup0/genesis.json"
+    },
+    "system_address": {
+      "status": "fixed",
+      "value": "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
+      "source": "Rollup0 Network Specification Appendix D; public development identity only"
+    },
+    "system_transaction_envelope": {
+      "status": "fixed",
+      "value": {
+        "type": "legacy EIP-155",
+        "rpc_type": "0x0",
+        "typed_prefix": false,
+        "gas_price_wei": 1000000000,
+        "gas_limit": 2000000,
+        "authorization": "SYSTEM_ADDRESS secp256k1 signature",
+        "development_private_key": "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+        "private_key_scope": "Public development fixture only; a production profile must select a distinct secret or a new authorization design.",
+        "ordering": "outbound [load,user] pairs, inbound deliveries, remaining users"
+      },
+      "source": "Rollup0 Network Specification Appendix C"
+    }
+  },
+  "operation": {
+    "sequencing_model": {
+      "status": "fixed",
+      "value": "single permissioned operator",
+      "source": "Rollup0 Network Specification §3"
+    },
+    "sequencing_authority": {
+      "status": "release-blocker",
+      "id": "R0-OPERATOR",
+      "issue": "Pin the production operator identity and rotation procedure."
+    },
+    "slot_construction": {
+      "status": "fixed",
+      "value": {
+        "settlement_interval_ms": 5000,
+        "l2_interval_ms": 1000,
+        "proof_budget_ms": 500,
+        "submission_slack_ms": 1300,
+        "nominal_width": 5,
+        "steady_composition": {
+          "live": 3,
+          "future": 1,
+          "sync": 1
+        },
+        "scheduler_anchor": "observed canonical Chiado heads",
+        "header": {
+          "beneficiary": "0x0000000000000000000000000000000000000000",
+          "prev_randao": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "timestamp_rule": "parent timestamp plus 1 second"
+        }
+      },
+      "source": "Rollup0 Network Specification §2"
+    },
+    "atomic_inclusion": {
+      "status": "fixed",
+      "value": {
+        "bundle_order": "postAndVerifyBatch followed by inbound riders in batch order",
+        "rider_count_equals_inbound_entry_count": true,
+        "rider_transaction_index": "post_transaction_index + 1 + rider_index",
+        "inclusion_rule": "Include the exact raw transactions together at the selected Chiado block number and timestamp or include none.",
+        "failure_rule": "Reject a missing, extra, interposed, reordered, substituted, or independently droppable rider."
+      },
+      "source": "Rollup0 Network Specification §§4.4-4.5"
+    },
+    "max_user_transactions_per_bundle": {
+      "status": "fixed",
+      "value": 3,
+      "source": "eez-rollup0/docker-compose.chiado-node.yml EEZ_MAX_USER_TXS_PER_BUNDLE"
+    },
+    "proof_routing_mitigation": {
+      "status": "release-blocker",
+      "id": "R0-PROOF-ROUTING",
+      "issue": "Activate a versioned contract or authenticated submission rule that binds the postAndVerifyBatch caller, transientExecutionEntryCount, transientLookupCallCount, replay domain, and front-running/failure behavior. Complete-calldata validator checks alone do not repair the 5c51e02 proof digest."
+    }
+  },
+  "proof_policy": {
+    "model": {
+      "status": "fixed",
+      "value": {
+        "attestation_model": "Permissioned threshold of independent single-signer ECDSA proof-system contracts",
+        "cross_proof_system_interactions": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "source": "Rollup0 Network Specification §1 and §4.3; Appendix E.5"
+    },
+    "allowed_proof_systems_and_vkeys": {
+      "status": "release-blocker",
+      "id": "R0-PROOF-POLICY",
+      "issue": "Publish the production accepted proof systems, signer identities, and manager-held verification keys."
+    },
+    "threshold": {
+      "status": "release-blocker",
+      "id": "R0-PROOF-POLICY",
+      "issue": "Pin the production validator count M and required threshold N."
+    }
+  },
+  "data_availability": {
+    "requirement": {
+      "status": "fixed",
+      "value": "Publish all user transactions and L1-shape derivation entries needed for byte-identical derivation from the settlement host, with exact sidecar-to-batch correspondence.",
+      "source": "Rollup0 Network Specification §§4 and 6"
+    },
+    "channel": {
+      "status": "fixed",
+      "value": {
+        "transport": "EEZ batch callData on Chiado",
+        "tag": "0x00",
+        "blob_indices": []
+      },
+      "source": "Rollup0 Network Specification §4.1"
+    },
+    "codec": {
+      "status": "fixed",
+      "value": "tag 0x00 followed by canonical RLP [blockTxCounts, transactions, l2_entries]",
+      "source": "Rollup0 Network Specification §4.1"
+    },
+    "derivation_rule": {
+      "status": "fixed",
+      "value": "Derive only canonical batches using exact transaction receipts and ordered EEZ log occurrences with multiplicity; rebuild user and system transactions in block order and accept only a unique applied prefix.",
+      "source": "Rollup0 Network Specification §6"
+    }
+  },
+  "governance_recovery": {
+    "manager_authority": {
+      "status": "fixed",
+      "value": "The per-rollup manager selects proof policy and may call setStateRoot outside a block in which settlement locked the rollup.",
+      "source": "EEZ Framework Specification §§4.8 and 5.4"
+    },
+    "upgrade_policy": {
+      "status": "release-blocker",
+      "id": "R0-UPGRADES",
+      "issue": "Publish contract upgrade, manager replacement, key rotation, and parameter-change procedures."
+    },
+    "reorg_and_emergency_rule": {
+      "status": "fixed",
+      "value": "Rewind and rederive after a Chiado reorg; validate canonical receipts before requeue; halt for operator intervention if automatic history is exceeded or a finalized settlement is displaced.",
+      "source": "Rollup0 Network Specification §6.4"
+    }
+  },
+  "release_blockers": [
+    "R0-DEPLOYMENT",
+    "R0-PROOF-POLICY",
+    "R0-PROOF-ROUTING",
+    "R0-OPERATOR",
+    "R0-UPGRADES"
+  ]
+}
