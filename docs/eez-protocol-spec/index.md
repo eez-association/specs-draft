@@ -4,8 +4,8 @@
 
 | | |
 |---|---|
-| **Status** | Draft / normative intent |
-| **Execution** | Cancun-equivalent Ethereum EVM; no custom opcodes or precompiles |
+| **Status** | Draft |
+| **Execution** | Ethereum-compatible EVM at a network-selected fork that includes Cancun features |
 | **Scope** | Cross-chain contracts, execution entries, replay, proving interfaces, settlement, and byte-exact wire formats |
 
 EEZ is a cross-chain protocol: a set of settlement and execution contracts and a settlement rule
@@ -18,7 +18,7 @@ interactions. An EEZ network can select a narrower subset.
 EEZ does not define block cadence, sequencing or admission, data availability, fees, gas limits,
 chain derivation, or a network's proof policy. Those are choices made by each EEZ network.
 
-Key words (MUST/SHOULD/MAY) carry their usual normative meaning.
+The words MUST, SHOULD, and MAY mark protocol requirements.
 
 ## Reading order
 
@@ -27,4 +27,3 @@ Key words (MUST/SHOULD/MAY) carry their usual normative meaning.
 3. [Execution Model](03-execution-model.md)
 4. [Proving and Settlement](04-proving-and-settlement.md)
 5. [Wire Formats and Conformance Vectors](05-wire-formats.md)
-

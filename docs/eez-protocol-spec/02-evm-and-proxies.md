@@ -2,9 +2,9 @@
 
 ## 2.1 EVM target
 
-EEZ executes on an **Ethereum-equivalent EVM at the Cancun fork**: no custom opcodes, no custom
-precompiles, the standard gas schedule and transaction types. Cross-chain behavior is layered on
-top via contracts and an off-chain simulation step, never via EVM changes.
+EEZ requires an Ethereum-compatible EVM fork that includes the Cancun features used by the EEZ
+contracts. Each EEZ network selects its exact execution fork. EEZ adds no custom opcode or
+precompile; cross-chain behavior is layered on top through contracts and off-chain simulation.
 
 ## 2.2 Cross-chain proxy
 
