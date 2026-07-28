@@ -10,7 +10,7 @@ A candidate's direct cost is approximately:
 ```text
 Rollup0 execution
 + proof or validation
-+ Ethereum calldata
++ Ethereum blobs
 + Ethereum settlement execution
 + ordered bundle inclusion
 + expected retry cost
@@ -21,15 +21,14 @@ submission costs even when another valid candidate settles first.
 
 ## B.2 Data Availability
 
-For calldata payload `p`, the Ethereum DA gas is determined by the number of zero and nonzero bytes
-under Ethereum calldata pricing:
+For a candidate using `n` blobs, the DA cost is determined by the Ethereum blob base fee and the
+blob gas charged per blob:
 
 ```text
-DA_gas(p) = zero_bytes(p) * zero_byte_gas
-          + nonzero_bytes(p) * nonzero_byte_gas
+DA_cost = n * blob_gas_per_blob * blob_base_fee
 ```
 
-The exact monetary cost also depends on the Ethereum base fee and any inclusion payment.
+The exact monetary cost also depends on settlement execution gas and any inclusion payment.
 
 ## B.3 Settlement Scaling
 
@@ -43,7 +42,7 @@ Settlement cost grows with:
 - bundle inclusion overhead.
 
 Production capacity limits require measurements against the final contracts, proof policy, and
-system-transaction format. This draft does not provide measured limits.
+system-call format. This draft does not provide measured limits.
 
 ---
 

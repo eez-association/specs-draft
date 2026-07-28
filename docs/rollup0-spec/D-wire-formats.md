@@ -33,74 +33,30 @@ recovered address equals the signer configured for that proof system.
 proof-system index list is strictly increasing. The Rollup0 manager accepts only configured proof
 systems and rejects a submitted subset with fewer than the selected threshold `N`.
 
-## D.2 DA Grammar
+## D.2 Blob Format
 
-```text
-payload = 0x00 || rlp([blockTxCounts, transactions, l2Entries])
-```
+Rollup0 uses Ethereum blobs for anchored chain data. The format must encode or commit to:
 
-The top-level RLP item is exactly a three-element list.
+1. a format version;
+2. the exact settled Rollup0 parent;
+3. every block boundary in the anchored range;
+4. every signed pure-L2 transaction in block order;
+5. all non-derived header inputs;
+6. the EEZ objects and system-call inputs for every synchronous effect; and
+7. the ordered Ethereum trigger manifest.
 
-| Element | RLP shape | Rule |
-|---|---|---|
-| `blockTxCounts` | list of byte strings interpreted as unsigned integers | one count per Rollup0 block |
-| `transactions` | list of byte strings | complete signed EIP-2718 user transactions in block-major order |
-| `l2Entries` | list of byte strings | complete EEZ L2 execution-object encodings |
+!!! note "TO BE DEFINED"
+    The byte-exact encoding, field limits, multi-blob rules, and conformance vectors are not yet
+    defined. The previous calldata RLP draft is not the Rollup0 blob format and must not be used by
+    an independent implementation.
 
-A decoder MUST enforce:
+## D.3 Undefined System Call
 
-1. The payload starts with `0x00`.
-2. The remaining bytes contain exactly one canonical RLP item and no trailing bytes.
-3. The top-level item contains exactly three lists.
-4. `blockTxCounts` is nonempty.
-5. Each count is a canonical minimal unsigned RLP integer in `[0, 65535]`.
-6. The checked sum of all counts equals `len(transactions)`.
-7. The last count is zero.
-8. Every transaction and L2-entry element is an RLP byte string.
+Rollup0 represents an inbound action as an EIP-4788-style system call. The call is injected by
+block execution and is not included in the transaction list. Its byte-exact input follows the EEZ
+inbound delivery ABI.
 
-Integer zero is encoded as the RLP empty byte string, `0x80`.
-
-Candidate validation, rather than the outer RLP decoder, MUST then require each transaction byte
-string to contain one complete supported signed EIP-2718 envelope. It MUST require each L2-entry
-byte string to contain one complete EEZ L2 object, and require the entries to match the candidate's
-system transactions in count and order.
-
-## D.3 DA Conformance Vector
-
-The range contains two Rollup0 blocks. The first has two user transactions. The second is the Sync
-block and has no user transaction.
-
-```text
-blockTxCounts = [2, 0]
-
-transactions = [
-  0x02f8650180808094000000000000000000000000000000000000dead80c0,
-  0x02f8650180018094000000000000000000000000000000000000beef80c0
-]
-
-l2Entries = [
-  0x00000000000000000000000000000000000000000000000000000000deadbeef
-]
-```
-
-Canonical RLP:
-
-```text
-0xf865c20280f83e9e02f8650180808094000000000000000000000000000000000000dead80c09e02f8650180018094000000000000000000000000000000000000beef80c0e1a000000000000000000000000000000000000000000000000000000000deadbeef
-```
-
-Complete payload:
-
-```text
-0x00f865c20280f83e9e02f8650180808094000000000000000000000000000000000000dead80c09e02f8650180018094000000000000000000000000000000000000beef80c0e1a000000000000000000000000000000000000000000000000000000000deadbeef
-```
-
-The payload length is 104 bytes. The `c20280` segment encodes the count list `[2, 0]`.
-
-The executable fixture is [`fixtures/da-rlp-fixture.py`](fixtures/da-rlp-fixture.py).
-
-## D.4 Undefined System Envelope
-
-Transaction type `0x7e` is reserved for Rollup0 inbound system transactions. This draft does not
-define its byte encoding. No conformance vector exists for that envelope. The encoding is an
-explicit production blocker, not an implementation choice.
+!!! note "TO BE DEFINED"
+    The exact system caller, gas rules, value source, and commitment of results and logs are not yet
+    defined. No complete conformance vector can be produced until those rules are fixed. The
+    recovered draft's `0x7e` unsigned-transaction proposal is not a Rollup0 protocol rule.

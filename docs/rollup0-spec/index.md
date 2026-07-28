@@ -30,7 +30,7 @@ Unfinished parts are marked **To be defined** and collected in
 
 1. [Overview and Scope](01-overview.md)
 2. [Architecture](02-architecture.md)
-3. [EVM, Proxy, and System Transactions](03-evm-proxy-systemtx.md)
+3. [EVM, Proxy, and System Calls](03-evm-proxy-systemtx.md)
 4. [Block Production and Headers](04-block-production.md)
 5. [Execution Profile](05-execution-model.md)
 6. [Composer and Candidate Competition](06-composer.md)
@@ -47,3 +47,4 @@ Appendices:
 - [Appendix B: Gas and Cost Model](B-gas-cost-analysis.md)
 - [Appendix C: Open Questions](C-open-questions.md)
 - [Appendix D: Rollup0 Wire Format](D-wire-formats.md)
+- [Appendix E: Current Implementation Differences](E-implementation-divergences.md)

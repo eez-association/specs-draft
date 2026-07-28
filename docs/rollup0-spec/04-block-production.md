@@ -16,14 +16,16 @@ The six positions are five Live positions followed by one Sync position:
 Live, Live, Live, Live, Live, Sync
 ```
 
-A Live block contains ordinary Rollup0 transactions. A Sync block terminates the interval and
-carries the system transaction described in [Chapter 3](03-evm-proxy-systemtx.md) when an inbound
-action is accepted.
+A Live block contains ordinary Rollup0 transactions. The final position is the Sync position. Its
+block can contain ordinary pure-L2 transactions. When an inbound action is applied, the block also
+carries the system call described in [Chapter 3](03-evm-proxy-systemtx.md), after all of its
+pure-L2 transactions.
 
 This draft has no proof window. All five non-Sync positions are Live positions.
 
-Each Sync block shares the timestamp of the Ethereum block that carries its candidate. The six
-Rollup0 blocks in that interval use the same Ethereum anchor.
+Each Sync block has the scheduled timestamp of its corresponding Ethereum slot. The Sync block
+still exists when that Ethereum slot is missed. Only the terminal Sync block of an included
+candidate necessarily shares a timestamp with the Ethereum block that carries the candidate.
 
 Chiado is a development settlement network only. Its nominal 5-second interval contains five
 1-second Rollup0 positions: four Live positions followed by one Sync position. Chiado values are
@@ -61,22 +63,38 @@ The fixed header choices are:
 | `parentBeaconBlockRoot` | zero when required by the selected EVM fork |
 | transaction, receipt, state, request, and blob fields | exact execution-derived or parent-derived values required by the selected EVM fork |
 
-The `prevRandao` value is the RANDAO of the Ethereum block to which the interval is anchored. All
-six Rollup0 blocks in that interval use the same value. The shared Sync/Ethereum timestamp identifies
-that block. Applications MUST NOT use this value as secure randomness: it is visible to builders
-and can be biased by the Ethereum proposer.
+Applications MUST NOT use `prevRandao` as secure randomness. Its source is visible to builders and
+can be biased by the Ethereum proposer.
+
+!!! note "TO BE DEFINED"
+    The exact `prevRandao` source for live, unanchored, and missed-slot Rollup0 blocks is not yet
+    selected.
+
+    - Using the latest observed Ethereum RANDAO permits live block production before the matching
+      Ethereum slot completes, but several Rollup0 intervals can reuse one value.
+    - Using the RANDAO from the Ethereum block at the matching Sync timestamp gives direct slot
+      alignment, but requires waiting for that block and needs a separate missed-slot rule.
 
 ## 4.3 Sync Blocks and Candidate Ranges
 
-A normal candidate range:
+An anchor range:
 
 - starts immediately after its named settled Rollup0 parent;
-- contains the six Rollup0 blocks for one nominal interval;
-- ends at a Sync block; and
-- publishes one transaction count for every block in the range.
+- contains every Rollup0 block since that parent, including empty blocks;
+- can span more than one nominal Ethereum interval;
+- ends at the Rollup0 position whose timestamp equals the target Ethereum block timestamp; and
+- publishes enough boundary data to reconstruct every block in the range.
 
 The range begins at the last Ethereum-confirmed Rollup0 head. Its first block is
-`fromBlock + 1`, and its Sync block is `toBlock`.
+`fromBlock.number + 1`. Its terminal position contains the variants `B[0]` through `B[n]` described
+in Chapter 7.
+
+!!! note "TO BE DEFINED"
+    The exact block commitment for every possible synchronous prefix is not yet selected. The
+    published data must be enough to reconstruct each prefix block, but the team still needs to
+    decide whether validators sign every possible block hash or derive the selected hash from the
+    number of processed actions. The commitment must distinguish different prefix lengths even
+    when their state roots are equal.
 
 ## 4.4 Unsafe Blocks
 

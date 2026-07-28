@@ -21,11 +21,12 @@ A composer:
 2. collects and orders Rollup0 user transactions;
 3. observes an Ethereum-to-Rollup0 intent when the candidate includes one;
 4. simulates the complete Ethereum and Rollup0 interaction;
-5. builds the Rollup0 blocks and terminal Sync block;
+5. builds the Rollup0 blocks and every terminal Sync-block variant;
 6. builds the EEZ batch and Rollup0 DA payload;
-7. asks the validator/prover set to verify the complete candidate;
+7. asks the validator/prover set to verify the complete candidate and every possible applied
+   synchronous prefix;
 8. obtains the required proof or signatures;
-9. submits the exact Ethereum bundle; and
+9. submits the exact Ethereum prefix-bundle choices; and
 10. reconciles its unsafe blocks with canonical Ethereum settlement.
 
 The composer MAY perform these steps with any internal architecture. The resulting candidate MUST
@@ -41,11 +42,13 @@ A validator/prover checks at least:
 - every transaction executes from the claimed parent state;
 - the EEZ batch is the exact result of that execution;
 - the DA payload reconstructs the complete range;
-- the system transaction is byte-identical to the deterministic Rollup0 construction;
-- the proposed Ethereum bundle matches the simulated interaction.
+- every system call is byte-identical to the deterministic Rollup0 construction;
+- `R0` and every later prefix root match independent execution; and
+- every proposed Ethereum prefix bundle and the ordered trigger manifest match the simulated
+  interaction.
 
-Each validator/prover MUST sign every candidate it receives that passes these checks. It MAY sign
-several valid candidates with the same parent.
+Each validator/prover provides this work on a best-effort basis. When it completes the checks, it
+signs only a candidate that passes them. It MAY sign several valid candidates with the same parent.
 
 ## 6.4 Candidate Competition
 
@@ -62,9 +65,10 @@ signatures.
 
 ## 6.5 Failure and Retry
 
-A candidate that is invalid, stale, not included, or whose bundle cannot execute does not advance
-Rollup0. Its composer MAY return eligible user transactions to its local pool after checking the
-canonical winning candidate.
+A candidate that is invalid, stale, or not included does not advance Rollup0. An included prefix
+bundle advances Rollup0 to `B[0]` or a later `B[k]` even when the longest candidate bundle is not
+selected. Its composer MAY return eligible transactions from the unselected suffix to its local
+pool after checking the canonical result.
 
 A local timeout is not a settlement result. Settlement follows canonical Ethereum evidence.
 

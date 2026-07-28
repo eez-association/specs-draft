@@ -12,7 +12,9 @@ accepted proof systems, verification keys, and threshold. The
 interface and digest. [EEZ Wire Formats](../eez-protocol-spec/05-wire-formats.md) defines the
 encoding and proof-system fold.
 
-The production values of `M`, `N`, the member keys, and the rotation procedure are not yet fixed.
+!!! note "TO BE DEFINED"
+    The production values of `M`, `N`, the member keys, and the rotation procedure are not yet
+    selected.
 
 Rollup0 realizes `N`-of-`M` as `N` distinct accepted single-signer proof systems, not as one proof
 system containing `N` signatures. The Rollup0 manager rejects a submitted subset with fewer than
@@ -35,13 +37,17 @@ other.
 
 ## 8.2 Producer-Neutral Validation
 
-Each validator/prover MUST:
+When a validator/prover accepts a candidate for full validation, it:
 
-1. authenticate the complete candidate and its referenced Ethereum and Rollup0 data;
-2. independently execute it;
-3. check the EEZ batch, Rollup0 blocks, DA payload, Sync transaction, and intended bundle;
-4. sign or prove it if and only if it is valid; and
-5. continue checking other candidates for the same parent.
+1. authenticates the complete candidate and its referenced Ethereum and Rollup0 data;
+2. independently executes it;
+3. checks the EEZ batch, Rollup0 blocks, DA payload, pure-L2 prefix, every synchronous prefix, and
+   intended prefix bundles;
+4. signs or proves it if and only if it is valid; and
+5. remains free to check other candidates for the same parent.
+
+This is a best-effort service. The list above defines the checks performed before signing; it does
+not create an availability or response-time guarantee.
 
 Signing two valid siblings is allowed. A signature states that a candidate is valid; it does not
 state that the candidate is canonical.
@@ -66,16 +72,32 @@ A candidate is applicable only when:
 - its Rollup0 DA and range are valid; and
 - its Ethereum execution produces the required settlement evidence.
 
-The first applicable candidate advances the Rollup0 cursor to the endpoint established by that
-evidence. Later candidates are evaluated against the updated cursor.
+The first applicable candidate advances the Rollup0 cursor to the exact block variant selected by
+Ethereum execution. If `k` synchronous actions were processed, the cursor becomes the number,
+block hash, and state root of `B[k]`. Later candidates are evaluated against this updated cursor.
 
 A stale or invalid candidate does not advance the cursor. A reverted submission does not reserve a
 position or prevent a later candidate from winning.
 
-A candidate is settled only when its Ethereum inclusion emits
-`L2ExecutionPerformed(rollupId, newState)` for Rollup0 and `newState` equals the state root of the
-candidate's Sync block. Inclusion of the settlement transaction alone is insufficient. A follower
-filters evidence by EEZ contract address and Rollup0 ID.
+!!! caution "TO BE DEFINED: one settlement per Ethereum block"
+    Rollup0 permits at most one settled candidate for a Rollup0 Sync timestamp. The current EEZ
+    contract stores the Rollup0 state root but not its block hash or number. It can accept a second
+    same-rollup batch in one Ethereum block when the expected state root still matches, for example
+    after an empty or reverting first candidate.
+
+    Candidate proofs cannot resolve this after several valid siblings have already been signed.
+    The team must decide how the settlement contract enforces the rule. The direct options are to
+    reject a second Rollup0 batch in the same Ethereum block or to store and check the exact
+    Rollup0 cursor.
+
+A candidate is settled only when its Ethereum inclusion establishes `R0` for Rollup0. A successful
+Rollup0 action is evidenced by its retained EEZ consumption and state update. A caught Rollup0
+revert is evidenced by deterministic replay of the exact Ethereum trigger against the canonical L1
+state. The final settled endpoint is `B[k]`, not necessarily the candidate's full intended variant.
+
+Inclusion of the settlement transaction or a matching state-root event alone is insufficient. A
+follower filters evidence by EEZ contract address and Rollup0 ID, preserves transaction and log
+order, replays the trigger transactions, and verifies the processed action sequence.
 
 ## 8.5 Safety Boundary
 

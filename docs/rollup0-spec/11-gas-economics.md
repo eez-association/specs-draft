@@ -5,10 +5,11 @@
 Rollup0 blocks use a gas limit of `30,000,000`. Transaction gas follows the selected EVM fork.
 The base fee follows EIP-1559 and is derived from the parent header.
 
-The production EIP-1559 parameters, genesis base fee, fee recipient, and treatment of base and
-priority fees are not yet defined.
+!!! note "TO BE DEFINED"
+    The production EIP-1559 parameters, genesis base fee, fee recipient, and treatment of base and
+    priority fees are not yet selected.
 
-The draft budgets approximately `2,000,000` Rollup0 gas for an inbound system transaction.
+The draft budgets approximately `2,000,000` Rollup0 gas for an inbound system call.
 
 Rollup0 routes fees to deployment-selected fee-vault recipients rather than requiring the
 Ethereum-style base-fee burn. The exact vaults remain deployment parameters.
@@ -19,7 +20,7 @@ A composer can pay for:
 
 - Rollup0 execution;
 - validation or proving;
-- calldata publication;
+- blob publication;
 - the Ethereum settlement transaction;
 - the trigger transaction or bundle inclusion; and
 - retries for a candidate that loses or is not included.
@@ -29,8 +30,8 @@ candidate production is profitable.
 
 ## 11.3 Data Availability Cost
 
-The tag-`0x00` payload is Ethereum calldata. Cost grows with payload bytes and Ethereum calldata
-pricing.
+Rollup0 publishes anchored chain data in Ethereum blobs. Cost follows Ethereum blob-gas pricing and
+the number of blobs used by a candidate.
 
 The production design must select:
 
@@ -40,7 +41,8 @@ The production design must select:
 - who pays the DA cost; and
 - whether Rollup0 charges users an explicit Ethereum-data fee.
 
-This draft does not define a blob channel.
+!!! note "TO BE DEFINED"
+    The exact blob capacity and fee-allocation rules are not yet selected.
 
 ## 11.4 Settlement and Bundle Limits
 
@@ -51,14 +53,15 @@ system and inclusion mechanism.
 The draft budgets `4,000,000` Ethereum gas for `postAndVerifyBatch`. The maximum bundle capacity
 still depends on the final batch shape, proof threshold, trigger, and Ethereum block gas headroom.
 
-## 11.5 System-Transaction Gas and Value
+## 11.5 System-Call Gas and Value
 
-The Sync system transaction requires an exact gas limit, fee rule, nonce rule, and value source.
-These values must be deterministic and available to every composer and follower.
+The Sync system call requires an exact gas limit, fee rule, authorization rule, and value
+source. These values must be deterministic and available to every composer and follower.
 
-`SYSTEM_ADDRESS` is the transaction sender and pays the Rollup0 gas from its balance. The
-production design must define its funding and top-up policy, and how value supplied on Rollup0 is
-backed by value held on Ethereum.
+!!! note "TO BE DEFINED"
+    Rollup0 must define separate gas accounting and receipt or log behavior for its EIP-4788-style
+    system calls. It must also define how value supplied by a system call on Rollup0 is backed by
+    value held on Ethereum.
 
 ---
 

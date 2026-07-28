@@ -8,9 +8,9 @@ See [EEZ Execution Model](../eez-protocol-spec/03-execution-model.md).
 
 Rollup0 selects this subset:
 
-- one top-level state-changing Ethereum-to-Rollup0 call per interaction;
+- one top-level state-changing Ethereum-to-Rollup0 call per Ethereum transaction;
 - one return value;
-- read-only EEZ lookups;
+- no cross-network lookup unless the `STATICCALL` extension in Chapter 1 is selected;
 - no direct execution-network-to-execution-network action;
 - no cross-network reentrancy;
 - no nested cross-network action; and
@@ -22,13 +22,21 @@ Ordinary nested calls that remain on one network are allowed.
 
 For each candidate, the composer and every validator/prover independently:
 
-1. execute the ordered user transactions from the named Rollup0 parent;
-2. construct the terminal Sync block;
-3. insert the deterministic inbound system transaction when required;
-4. execute the complete range;
-5. derive the EEZ entries, lookups, state deltas, return data, and value changes from that
-   execution; and
-6. require the final EEZ state commitment to equal the Sync block state root.
+1. execute every block after the named Rollup0 parent;
+2. execute the terminal block's pure-L2 transactions and record `R0`;
+3. execute each synchronous action in its intended Ethereum trigger order;
+4. construct `B[i]` and record `R[i]` after each action `i`;
+5. represent a successful action with its EEZ execution entry and a reverting action with its
+   failed lookup;
+6. derive the state deltas, return data, and value changes for every prefix; and
+7. require the EEZ state sequence to be `R0, R[1], ..., R[n]`.
+
+`R0` is the Sync-block root when no synchronous action is processed. For a successful action
+`i`, its EEZ entry requires `R[i - 1]` and produces `R[i]`. When a reverting action is caught by its
+Ethereum caller and processed, it leaves no persistent Rollup0 state or value change. Therefore
+`R[i]` MUST equal `R[i - 1]`. `B[i]` remains distinct because its block commitment records the
+system call and failed result. The pure-L2 transactions are identical in every possible block
+variant.
 
 The proof or signatures cover the EEZ public-input hash, including commitments to the execution
 entries, lookups, and Rollup0 DA payload. A supplied root or return value is not trusted without
@@ -41,20 +49,31 @@ A valid candidate preserves all EEZ invariants, including:
 
 - the current state in each state delta equals the state committed before the effect;
 - state deltas form one continuous state transition;
+- `R0` contains the complete pure-L2 prefix and no synchronous effect;
+- every `B[i]` contains exactly the first `i` synchronous actions;
 - the rolling hash matches the exact call order, results, and return data;
-- every expected call and lookup is consumed exactly once;
+- every expected successful call is consumed in replay;
+- every expected failed lookup returns its exact committed revert data in replay;
 - value is conserved under the EEZ accounting rules; and
-- the accepted Rollup0 endpoint equals independently executed Rollup0 state.
+- the accepted `B[i]` header and state equal independent Rollup0 execution.
 
 A candidate that fails an EEZ invariant is invalid regardless of how many parties signed it.
 
 ## 5.4 Failed Calls
 
-An ordinary EVM revert is part of execution. Its receipt, gas use, state rollback, and return data
-are handled by the selected EVM and EEZ rules.
+An ordinary Rollup0 call revert is a possible precomputed result. The Rollup0 system call captures
+the target revert without changing persistent state. EEZ returns the committed revert data on
+Ethereum through a failed lookup. If the outer Ethereum transaction catches that revert and
+succeeds, the synchronous action is processed and the next trigger can execute. The failed EEZ call
+frame leaves no persistent consumption or state-update log.
 
-The candidate remains valid only when every composer-supplied result exactly matches independent
-execution. This specification does not add a retry or cross-transaction rollback rule.
+When the outer Ethereum trigger transaction reverts, any EEZ consumption and state update in that
+transaction also reverts. Under the intended atomic-bundle rule, a bundle containing that trigger is
+ineligible and a selected shorter bundle contains no later trigger. Chapter 7 describes the current
+builder trust assumption and the unresolved enforcement design.
+
+The candidate remains valid only when every composer-supplied result, `B[i]`, and prefix root
+exactly matches independent execution.
 
 ---
 

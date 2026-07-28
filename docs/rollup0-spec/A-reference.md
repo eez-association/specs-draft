@@ -12,11 +12,10 @@ This appendix summarizes values defined in the main chapters. The chapter text t
 | Positions per nominal interval | `6` |
 | Position order | `5 Live, 1 Sync` |
 | Block gas limit | `30,000,000` |
-| EVM fork | Cancun |
+| EVM fork | TO BE DEFINED; no earlier than Cancun |
 | Settlement transaction gas budget | `4,000,000` |
-| Inbound system-transaction gas budget | approximately `2,000,000` |
-| DA tag | `0x00` |
-| DA channel | Ethereum calldata |
+| Inbound system-call gas budget | approximately `2,000,000` |
+| DA channel | Ethereum blobs |
 | Candidate production | open |
 | Candidate relay | permissionless |
 | Candidate selection | first applicable candidate in canonical Ethereum transaction order |
@@ -40,9 +39,8 @@ These are not production values.
 |---|---|
 | L2 EEZ manager | `0x4200000000000000000000000000000000000007` |
 | Bridge receiver | `0x4200000000000000000000000000000000000008` |
-| Inbound system-transaction type | `0x7e` |
 
-The production genesis must bind exact bytecode and exact system-transaction behavior.
+The production genesis must bind exact bytecode and exact system-call behavior.
 
 ## A.4 Provisional Deployment Values
 
@@ -55,30 +53,28 @@ The restored draft uses these development defaults. Production must either confi
 | Maximum validator/prover set size | `M <= 20` |
 | Example threshold | `ceil(2M / 3) + 1` |
 
-The Rollup0 chain ID, genesis base fee, `SYSTEM_ADDRESS`, fee-vault addresses, validator/prover
-keys, and actual threshold are not fixed.
+!!! note "TO BE DEFINED"
+    The Rollup0 chain ID, initial EVM fork, genesis base fee, system caller, fee-vault addresses,
+    validator/prover keys, and actual threshold are not fixed.
 
-## A.5 DA Grammar
+## A.5 DA Format
 
-```text
-payload = 0x00 || rlp([blockTxCounts, transactions, l2Entries])
-```
-
-`blockTxCounts` contains canonical minimal RLP integers with values in `[0, 65535]`.
-Its last value is zero for the Sync block. See [Appendix D](D-wire-formats.md).
+!!! note "TO BE DEFINED"
+    Rollup0 publishes anchored chain data in Ethereum blobs. The byte-exact format is not yet
+    defined. See [Appendix D](D-wire-formats.md).
 
 ## A.6 Terms
 
 - **Candidate:** one proposed Rollup0 range, EEZ batch, DA payload, proof context, proof or
-  signatures, and intended Ethereum bundle.
+  signatures, and set of intended Ethereum prefix bundles.
 - **Composer:** any party that constructs a candidate.
 - **Validator/prover:** a member of the permissioned validity set that independently checks and
   signs or proves candidates.
 - **Relayer:** any party that submits a completed candidate to Ethereum.
 - **Follower:** a client that derives Rollup0 from canonical Ethereum.
 - **Live block:** an ordinary Rollup0 block in a nominal interval.
-- **Sync block:** the final Rollup0 position in an interval and the only block that carries an
-  inbound system transaction.
+- **Sync block:** the block at the scheduled final Rollup0 position for an Ethereum slot. It
+  contains a pure-L2 transaction prefix followed by zero or more synchronous actions.
 - **Settled cursor:** the exact Rollup0 parent identity established by canonical Ethereum history.
 - **Sibling:** one of several candidates built from the same settled parent.
 - **Applicable:** valid and based on the current settled cursor when evaluated on Ethereum.

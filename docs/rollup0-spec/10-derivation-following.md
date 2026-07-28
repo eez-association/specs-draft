@@ -15,8 +15,9 @@ It processes relevant Ethereum blocks, transactions, receipts, and logs in canon
 RPC response order is not consensus order. The follower authenticates each Ethereum header,
 transaction, receipt, contract address, and Rollup0 identifier before using it.
 
-`BatchPosted` locates a candidate publication. `L2ExecutionPerformed` identifies an applied
-Rollup0 endpoint. The follower accepts both only from the selected EEZ deployment.
+`BatchPosted` locates a candidate publication. `L2ExecutionPerformed` identifies individual
+Rollup0 state updates, but does not by itself identify the selected `B[k]`. The follower accepts
+both events only from the selected EEZ deployment and derives the endpoint by replay.
 
 ## 10.2 Derivation
 
@@ -24,13 +25,16 @@ For each applicable candidate, the follower:
 
 1. verifies that `fromBlock` and the candidate pre-state match its Ethereum-confirmed Rollup0 head;
 2. decodes the EEZ batch and Rollup0 DA payload;
-3. partitions the user transactions using `blockTxCounts`;
+3. recovers every block boundary, pure-L2 transaction, and intended Ethereum trigger from the
+   selected blobs;
 4. reconstructs each header from its parent under Chapter 4;
-5. reconstructs the Sync system transaction from the EEZ entries and Rollup0 rules;
-6. executes every block in order;
-7. recomputes every state, transaction, receipt, and header commitment;
-8. compares the executed endpoint with canonical settlement evidence; and
-9. commits the complete accepted range and advances its cursor.
+5. executes the terminal block's pure-L2 prefix and verifies `R0`;
+6. reconstructs and executes every `B[i]` from the EEZ entries and failed lookups;
+7. replays the ordered Ethereum triggers and derives the processed action prefix from their
+   execution, receipts, and retained EEZ logs;
+8. recomputes every state, transaction, receipt, and header commitment for that prefix;
+9. compares the executed endpoint with canonical settlement evidence; and
+10. commits the accepted range and advances its cursor.
 
 The follower MUST reject missing, extra, reordered, or malformed transactions and sidecar data. It
 MUST NOT trust a candidate's claimed endpoint without replay.
@@ -42,7 +46,15 @@ advances the cursor, a sibling for the old parent is stale. A stale sibling does
 Rollup0 block range.
 
 If an EEZ entry is not consumed, the follower validates replay against the last state root that
-canonical settlement actually applied, not against a claimed full-candidate endpoint.
+canonical settlement actually applied, not against a claimed full-candidate endpoint. It preserves
+log order and multiplicity; it does not infer the prefix from an unordered set of matching roots.
+
+The pure-L2 prefix remains part of `B[0]` even when no synchronous action is processed. A caught
+Rollup0 revert can advance the action prefix without changing the state root. The exact prefix
+index, not the state root alone, selects the terminal block variant.
+
+The duplicate-call rule in Chapter 7 must be resolved before followers can assign two identical
+calls to exact Ethereum transactions.
 
 ## 10.4 Unsafe, Safe, and Finalized
 
@@ -63,15 +75,16 @@ On an Ethereum reorganization, a follower:
 4. discards conflicting unsafe descendants; and
 5. derives the replacement Ethereum branch in order.
 
-A reorganization beyond retained history or a displacement of finalized Ethereum settlement
-requires an authenticated recovery decision. The automatic history bound and recovery authority
-are not yet defined.
+!!! note "TO BE DEFINED"
+    A reorganization beyond retained history or a displacement of finalized Ethereum settlement
+    requires an authenticated recovery decision. The automatic history bound and recovery
+    authority are not yet selected.
 
 ## 10.6 Invalid Canonical Data
 
 If canonical Ethereum data cannot be reconciled with the selected EEZ and Rollup0 rules, the
 follower MUST halt. It MUST NOT guess a missing transaction, repair an ambiguous candidate, or
-substitute a matching state-root value from another effect.
+substitute a matching state-root value from another action.
 
 ---
 

@@ -11,24 +11,28 @@ The EEZ call hash and proof digest do not by themselves state every deployment p
 - What prevents a stale but otherwise valid batch from being resubmitted?
 - What structure must `crossProofSystemInteractions` have for Rollup0?
 
-## C.2 System Transaction
+## C.2 System Call
 
-- What is the byte-exact type-`0x7e` envelope?
-- How are nonce, gas, fees, and value derived?
-- Which execution rule authorizes the unsigned envelope from `SYSTEM_ADDRESS`?
-- How are arbitrary transactions from `SYSTEM_ADDRESS` prevented?
+- What system caller address invokes the EIP-4788-style call?
+- How are gas, logs, return data, and value handled?
+- How are system-call results exposed through receipts, RPC, explorers, and indexers?
+- Which block commitments include the system call and its result?
 
 ## C.3 Ethereum Inclusion
 
-- Which builder or protocol provides ordered all-or-none inclusion?
-- What happens when the trigger reverts or the builder drops one transaction?
+- Will Rollup0 submit one strict atomic bundle for every trigger prefix?
+- Which builders support overlapping prefix bundles with one shared settlement transaction?
+- Is trusting those builders not to repackage signed transactions acceptable for Rollup0?
+- Is a contract-enforced progress mechanism needed instead?
+- Which duplicate-call rule from Chapter 7 will Rollup0 select?
+- Should duplicate rejection be enforced by Rollup0 validation or by the EEZ contract?
 - Who pays inclusion fees?
 - How does a relayer submit a candidate without gaining composer privileges?
 
 ## C.4 Adversarial Gas, DA, and Recovery
 
 - Can a Rollup0 target exhaust the fixed inbound gas budget after Ethereum state has advanced?
-- Which payload-size and fee rules prevent calldata-cost griefing?
+- Which payload-size and fee rules prevent blob-cost griefing?
 - Is re-inclusion safe when an Ethereum reorganization removes the trigger but leaves the candidate
   available for resubmission?
 - What backs Rollup0 native value on Ethereum?
