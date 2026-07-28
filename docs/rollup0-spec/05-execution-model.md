@@ -26,17 +26,23 @@ For each candidate, the composer and every validator/prover independently:
 2. execute the terminal block's pure-L2 transactions and record `R0`;
 3. execute each synchronous action in its intended Ethereum trigger order;
 4. construct `B[i]` and record `R[i]` after each action `i`;
-5. represent a successful action with its EEZ execution entry and a reverting action with its
-   failed lookup;
+5. represent a successful Ethereum-side result with its EEZ execution entry and a reverting result
+   with its failed lookup;
 6. derive the state deltas, return data, and value changes for every prefix; and
 7. require the EEZ state sequence to be `R0, R[1], ..., R[n]`.
 
 `R0` is the Sync-block root when no synchronous action is processed. For a successful action
-`i`, its EEZ entry requires `R[i - 1]` and produces `R[i]`. When a reverting action is caught by its
-Ethereum caller and processed, it leaves no persistent Rollup0 state or value change. Therefore
-`R[i]` MUST equal `R[i - 1]`. `B[i]` remains distinct because its block commitment records the
-system call and failed result. The pure-L2 transactions are identical in every possible block
-variant.
+`i`, its EEZ entry requires `R[i - 1]` and produces `R[i]`. For a reverting action, the Rollup0
+`EEZL2` contract verifies the application failure and then reverts its outer call with the
+dedicated verified-failure error. The protocol transaction receives status `0` and leaves no
+persistent Rollup0 state or value change. Therefore `R[i]` MUST equal `R[i - 1]`. `B[i]` remains
+distinct because its transaction root includes the transaction and its receipt root includes the
+failed receipt. The pure-L2 transactions are identical in every possible block variant.
+
+The transaction root commits the exact protocol transaction and its position. The receipt root
+commits its status, cumulative gas use, bloom, and logs. Exact return or revert data remains
+committed by the EEZ execution data and is checked by deterministic replay; Ethereum-style
+receipts do not contain return data.
 
 The proof or signatures cover the EEZ public-input hash, including commitments to the execution
 entries, lookups, and Rollup0 DA payload. A supplied root or return value is not trusted without
@@ -61,11 +67,14 @@ A candidate that fails an EEZ invariant is invalid regardless of how many partie
 
 ## 5.4 Failed Calls
 
-An ordinary Rollup0 call revert is a possible precomputed result. The Rollup0 system call captures
-the target revert without changing persistent state. EEZ returns the committed revert data on
-Ethereum through a failed lookup. If the outer Ethereum transaction catches that revert and
-succeeds, the synchronous action is processed and the next trigger can execute. The failed EEZ call
-frame leaves no persistent consumption or state-update log.
+An ordinary Rollup0 call failure is a possible precomputed result. This includes `REVERT` and an
+exceptional halt such as an out-of-gas inside the target call. `EEZL2` verifies the target result
+and its exact data before returning the dedicated verified-failure error. Rollup0 recognizes that
+error as a completed failed protocol transaction with receipt status `0` and rolls back its
+complete EVM frame. EEZ returns the committed failure data on Ethereum through a failed lookup. If
+the outer Ethereum transaction catches that failure and succeeds, the synchronous action is
+processed and the next trigger can execute. The failed protocol transaction leaves no persistent
+state, value movement, or log.
 
 When the outer Ethereum trigger transaction reverts, any EEZ consumption and state update in that
 transaction also reverts. Under the intended atomic-bundle rule, a bundle containing that trigger is

@@ -42,7 +42,7 @@ Settlement cost grows with:
 - bundle inclusion overhead.
 
 Production capacity limits require measurements against the final contracts, proof policy, and
-system-call format. This draft does not provide measured limits.
+protocol-transaction format. This draft does not provide measured limits.
 
 ---
 

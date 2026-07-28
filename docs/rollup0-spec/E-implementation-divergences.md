@@ -36,15 +36,39 @@ while choosing an unsafe view; it is not part of validity after a block settles 
 The current peer-to-peer representation does not contain a standardized producer-signature
 envelope. This prevents portable signature-based filtering and prioritization.
 
-## E.3 System Calls and Test Verification
+## E.3 Inbound Transactions and Test Verification
 
-The current client represents privileged system execution as an ordinary signed transaction from
-a public development key. Production Rollup0 uses an EIP-4788-style system call with no private
-key, signature, transaction nonce, or transaction envelope. Its remaining gas, value, log, and
-block-commitment rules are still to be defined. The development key and its restricted capabilities
-are implementation aids, not protocol rules. Current manager bookkeeping can also leave persistent
-state after a target failure. Production lowering must keep a failed action state-root-neutral while
-committing its call and result in the block.
+The current client represents privileged inbound execution as an ordinary signed legacy
+transaction from a public development key. Production Rollup0 instead uses an unsigned,
+protocol-derived EIP-2718 transaction. It remains in the normal transaction and receipt lists, but
+has no private key or transaction nonce and cannot enter through the public transaction pool. The
+development key and its restricted capabilities are implementation aids, not protocol rules.
+
+The signed development transaction can provide `msg.value` only from its sender's existing
+balance. It does not implement Rollup0's protocol credit for inbound native value or remove that
+credit after a verified failure. It also uses a configured `2,000,000` transaction gas limit.
+Production protocol transactions instead encode the gas remaining in the block's common gas pool.
+The development transaction uses a configured gas price and ordinary transaction fee deduction;
+Rollup0's production fee mechanism is still to be selected.
+
+The current client puts zero in `parentBeaconBlockRoot` and applies the standard EIP-4788
+pre-execution state update. Production Rollup0 also puts zero in the field, but must disable the
+beacon-roots contract update because Rollup0 has no beacon chain.
+
+The current client does not execute failed inbound actions end to end and assumes successful
+inbound outcomes while building its privileged transactions. Its generated contract ABI also
+targets an older `eez-core-protocol` layout. Production Rollup0 must generate its ABI from the
+exact `EEZL2` artifact selected for genesis and implement the verified-failure path defined in
+Chapter 3. A verified application failure must create a typed receipt with status `0` and roll back
+the temporary value credit. Any other outer `EEZL2` failure invalidates the candidate.
+
+Current `EEZL2` bookkeeping can also leave state, value, or logs after a target application
+failure. Production Rollup0 requires the dedicated verified-failure error so the complete inbound
+transaction frame rolls back and the `EEZL2` balance returns to its pre-transaction value.
+
+The current transaction format does not contain the production source identifier or typed-envelope
+rules. It therefore cannot provide the required origin binding or conformance vectors described in
+Appendix D.
 
 Development configurations may use a mock verifier that accepts a fixed digest. This verifier
 exists only for tests. It does not validate a Rollup0 candidate and is not an allowed production
@@ -85,4 +109,4 @@ required order and are not valid production settlement paths.
 
 ---
 
-*This is the final appendix.*
+*Next: [Appendix F, Inbound Transaction Design](F-system-transaction-design.md).*

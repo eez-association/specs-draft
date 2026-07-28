@@ -16,6 +16,7 @@ Rollup0 selects:
 - a permissioned validator set that operates on a best-effort basis;
 - signing of valid sibling candidates without slashing or an equivocation penalty;
 - canonical Ethereum transaction order as the candidate-selection rule;
+- unsigned protocol-derived transactions for accepted inbound actions;
 - blob data availability; and
 - reconstruction from archived blobs, or from peer-to-peer data checked against Ethereum.
 
@@ -24,7 +25,8 @@ positions still exist, but no synchronous transaction can settle in the missed E
 
 Every Rollup0 block can contain pure-L2 transactions. The block at the sixth position is a Sync
 block, whether or not synchronous execution occurs. A Sync block places all pure-L2 transactions
-before its zero or more synchronous actions.
+before its zero or more synchronous actions. Each accepted action is represented by an unsigned
+transaction derived from its Ethereum trigger.
 
 Every anchor contains every L2 block since the previous anchor, including empty blocks. A composer
 must anchor when a synchronous transaction occurs. It should also anchor after the operational
@@ -132,7 +134,7 @@ Chapter 7 marks the choice between trusting compatible builders and adding proto
 
 Let `R0` be the state root after the fixed pure-L2 prefix and before any synchronous action. Let
 `R[i]` be the root after the first `i` synchronous actions. A synchronous action that returns a
-caught revert can leave `R[i]` equal to `R[i - 1]`.
+caught revert leaves `R[i]` equal to `R[i - 1]`.
 
 `postAndVerifyBatch` establishes `R0`. The canonical endpoint is `B[k]`, where `k` is the number of
 included trigger transactions. A trigger outside the selected prefix does not remove the pure-L2

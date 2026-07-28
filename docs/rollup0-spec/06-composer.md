@@ -42,7 +42,10 @@ A validator/prover checks at least:
 - every transaction executes from the claimed parent state;
 - the EEZ batch is the exact result of that execution;
 - the DA payload reconstructs the complete range;
-- every system call is byte-identical to the deterministic Rollup0 construction;
+- every protocol transaction has the required position and is byte-identical to the deterministic
+  Rollup0 construction;
+- every protocol transaction and typed receipt is included in the correct transaction and receipt
+  root;
 - `R0` and every later prefix root match independent execution; and
 - every proposed Ethereum prefix bundle and the ordered trigger manifest match the simulated
   interaction.

@@ -61,13 +61,13 @@ Rollup0 uses the settlement contracts and EVM binding defined by
 - proof-input construction; and
 - generic events and ABI encodings.
 
-Rollup0 additionally requires an L2 EEZ predeploy and a deterministic system-call mechanism
-for inbound execution. Their Rollup0-specific placement and unresolved production parameters are
-defined in [Chapter 3](03-evm-proxy-systemtx.md).
+Rollup0 additionally requires an L2 EEZ predeploy and a deterministic protocol-transaction
+mechanism for inbound execution. Their Rollup0-specific placement and unresolved production
+parameters are defined in [Chapter 3](03-evm-proxy-systemtx.md).
 
 Execution clients expose the standard Engine API needed to build, validate, execute, and import
 Rollup0 blocks.
 
 ---
 
-*Next: [Chapter 3, EVM, Proxy, and System Calls](03-evm-proxy-systemtx.md).*
+*Next: [Chapter 3, EVM, Proxy, and Inbound Transactions](03-evm-proxy-systemtx.md).*

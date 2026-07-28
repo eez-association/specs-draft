@@ -71,7 +71,7 @@ nav:
       - Overview: rollup0-spec/index.md
       - "1. Overview and Scope": rollup0-spec/01-overview.md
       - "2. Architecture": rollup0-spec/02-architecture.md
-      - "3. EVM, Proxy, and System Calls": rollup0-spec/03-evm-proxy-systemtx.md
+      - "3. EVM, Proxy, and Inbound Transactions": rollup0-spec/03-evm-proxy-systemtx.md
       - "4. Block Production and Headers": rollup0-spec/04-block-production.md
       - "5. Execution Profile": rollup0-spec/05-execution-model.md
       - "6. Composer and Candidate Competition": rollup0-spec/06-composer.md
@@ -86,6 +86,7 @@ nav:
       - "Appendix C: Open Questions": rollup0-spec/C-open-questions.md
       - "Appendix D: Rollup0 Wire Format": rollup0-spec/D-wire-formats.md
       - "Appendix E: Current Implementation Differences": rollup0-spec/E-implementation-divergences.md
+      - "Appendix F: Inbound Transaction Design": rollup0-spec/F-system-transaction-design.md
   - Gnosis Chain: gnosis-chain-spec/index.md
 
 plugins:

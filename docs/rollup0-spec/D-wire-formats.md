@@ -2,7 +2,7 @@
 
 [EEZ Wire Formats](../eez-protocol-spec/05-wire-formats.md) defines EEZ ABI tuples, selectors,
 hashes, events, proof inputs, and proxy bytecode. This appendix defines only the Rollup0 DA
-envelope and the Rollup0 ECDSA proof policy.
+envelope, inbound protocol transaction, and ECDSA proof policy.
 
 ## D.1 ECDSA Attestation
 
@@ -40,9 +40,9 @@ Rollup0 uses Ethereum blobs for anchored chain data. The format must encode or c
 1. a format version;
 2. the exact settled Rollup0 parent;
 3. every block boundary in the anchored range;
-4. every signed pure-L2 transaction in block order;
+4. every pure-L2 and protocol-derived transaction in exact block order;
 5. all non-derived header inputs;
-6. the EEZ objects and system-call inputs for every synchronous effect; and
+6. the EEZ objects and Ethereum origin data for every synchronous effect; and
 7. the ordered Ethereum trigger manifest.
 
 !!! note "TO BE DEFINED"
@@ -50,13 +50,35 @@ Rollup0 uses Ethereum blobs for anchored chain data. The format must encode or c
     defined. The previous calldata RLP draft is not the Rollup0 blob format and must not be used by
     an independent implementation.
 
-## D.3 Undefined System Call
+## D.3 Inbound Protocol Transaction
 
-Rollup0 represents an inbound action as an EIP-4788-style system call. The call is injected by
-block execution and is not included in the transaction list. Its byte-exact input follows the EEZ
-inbound delivery ABI.
+Rollup0 represents each accepted inbound action as an unsigned EIP-2718 transaction in the normal
+transaction list. Its typed receipt occupies the matching receipt index. The receipt payload
+contains the standard status, cumulative gas used, log bloom, and logs fields.
 
-!!! note "TO BE DEFINED"
-    The exact system caller, gas rules, value source, and commitment of results and logs are not yet
-    defined. No complete conformance vector can be produced until those rules are fixed. The
-    recovered draft's `0x7e` unsigned-transaction proposal is not a Rollup0 protocol rule.
+The transaction is derived rather than signed. Its sender is `SYSTEM_ADDRESS`, its recipient is
+`EEZL2`, and its calldata follows the selected `EEZL2` inbound delivery ABI. Its access list,
+blob-hash list, and authorization list are empty. Its gas limit equals the block gas remaining
+immediately before it starts.
+
+The transaction root commits the exact input and order. The receipt root commits status, gas use,
+and logs. The state root commits persistent execution effects. Exact return or revert data is
+checked against the EEZ execution data during replay and is not added to the receipt.
+
+For a value-bearing transaction, the state checkpoint starts before the temporary protocol credit
+and the `EEZL2` call. A verified application failure discards that checkpoint but still produces
+the failed typed receipt and consumes gas. Any other outer failure invalidates the candidate.
+
+!!! note "TO BE DEFINED: byte-exact envelope"
+    The transaction type, payload encoding, source-identifier calculation, fee fields, transaction
+    hash vectors, JSON-RPC extensions, and protocol-credit encoding are not yet defined. The blob
+    format must carry the exact serialized transaction bytes and the authenticated origin data
+    needed to verify their derivation. No complete conformance vector can be produced until these
+    rules are fixed.
+
+    [Appendix F](F-system-transaction-design.md) compares an OP-compatible `0x7e` envelope with a
+    Rollup0-specific transaction type.
+
+---
+
+*Next: [Appendix E, Current Implementation Differences](E-implementation-divergences.md).*

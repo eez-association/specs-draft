@@ -29,7 +29,8 @@ For each applicable candidate, the follower:
    selected blobs;
 4. reconstructs each header from its parent under Chapter 4;
 5. executes the terminal block's pure-L2 prefix and verifies `R0`;
-6. reconstructs and executes every `B[i]` from the EEZ entries and failed lookups;
+6. reconstructs each protocol transaction from the Ethereum origin data, EEZ entries, and failed
+   lookups, then executes every `B[i]`;
 7. replays the ordered Ethereum triggers and derives the processed action prefix from their
    execution, receipts, and retained EEZ logs;
 8. recomputes every state, transaction, receipt, and header commitment for that prefix;

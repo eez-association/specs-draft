@@ -5,14 +5,18 @@
 Rollup0 blocks use a gas limit of `30,000,000`. Transaction gas follows the selected EVM fork.
 The base fee follows EIP-1559 and is derived from the parent header.
 
+Ordinary and protocol-derived transactions share this limit. An inbound protocol transaction
+encodes the gas remaining when it starts. It has no separate allowance and no smaller
+per-transaction cap. Rollup0 charges the active fork's standard non-creation transaction intrinsic
+gas over its calldata. Intrinsic and EVM execution gas contribute to its typed receipt and the
+block's `gasUsed`.
+
 !!! note "TO BE DEFINED"
     The production EIP-1559 parameters, genesis base fee, fee recipient, and treatment of base and
     priority fees are not yet selected.
 
-The draft budgets approximately `2,000,000` Rollup0 gas for an inbound system call.
-
-Rollup0 routes fees to deployment-selected fee-vault recipients rather than requiring the
-Ethereum-style base-fee burn. The exact vaults remain deployment parameters.
+Rollup0 has not yet selected whether ordinary transaction fees use the Ethereum base-fee burn and
+priority-fee recipient rules or route some fees to deployment-selected vaults.
 
 ## 11.2 Composer Costs
 
@@ -53,15 +57,16 @@ system and inclusion mechanism.
 The draft budgets `4,000,000` Ethereum gas for `postAndVerifyBatch`. The maximum bundle capacity
 still depends on the final batch shape, proof threshold, trigger, and Ethereum block gas headroom.
 
-## 11.5 System-Call Gas and Value
+## 11.5 Inbound Transaction Gas and Value
 
-The Sync system call requires an exact gas limit, fee rule, authorization rule, and value
-source. These values must be deterministic and available to every composer and follower.
+Chapter 3 defines the common gas pool and the protocol credit used for inbound value. Every
+composer, validator or prover, and follower must reproduce the same gas use and value movement.
 
 !!! note "TO BE DEFINED"
-    Rollup0 must define separate gas accounting and receipt or log behavior for its EIP-4788-style
-    system calls. It must also define how value supplied by a system call on Rollup0 is backed by
-    value held on Ethereum.
+    Rollup0 must select one of the protocol-transaction fee approaches discussed in Chapter 3. The
+    choice must define who pays, which asset is charged, how the amount is calculated, where it
+    goes, how refunds work, what `GASPRICE` and `effectiveGasPrice` return, and how inbound value is
+    backed by value held on Ethereum.
 
 ---
 

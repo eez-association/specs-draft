@@ -24,8 +24,8 @@
 - **No secure in-block randomness:** the interval's Ethereum-derived `prevRandao` is predictable to
   block builders and proposer-biasable.
 - **Simulation parity:** a composer and every validator/prover must simulate the exact selected EVM
-  fork and system-call semantics. A mismatch makes an apparently valid candidate fail on Ethereum
-  or derive a different Rollup0 block.
+  fork and protocol-transaction semantics. A mismatch makes an apparently valid candidate fail on
+  Ethereum or derive a different Rollup0 block.
 
 ## 12.2 Undefined Production Choices
 
@@ -38,8 +38,14 @@ The following need exact definitions before production:
 - the initial EVM fork and later fork-activation schedule;
 - validator/prover membership, proof systems, keys, threshold, and rotation;
 - proof context and domain separation;
-- the EIP-4788-style system caller, gas, logs, result commitment, and value source;
-- deterministic lowering from EEZ entries to the system call;
+- the protocol-transaction type, byte-exact payload, source identifier, transaction-hash vectors,
+  receipt encoding, and RPC fields;
+- protocol-transaction fee handling, including `GASPRICE` and receipt `effectiveGasPrice`;
+- the failure-capable `EEZL2` artifact and verified-failure error ABI;
+- whether to keep one protocol transaction per Ethereum trigger transaction;
+- whether every protocol-level transaction failure invalidates the complete candidate;
+- whether `EEZL2` keeps the selected per-transaction balance-neutrality rule;
+- deterministic lowering from EEZ entries and Ethereum origin data to the protocol transaction;
 - the Ethereum builder and strict prefix-bundle submission mechanism;
 - the duplicate top-level cross-chain call rule;
 - enforcement of one Rollup0 settlement per Ethereum block;
@@ -52,14 +58,32 @@ The following need exact definitions before production:
 
 These are unresolved protocol inputs. A client MUST NOT select production values by convention.
 
-## 12.3 Interoperability Boundary
+## 12.3 Possible Rollup0.x L2 Contract Changes
+
+The initial Rollup0 network uses the `eez-core-protocol` `EEZL2` implementation without changing
+it. This keeps the initial L2 contract surface aligned with the reference implementation and avoids
+introducing a second contract design before genesis.
+
+A later Rollup0.x hardfork may consider:
+
+- clearing an inbound execution table immediately after its action completes, which removes
+  inactive table data but adds storage writes;
+- moving action-scoped execution data to EIP-1153 transient storage, which gives it a natural
+  transaction lifetime but requires a different storage implementation; and
+- replacing the array-based inbound entrypoint with one action per call, which makes the Rollup0
+  protocol-transaction calldata smaller but changes the `eez-core-protocol` ABI.
+
+These changes affect predeploy bytecode, state roots, protocol-transaction encoding, and client
+conformance. They are not part of the initial Rollup0 protocol.
+
+## 12.4 Interoperability Boundary
 
 The fixed parts of this draft define the Rollup0 network model, normal cadence, open candidate
 rules, and deterministic derivation requirements.
 
-The undefined choices above prevent a byte-identical production genesis, Sync system call,
-proof policy, and settlement path. Independent production implementations are not interoperable
-until those choices are specified and accompanied by conformance vectors.
+The undefined choices above prevent a byte-identical production genesis, inbound protocol
+transaction, proof policy, and settlement path. Independent production implementations are not
+interoperable until those choices are specified and accompanied by conformance vectors.
 
 Detailed questions are listed in [Appendix C](C-open-questions.md).
 

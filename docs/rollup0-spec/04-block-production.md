@@ -18,8 +18,8 @@ Live, Live, Live, Live, Live, Sync
 
 A Live block contains ordinary Rollup0 transactions. The final position is the Sync position. Its
 block can contain ordinary pure-L2 transactions. When an inbound action is applied, the block also
-carries the system call described in [Chapter 3](03-evm-proxy-systemtx.md), after all of its
-pure-L2 transactions.
+carries the protocol-derived transaction described in
+[Chapter 3](03-evm-proxy-systemtx.md), after all of its pure-L2 transactions.
 
 This draft has no proof window. All five non-Sync positions are Live positions.
 
@@ -54,14 +54,26 @@ The fixed header choices are:
 | `number` | checked parent number plus one |
 | `timestamp` | checked parent timestamp plus 2 seconds |
 | `gasLimit` | `30,000,000` |
-| `extraData` | empty |
+| `extraData` | zero to 32 bytes selected by the composer |
 | `difficulty` | zero |
 | `nonce` | eight zero bytes |
 | `beneficiary` | deployment fee recipient |
 | `baseFeePerGas` | EIP-1559 value derived from the parent |
 | `withdrawals` | present and empty when required by the selected EVM fork |
-| `parentBeaconBlockRoot` | zero when required by the selected EVM fork |
+| `parentBeaconBlockRoot` | 32 zero bytes |
 | transaction, receipt, state, request, and blob fields | exact execution-derived or parent-derived values required by the selected EVM fork |
+
+Rollup0 has no beacon chain. It retains the Cancun header field without changing the header
+encoding, but fixes `parentBeaconBlockRoot` to 32 zero bytes in every block. Protocol transactions
+are already committed by the transaction root. Their status, cumulative gas use, and logs are
+committed by the receipt root, and their state changes are committed by the state root.
+
+!!! note "No EIP-4788 beacon-roots update"
+    Rollup0 does not execute the EIP-4788 beacon-roots contract call. It also does not expose the
+    zero placeholder as a usable beacon root.
+
+The composer-selected `extraData` is part of the block hash and must be available in the published
+block data so followers reconstruct the same header.
 
 Applications MUST NOT use `prevRandao` as secure randomness. Its source is visible to builders and
 can be biased by the Ethereum proposer.

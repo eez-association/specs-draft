@@ -10,8 +10,9 @@ The published data must let an independent follower recover:
 - the exact settled parent named by the candidate;
 - every Rollup0 block and block boundary in the anchored range;
 - every signed pure-L2 transaction in block order, including those at the start of the Sync block;
+- the exact serialized bytes of every protocol-derived transaction in block order;
 - every non-derived header input;
-- the EEZ objects and system-call inputs for every synchronous action;
+- the EEZ objects and Ethereum origin data for every synchronous action;
 - the exact ordered manifest of intended Ethereum trigger transactions; and
 - the format version.
 
@@ -63,7 +64,7 @@ Rollup0 requires:
 - no duplicate or unrelated blob index;
 - proof context bound to the intended Ethereum settlement domain;
 - Rollup0 state deltas derived from `R0` and every exact synchronous prefix;
-- enough L2 entries to reconstruct every system call; and
+- enough L2 entries and origin data to reconstruct every protocol transaction; and
 - the proof or signatures required by Chapter 8.
 
 Rollup0 does not redefine the EEZ batch tuple or public-input hash.
