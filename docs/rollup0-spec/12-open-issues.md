@@ -21,8 +21,9 @@
 - **Trusted manager:** the Rollup0 manager selects the proof policy and retains the EEZ
   `setStateRoot` escape power assigned by the generic protocol.
 - **Permissioned recovery:** exceptional recovery requires an authority that is not yet defined.
-- **No secure in-block randomness:** the interval's Ethereum-derived `prevRandao` is predictable to
-  block builders and proposer-biasable.
+- **No secure in-block randomness:** anchor-derived `prevRandao` values are predictable after the
+  anchor seed is known. The derivation gives each block a different value but adds no entropy
+  between anchors.
 - **Simulation parity:** a composer and every validator/prover must simulate the exact selected EVM
   fork and protocol-transaction semantics. A mismatch makes an apparently valid candidate fail on
   Ethereum or derive a different Rollup0 block.
@@ -31,28 +32,30 @@
 
 The following need exact definitions before production:
 
-- Rollup0 chain ID, EEZ rollup ID, native asset, and genesis;
+- Rollup0 chain ID, EEZ rollup ID, native asset, genesis, and initial RANDAO seed;
 - the selected EEZ version;
 - production contract addresses, predeploy bytecode, and upgrade rules;
-- production fee-market parameters and the genesis base fee;
-- the initial EVM fork and later fork-activation schedule;
+- the genesis base fee;
+- the post-Fusaka EVM fork-activation schedule;
 - validator/prover membership, proof systems, keys, threshold, and rotation;
 - proof context and domain separation;
 - the protocol-transaction type, byte-exact payload, source identifier, transaction-hash vectors,
   receipt encoding, and RPC fields;
 - protocol-transaction fee handling, including `GASPRICE` and receipt `effectiveGasPrice`;
-- the failure-capable `EEZL2` artifact and verified-failure error ABI;
-- whether to keep one protocol transaction per Ethereum trigger transaction;
+- deterministic failed-lookup construction and validation for caught Rollup0 failures;
+- whether to keep one protocol transaction per successful Ethereum trigger;
 - whether every protocol-level transaction failure invalidates the complete candidate;
 - whether `EEZL2` keeps the selected per-transaction balance-neutrality rule;
 - deterministic lowering from EEZ entries and Ethereum origin data to the protocol transaction;
 - the Ethereum builder and strict prefix-bundle submission mechanism;
+- whether a later version permits actions after a caught failure by trusting exact builder ordering
+  or by adding a unified on-chain action cursor;
+- enforcement that the leading anchor-root transition either applies or reverts;
 - the duplicate top-level cross-chain call rule;
 - enforcement of one Rollup0 settlement per Ethereum block;
 - maximum payload size, transaction count, and gas;
-- value custody and backing;
+- the later dedicated-vault design, including liquidity, yield, losses, and withdrawals;
 - fee recipients, DA charging, and composer reimbursement;
-- genesis-timestamp alignment to the 2-second block grid;
 - deployment start block and historical upgrade boundaries; and
 - reorganization history bounds and emergency authority.
 
@@ -66,6 +69,8 @@ introducing a second contract design before genesis.
 
 A later Rollup0.x hardfork may consider:
 
+- enabling synchronous actions originating on Rollup0, routing them from sequencers to composers,
+  and then extending the profile to full nested composability in both directions;
 - clearing an inbound execution table immediately after its action completes, which removes
   inactive table data but adds storage writes;
 - moving action-scoped execution data to EIP-1153 transient storage, which gives it a natural

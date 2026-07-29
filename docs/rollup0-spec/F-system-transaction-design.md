@@ -12,20 +12,26 @@ The representation needed an explicit protocol decision because it affects:
 - whether receipts, traces, explorers, and indexers use standard Ethereum data; and
 - how the block is transported, stored, removed after a reorganization, and replayed.
 
-These rules cannot be left to each client. Two clients that represent the same inbound action in
-different ways calculate different block hashes.
+These rules cannot be left to each client. Two clients that represent the same successful inbound
+action in different ways calculate different block hashes.
 
 ## F.1 Selected Design
 
-Each accepted Ethereum trigger produces one unsigned, protocol-derived
+Each Ethereum trigger whose Rollup0 action succeeds produces one unsigned, protocol-derived
 [EIP-2718](https://eips.ethereum.org/EIPS/eip-2718) transaction in the Rollup0 Sync block. The
-transaction appears after the pure-L2 prefix and after any earlier protocol transaction.
+transaction appears after the pure-L2 prefix and after any earlier protocol transaction. A failed
+action produces an L1 EEZ failed lookup but no Rollup0 transaction.
 
 Derivation authorizes the transaction. A user does not sign it, it has no nonce, and a node does
 not accept it through the public transaction pool. Once derived, it occupies an ordinary position
 in the block's transaction list and has a matching typed receipt.
 
-This gives every inbound action:
+EIP-2718 defines only the typed envelope and its inclusion in the transaction and receipt tries.
+It does not require a signature, nonce, fee payment, or account update. The Rollup0 transaction
+type defines those rules. Its first EVM frame uses `SYSTEM_ADDRESS` as both `tx.origin` and
+`msg.sender`, but it does not increment that account's nonce or charge it an L2 fee.
+
+This gives every successful inbound action:
 
 - a transaction hash and transaction index;
 - a receipt status and cumulative gas value;
@@ -55,12 +61,11 @@ An out-of-band call resembles the fixed protocol operation used by
 [EIP-4788](https://eips.ethereum.org/EIPS/eip-4788). That approach is suitable for a small,
 fixed state update that does not need application receipts or event indexing.
 
-Inbound Rollup0 execution is different. It can run arbitrary application code, transfer value,
-consume substantial gas, emit logs, and return success or failure. An out-of-band design would
-therefore need its own record, receipt, log-index, trace, storage, and RPC rules. If its logs were
-omitted from `eth_getLogs`, applications would miss them. If Rollup0 added synthetic transaction
-hashes to those logs, a later transaction lookup would refer to an item that was not in the
-transaction root.
+Successful inbound Rollup0 execution can run arbitrary application code, transfer value, consume
+substantial gas, and emit logs. An out-of-band design would therefore need its own record, receipt,
+log-index, trace, storage, and RPC rules. If its logs were omitted from `eth_getLogs`, applications
+would miss them. If Rollup0 added synthetic transaction hashes to those logs, a later transaction
+lookup would refer to an item that was not in the transaction root.
 
 The protocol-derived transaction requires more than a decoder. Execution clients must support the
 type in their block and receipt structures, encoding, storage, validation, block-building
@@ -96,6 +101,10 @@ application execution rather than fixed block maintenance.
     - transaction-pool and `eth_sendRawTransaction` rejection; and
     - how blobs carry the exact transaction bytes and authenticated origin data.
 
+Regardless of the selected envelope, its gas-limit field must not exceed the Fusaka
+EIP-7825 limit of `16,777,216`. Derivation sets the field to the lower of that limit and the gas
+remaining in the block before the protocol transaction starts.
+
 The source identifier must distinguish otherwise identical actions without relying on a system
 account nonce. It also needs enough domain information to prevent an action from being reused
 between settlement chains, EEZ deployments, Rollup0 instances, or protocol versions.
@@ -115,21 +124,24 @@ between settlement chains, EEZ deployments, Rollup0 instances, or protocol versi
 
 ## F.4 Value and Failure
 
-An inbound action can carry value even though the system caller has no prefunded balance. Rollup0
-therefore opens a state checkpoint before crediting the exact value and executing the `EEZL2`
-call. On success, the value moves according to the verified EEZ action and the checkpoint is
-committed. On a verified application failure, the checkpoint, transaction effects, and temporary
-credit all roll back. The failed receipt and used-gas accounting remain.
+An inbound action can carry value even though the system caller has no prefunded balance. For a
+successful action, Rollup0 opens a state checkpoint before crediting the exact value and executing
+the `EEZL2` call. The value moves according to the verified EEZ action and the checkpoint is
+committed.
 
-This differs from the OP deposit execution rule, where the `mint` operation occurs before the
-reverting EVM transition and can remain after a failed deposit. Reusing the OP wire format would
-not make that behavior suitable for Rollup0.
+This differs from the OP deposit execution rule, where the `mint` operation occurs before EVM
+execution. Reusing the OP wire format would not make that behavior suitable for Rollup0.
 
-A verified application failure produces a typed receipt with status `0`. An unexpected outer
-`EEZL2` error is a protocol failure and invalidates the complete candidate; it is not accepted as
-another failed transaction. Validators and followers must therefore re-execute the transaction and
-classify its exact result. The receipt commits the failure status and gas use, but, like an Ethereum
-receipt, does not contain return or revert data. EEZ execution data commits those bytes.
+A failed action creates no Rollup0 protocol transaction, receipt, gas use, or temporary value
+credit. The L1 EEZ failed lookup contains its exact revert data and is pinned to the Rollup0
+pre-state. The trigger manifest and proof or validator signatures bind the lookup to its Ethereum
+transaction and action position. Validators and followers re-execute the call temporarily and
+discard its result after checking the failure.
+
+If the Ethereum caller catches the verified proxy revert, the Ethereum transaction can settle and
+is the candidate's final trigger. If the outer Ethereum transaction reverts, that trigger is not
+part of the accepted prefix. A later Rollup0.x version can add an L2 failure receipt if the network
+decides that mirrored failure history is worth a new execution rule.
 
 !!! note "TO BE DISCUSSED: fee fields"
     The selected representation does not decide who pays for synchronous execution. The final
@@ -140,6 +152,9 @@ receipt, does not contain return or revert data. EEZ execution data commits thos
     system caller, Rollup0 must either bypass the ordinary EIP-1559 fee-cap, upfront-balance,
     deduction, and refund checks for protocol transactions, or define fields and funding that
     satisfy those checks.
+
+    A failed inbound action has no Rollup0 transaction and consumes no Rollup0 block gas. Any charge
+    for simulating or proving that failure must occur on Ethereum.
 
 ## F.5 Header and Identity Consequences
 

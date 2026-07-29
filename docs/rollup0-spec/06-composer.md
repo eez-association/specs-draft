@@ -38,14 +38,19 @@ A validator/prover checks at least:
 
 - the candidate names the exact parent from which it was built;
 - the block range and terminal Sync position follow Chapter 4;
-- every block and header is valid;
+- replay reproduces every complete block and its exact block hash;
 - every transaction executes from the claimed parent state;
+- the transaction root, receipts, receipt root, logs bloom, gas used, state root, and all header
+  fields match replay;
 - the EEZ batch is the exact result of that execution;
 - the DA payload reconstructs the complete range;
 - every protocol transaction has the required position and is byte-identical to the deterministic
   Rollup0 construction;
 - every protocol transaction and typed receipt is included in the correct transaction and receipt
   root;
+- every failed action has one correctly pinned L1 EEZ failed lookup, exact revert data, and no
+  Rollup0 transaction;
+- a failed action, when present, is the candidate's final trigger;
 - `R0` and every later prefix root match independent execution; and
 - every proposed Ethereum prefix bundle and the ordered trigger manifest match the simulated
   interaction.

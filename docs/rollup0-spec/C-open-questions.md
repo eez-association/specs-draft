@@ -13,17 +13,17 @@ The EEZ call hash and proof digest do not by themselves state every deployment p
 
 ## C.2 Inbound Protocol Transaction
 
-- Will Rollup0 keep one protocol transaction per Ethereum trigger transaction, or select another
+- Will Rollup0 keep one protocol transaction per successful Ethereum trigger, or select another
   grouping option from Chapter 3?
 - What transaction type and byte-exact payload will Rollup0 use?
 - Which fields make the source identifier unique and bind it to the Ethereum and Rollup0 domains?
 - Will the typed receipt use only the standard EIP-2718 receipt fields?
-- What exact error ABI identifies a verified application failure?
 - Will every protocol-level transaction failure continue to invalidate the complete candidate?
 - Will `EEZL2` continue to require balance neutrality rather than an absolute zero balance?
 - Will Rollup0 keep the protocol-credit value source selected in Chapter 3?
 - Will protocol transactions continue to share the ordinary block gas pool?
 - Who pays for protocol-transaction gas, in which asset, and who receives it?
+- Who pays for simulating and proving a failed action that creates no Rollup0 transaction?
 - What do `GASPRICE` and receipt `effectiveGasPrice` return?
 - Which extra transaction fields, if any, are exposed through JSON-RPC?
 - How does the blob format carry the exact protocol transaction and its authenticated origin data?
@@ -34,6 +34,8 @@ The EEZ call hash and proof digest do not by themselves state every deployment p
 - Which builders support overlapping prefix bundles with one shared settlement transaction?
 - Is trusting those builders not to repackage signed transactions acceptable for Rollup0?
 - Is a contract-enforced progress mechanism needed instead?
+- Will a later version permit actions after a caught failure by trusting exact builder ordering or
+  by adding a unified on-chain action cursor?
 - Which duplicate-call rule from Chapter 7 will Rollup0 select?
 - Should duplicate rejection be enforced by Rollup0 validation or by the EEZ contract?
 - Who pays inclusion fees?
@@ -46,8 +48,8 @@ The EEZ call hash and proof digest do not by themselves state every deployment p
 - Which payload-size and fee rules prevent blob-cost griefing?
 - Is re-inclusion safe when an Ethereum reorganization removes the trigger but leaves the candidate
   available for resubmission?
-- Which Ethereum contract holds the value that backs Rollup0 native value, and how is the backing
-  invariant checked?
+- Will a later version move backing from pooled EEZ custody to a dedicated vault, and what liquidity
+  and loss rules would apply?
 - Who pays DA and proof costs?
 - How are fees distributed?
 - What automatic reorganization depth is supported?

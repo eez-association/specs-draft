@@ -45,29 +45,35 @@ Rollup0 uses Ethereum blobs for anchored chain data. The format must encode or c
 6. the EEZ objects and Ethereum origin data for every synchronous effect; and
 7. the ordered Ethereum trigger manifest.
 
+The manifest must end at its first failed action.
+
 !!! note "TO BE DEFINED"
     The byte-exact encoding, field limits, multi-blob rules, and conformance vectors are not yet
     defined. The previous calldata RLP draft is not the Rollup0 blob format and must not be used by
-    an independent implementation.
+    an independent implementation. The format must also define the authenticated candidate domain,
+    including the Ethereum chain, EEZ deployment, Rollup0 ID, protocol and format versions, parent,
+    and settlement context. It may place a field in the blob, EEZ batch, or manager `customData`,
+    but must not rely on unauthenticated side data.
 
 ## D.3 Inbound Protocol Transaction
 
-Rollup0 represents each accepted inbound action as an unsigned EIP-2718 transaction in the normal
+Rollup0 represents each successful inbound action as an unsigned EIP-2718 transaction in the normal
 transaction list. Its typed receipt occupies the matching receipt index. The receipt payload
-contains the standard status, cumulative gas used, log bloom, and logs fields.
+contains the standard status, cumulative gas used, log bloom, and logs fields. A failed action has
+an L1 EEZ failed lookup but no Rollup0 transaction or receipt.
 
 The transaction is derived rather than signed. Its sender is `SYSTEM_ADDRESS`, its recipient is
 `EEZL2`, and its calldata follows the selected `EEZL2` inbound delivery ABI. Its access list,
-blob-hash list, and authorization list are empty. Its gas limit equals the block gas remaining
-immediately before it starts.
+blob-hash list, and authorization list are empty. Its gas limit is the lower of the block gas
+remaining before it starts and the Fusaka per-transaction cap of `16,777,216`.
 
 The transaction root commits the exact input and order. The receipt root commits status, gas use,
-and logs. The state root commits persistent execution effects. Exact return or revert data is
-checked against the EEZ execution data during replay and is not added to the receipt.
+and logs. The state root commits persistent execution effects. Exact return data is checked against
+the EEZ execution data during replay and is not added to the receipt.
 
-For a value-bearing transaction, the state checkpoint starts before the temporary protocol credit
-and the `EEZL2` call. A verified application failure discards that checkpoint but still produces
-the failed typed receipt and consumes gas. Any other outer failure invalidates the candidate.
+For a value-bearing successful transaction, the state checkpoint starts before the temporary
+protocol credit and the `EEZL2` call. A failed action opens no checkpoint and creates no L2 value.
+Any outer failure in a protocol transaction that was expected to succeed invalidates the candidate.
 
 !!! note "TO BE DEFINED: byte-exact envelope"
     The transaction type, payload encoding, source-identifier calculation, fee fields, transaction

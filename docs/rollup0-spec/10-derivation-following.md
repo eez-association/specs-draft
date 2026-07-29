@@ -1,7 +1,8 @@
 # 10. Derivation and Following
 
 Rollup0 publishes enough data on Ethereum for a follower to reconstruct the selected Rollup0 chain
-without trusting a composer.
+without trusting a composer. A follower also reads Ethereum consensus data for the RANDAO seed
+created by each accepted anchor.
 
 ## 10.1 Canonical Input
 
@@ -29,8 +30,9 @@ For each applicable candidate, the follower:
    selected blobs;
 4. reconstructs each header from its parent under Chapter 4;
 5. executes the terminal block's pure-L2 prefix and verifies `R0`;
-6. reconstructs each protocol transaction from the Ethereum origin data, EEZ entries, and failed
-   lookups, then executes every `B[i]`;
+6. reconstructs each successful action's protocol transaction from its Ethereum origin data and
+   EEZ entry, verifies each failed lookup by temporary replay without creating an L2 transaction,
+   checks that no action follows a failure, and derives every `B[i]`;
 7. replays the ordered Ethereum triggers and derives the processed action prefix from their
    execution, receipts, and retained EEZ logs;
 8. recomputes every state, transaction, receipt, and header commitment for that prefix;
@@ -39,6 +41,10 @@ For each applicable candidate, the follower:
 
 The follower MUST reject missing, extra, reordered, or malformed transactions and sidecar data. It
 MUST NOT trust a candidate's claimed endpoint without replay.
+
+After accepting an anchor, the follower reads the post-block RANDAO mix from the corresponding
+canonical Ethereum beacon state. It activates that seed at the first Rollup0 block after the
+anchored endpoint. Scheduled Sync positions without an accepted anchor do not change the seed.
 
 ## 10.3 Competing Candidates
 
@@ -51,8 +57,9 @@ canonical settlement actually applied, not against a claimed full-candidate endp
 log order and multiplicity; it does not infer the prefix from an unordered set of matching roots.
 
 The pure-L2 prefix remains part of `B[0]` even when no synchronous action is processed. A caught
-Rollup0 revert can advance the action prefix without changing the state root. The exact prefix
-index, not the state root alone, selects the terminal block variant.
+Rollup0 revert can advance the Ethereum action prefix without changing the Rollup0 block or state
+root, but only as the final action in that candidate. The exact trigger-prefix index is still
+needed to derive which EEZ lookups were used, even when two adjacent `B[i]` values are identical.
 
 The duplicate-call rule in Chapter 7 must be resolved before followers can assign two identical
 calls to exact Ethereum transactions.
@@ -73,8 +80,9 @@ On an Ethereum reorganization, a follower:
 1. finds the canonical common ancestor;
 2. removes candidate evidence from orphaned Ethereum blocks;
 3. retreats the safe and finalized Rollup0 views to the last surviving endpoint;
-4. discards conflicting unsafe descendants; and
-5. derives the replacement Ethereum branch in order.
+4. restores the RANDAO seed established by the last surviving anchor;
+5. discards conflicting unsafe descendants; and
+6. derives the replacement Ethereum branch in order.
 
 !!! note "TO BE DEFINED"
     A reorganization beyond retained history or a displacement of finalized Ethereum settlement

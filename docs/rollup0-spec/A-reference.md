@@ -12,25 +12,36 @@ This appendix summarizes values defined in the main chapters. The chapter text t
 | Positions per nominal interval | `6` |
 | Position order | `5 Live, 1 Sync` |
 | Block gas limit | `30,000,000` |
-| Initial EVM fork | Cancun |
+| EIP-1559 gas target | `15,000,000` |
+| EIP-1559 elasticity multiplier | `2` |
+| EIP-1559 base-fee-change denominator | `50` |
+| Initial EVM fork | Fusaka, using the Osaka execution-layer rules |
 | Settlement transaction gas budget | `4,000,000` |
 | Inbound transaction type | TO BE DEFINED; unsigned EIP-2718 transaction |
-| Inbound transaction gas limit | remaining gas in the common `30,000,000` block gas pool |
-| Inbound transaction intrinsic gas | standard non-creation transaction calculation |
+| Maximum transaction gas limit | `16,777,216` (`2^24`) |
+| Inbound transaction gas limit | `min(remaining block gas, 16,777,216)` |
+| Inbound transaction gas charging | standard non-creation intrinsic gas and EIP-7623 calldata floor |
 | Inbound transaction fee | TO BE DISCUSSED |
 | System caller | `0xfffffffffffffffffffffffffffffffffffffffe` |
 | Inbound transaction access list | empty |
 | Inbound transaction blob hashes | empty |
+| EIP-2935 history update | enabled from genesis |
 | `parentBeaconBlockRoot` | 32 zero bytes |
 | EIP-4788 beacon-roots update | disabled |
+| `requestsHash` | `sha256("")` |
+| `prevRandao` refresh | after each successful canonical anchor |
+| Refreshed RANDAO source | post-block Ethereum beacon-state RANDAO mix |
+| Refreshed seed activation | first Rollup0 block after the anchored endpoint |
 | `extraData` | zero to 32 composer-selected bytes |
 | DA channel | Ethereum blobs |
 | Candidate production | open |
 | Candidate relay | permissionless |
 | Candidate selection | first applicable candidate in canonical Ethereum transaction order |
-| Failed application call | verified `EEZL2` error; typed receipt status `0`; complete transaction rolls back |
+| Failed application call | Final candidate action; L1 EEZ failed lookup; no Rollup0 transaction or receipt; block and state root unchanged |
 | `EEZL2` genesis balance | `0` |
 | `EEZL2` inbound transaction balance rule | post-call balance equals pre-call balance |
+| Ordinary genesis native balances | none |
+| L1 native-value custody | pooled in EEZ and accounted through Rollup0's per-rollup `etherBalance` |
 
 ## A.2 Development Cadence
 
@@ -60,14 +71,12 @@ The restored draft uses these development defaults. Production must either confi
 
 | Item | Development default |
 |---|---|
-| EIP-1559 elasticity multiplier | `6` |
-| EIP-1559 base-fee-change denominator | `250` |
 | Maximum validator/prover set size | `M <= 20` |
 | Example threshold | `ceil(2M / 3) + 1` |
 
 !!! note "TO BE DEFINED"
-    The Rollup0 chain ID, initial EVM fork, genesis base fee, fee-vault addresses, validator/prover
-    keys, and actual threshold are not fixed.
+    The Rollup0 chain ID, genesis base fee, genesis RANDAO seed, fee-vault addresses,
+    validator/prover keys, and actual threshold are not fixed.
 
 ## A.5 DA Format
 
@@ -86,9 +95,9 @@ The restored draft uses these development defaults. Production must either confi
 - **Follower:** a client that derives Rollup0 from canonical Ethereum.
 - **Live block:** an ordinary Rollup0 block in a nominal interval.
 - **Sync block:** the block at the scheduled final Rollup0 position for an Ethereum slot. It
-  contains a pure-L2 transaction prefix followed by zero or more synchronous actions.
-- **Protocol transaction:** an unsigned EIP-2718 transaction derived from an accepted Ethereum
-  trigger and included after the Sync block's pure-L2 prefix.
+  contains a pure-L2 transaction prefix followed by zero or more successful synchronous actions.
+- **Protocol transaction:** an unsigned EIP-2718 transaction derived from a successful
+  Ethereum-to-Rollup0 action and included after the Sync block's pure-L2 prefix.
 - **Settled cursor:** the exact Rollup0 parent identity established by canonical Ethereum history.
 - **Sibling:** one of several candidates built from the same settled parent.
 - **Applicable:** valid and based on the current settled cursor when evaluated on Ethereum.

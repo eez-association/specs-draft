@@ -17,6 +17,12 @@ A sequencer syncs and distributes Rollup0 blocks over peer-to-peer protocols and
 services. It can build pure-L2 blocks and delegate Sync-block composition to a composer. A sequencer
 can also perform the composer role itself.
 
+When pure-L2 transaction simulation reaches a cross-network proxy, an initial Rollup0 sequencer
+should reject the transaction instead of adding it to a pure-L2 block. Rejection does not consume
+the sender's nonce or charge an on-chain fee. Sequencers may rate limit or ban clients that waste
+simulation resources. Forwarding these transactions to a composer for outbound synchronous
+execution belongs to Rollup0.x.
+
 Sequencing is open. Rollup0 has no sequencer allowlist.
 
 ### Validator/Prover

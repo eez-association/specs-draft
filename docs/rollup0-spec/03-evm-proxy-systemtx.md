@@ -5,14 +5,26 @@
 Rollup0 executes an Ethereum-equivalent EVM. It adds no custom opcode or precompile. Cross-network
 behavior is provided by contracts and protocol-derived transactions.
 
-Rollup0 has no beacon chain. It keeps the Cancun header shape but does not execute the EIP-4788
-beacon-roots contract update. Chapter 4 fixes `parentBeaconBlockRoot` to zero.
+Rollup0 starts with the execution-layer rules of the Ethereum Fusaka hardfork, whose execution
+fork is Osaka. Every Ethereum execution fork through Osaka is active at genesis. Rollup0 adopts
+later Ethereum execution forks through explicit Rollup0 hardforks.
 
-Rollup0 starts with the Ethereum Cancun execution rules. It adopts later Ethereum execution
-hardforks through explicit Rollup0 hardforks.
+Rollup0 has no beacon chain. It keeps the post-Cancun header shape but does not execute the
+EIP-4788 beacon-roots contract update. Chapter 4 fixes `parentBeaconBlockRoot` to zero.
 
 !!! note "TO BE DEFINED"
-    The activation rule and schedule for post-Cancun hardforks are not yet selected.
+    The activation rule and schedule for post-Fusaka hardforks are not yet selected.
+
+Rollup0 activates the
+[EIP-2935 block-hash history contract](https://eips.ethereum.org/EIPS/eip-2935) at genesis. Before
+the transactions in every block after genesis, the executor performs the standard EIP-2935 system
+operation and stores the parent block hash. The call uses
+`0xfffffffffffffffffffffffffffffffffffffffe` as its caller, transfers no value, and does not
+consume gas from the Rollup0 block gas pool. The genesis state contains the standard history
+contract at `0x0000F90827F1C53a10cb7A02335B175320002935`.
+
+The EIP-2935 write is part of the state transition. Consequently, every non-genesis Rollup0 block
+changes the state root even when it contains no transaction.
 
 ## 3.2 EEZ Proxies
 
@@ -34,8 +46,7 @@ settings to the predeploy address.
 !!! note "TO BE DEFINED: EEZL2 artifact"
     Rollup0 will use the latest `eez-core-protocol` `EEZL2` version selected when the production
     genesis is finalized. The final genesis specification must state its bytecode hash, Rollup0
-    rollup ID, and system caller. The selected version must support the verified application-failure
-    behavior defined in this chapter. A later `EEZL2` version requires a Rollup0 hardfork.
+    rollup ID, and system caller. A later `EEZL2` version requires a Rollup0 hardfork.
 
 !!! note "Separate EEZ predeploy namespace"
     Rollup0 reserves the
@@ -48,9 +59,10 @@ settings to the predeploy address.
 
 ## 3.3 Inbound Protocol Transaction
 
-Each accepted Ethereum-to-Rollup0 action is delivered in the Sync block by a deterministic,
+Each successful Ethereum-to-Rollup0 action is delivered in the Sync block by a deterministic,
 unsigned EIP-2718 transaction. This protocol transaction is included in the normal Rollup0
-transaction list. It is authorized by Rollup0 derivation rules rather than by a signature.
+transaction list. It is authorized by Rollup0 derivation rules rather than by a signature. A
+failed action uses an EEZ failed lookup on Ethereum and does not create a Rollup0 transaction.
 
 The protocol transaction:
 
@@ -99,18 +111,20 @@ is empty.
 Other block-context opcodes, including `CHAINID`, `BASEFEE`, and `BLOBBASEFEE`, use the ordinary
 Rollup0 block environment.
 
-For now, each included Ethereum trigger transaction produces exactly one Rollup0 protocol
-transaction. These transactions execute in canonical Ethereum trigger order. Each one has its own
-transaction execution context. Persistent state from an earlier transaction remains visible, while
-transient storage, warmed addresses, gas refunds, and other transaction-scoped state reset.
+For now, each included Ethereum trigger whose Rollup0 action succeeds produces exactly one Rollup0
+protocol transaction. Failed actions produce none. The protocol transactions execute in canonical
+Ethereum trigger order. Each one has its own transaction execution context. Persistent state from
+an earlier transaction remains visible, while transient storage, warmed addresses, gas refunds, and
+other transaction-scoped state reset.
 
 !!! note "TO BE DISCUSSED: protocol-transaction grouping"
     Rollup0 currently selects option 1. Clients must use this option unless a later specification
     changes it.
 
-    1. **One protocol transaction per Ethereum trigger transaction.** This gives each action its
-       own execution context, gas budget, and failure boundary. It also maps each action directly
-       to the Ethereum transaction that receives its result. It has some repeated call overhead.
+    1. **One protocol transaction per successful Ethereum trigger.** This gives each successful
+       action its own execution context and gas budget. It also maps each delivered state transition
+       directly to the Ethereum transaction that receives its result. It has some repeated call
+       overhead.
     2. **One protocol transaction for the complete accepted trigger prefix.** The L2 EEZ contract
        would loop over every action. This reduces call overhead, but the actions share one gas budget and
        transaction-scoped EVM state. One outer failure could prevent later actions.
@@ -135,34 +149,47 @@ transient storage, warmed addresses, gas refunds, and other transaction-scoped s
     transaction and discusses the `0x7e` compatibility question.
 
 Protocol transactions and ordinary transactions use the same block gas pool. Rollup0 does not
-reserve a separate system gas pool and does not impose a smaller per-transaction cap. Each inbound
-protocol transaction encodes a gas limit equal to the gas remaining under the block's
-`30,000,000` gas limit immediately before it starts.
+reserve a separate system gas pool. Under the Fusaka rules, every transaction has the EIP-7825
+maximum gas limit of `16,777,216` (`2^24`). Each inbound protocol transaction therefore encodes:
+
+```text
+gasLimit = min(gas remaining in the block, 16,777,216)
+```
 
 Before EVM execution, Rollup0 charges the standard intrinsic gas for a non-creation transaction
 under the active Ethereum fork. The calculation uses the complete calldata passed to `EEZL2`.
-At Cancun, with the selected empty access list, it is:
+With the selected empty access list, define:
 
 ```text
-intrinsicGas = 21,000
-             + 4  * zeroCalldataBytes
-             + 16 * nonZeroCalldataBytes
+calldataTokens = zeroCalldataBytes + 4 * nonZeroCalldataBytes
+intrinsicGas   = 21,000 + 4  * calldataTokens
+calldataFloor  = 21,000 + 10 * calldataTokens
 ```
 
-The EVM frame receives the remaining gas after this charge. The intrinsic gas remains used when
-the application or outer call reverts. A candidate is invalid if the block does not have enough
-gas for the intrinsic charge. Intrinsic and EVM execution gas both contribute to the transaction
-receipt and block `gasUsed`, and leave less gas for later transactions.
+The gas limit must cover both `intrinsicGas` and `calldataFloor`. The EVM frame receives the gas
+remaining after the intrinsic charge. Under EIP-7623, the final transaction gas used is:
+
+```text
+gasUsed = 21,000 + max(
+    4 * calldataTokens + executionGasUsed,
+    10 * calldataTokens
+)
+```
+
+This gas remains used when the successful action catches an internal application revert. A
+candidate is invalid if the transaction exceeds the EIP-7825 cap, its outer `EEZL2` call reverts,
+or the block does not have enough gas for the required intrinsic and calldata-floor charges.
+Intrinsic and EVM execution gas contribute to the transaction receipt and block `gasUsed`, and
+leave less gas for later transactions.
 
 The proof or validator policy must execute the exact candidate and check this gas accounting before
 the candidate can settle on Ethereum. A candidate is invalid if its cumulative gas use exceeds the
 block gas limit or an outer `EEZL2` call has a protocol failure. Ethereum does not perform this
 Rollup0 gas check itself.
 
-An out-of-gas inside the target application can still be a valid application result when `EEZL2`
-has enough gas to verify the expected failure and return the dedicated verified-failure error. The
-corresponding Ethereum transaction then observes that precomputed failure. If `EEZL2` itself runs
-out of gas, the candidate is invalid and cannot be used in a settlement bundle.
+An out-of-gas in the simulated target application is a failed action. It is handled by an EEZ
+failed lookup on Ethereum and does not produce a Rollup0 protocol transaction. An out-of-gas in a
+protocol transaction that was expected to succeed makes the candidate invalid.
 
 !!! note "TO BE DISCUSSED: shared block gas"
     Rollup0 currently uses one gas pool for ordinary and protocol-derived transactions. This keeps
@@ -197,54 +224,37 @@ for an ordinary EIP-1559 upfront gas purchase.
     the values returned by the EVM `GASPRICE` opcode and receipt `effectiveGasPrice`. It must not
     silently deduct the application call's `msg.value`.
 
+    A failed inbound action has no Rollup0 protocol transaction, consumes no Rollup0 block gas, and
+    cannot debit or credit an L2 fee. Any charge for simulating and proving that failure must occur
+    through the Ethereum settlement flow.
+
     This is also a transaction-validity rule. Rollup0 must either bypass the ordinary fee-cap,
     upfront-balance, fee-deduction, and refund checks for this derived transaction type, or define
     the exact fee fields and funded account that satisfy them. Clients cannot infer this from the
     block's base fee.
 
 The Sync block begins with an ordered pure-L2 transaction prefix. These transactions are fixed for
-the candidate and execute regardless of which later Ethereum trigger transactions succeed. A Sync
-block with no applied inbound action contains only this pure-L2 prefix.
+the candidate and execute regardless of which later Ethereum trigger transactions succeed. The
+block then contains one protocol transaction for each successful Rollup0 action, in Ethereum
+trigger order. A Sync block with no successful inbound action contains only the pure-L2 prefix.
 
 When the target application succeeds, the `EEZL2` call returns normally after it verifies the
 execution entry. The protocol transaction has receipt status `1`.
 
-When the target application returns `success = false`, `EEZL2` first verifies that result, the exact
-return or revert data, and the rolling hash. This includes `REVERT` and exceptional EVM failures
-such as an out-of-gas inside the target call. `EEZL2` then reverts its own call with a dedicated
-error. The provisional error is:
+When the simulated Rollup0 application returns `success = false`, the L1 EEZ batch contains one
+failed lookup with the exact action hash, pre-state root, and revert data. The proof or validator
+signatures bind that lookup and the trigger manifest. No Rollup0 protocol transaction is created,
+no `EEZL2` table is loaded, and no L2 gas, nonce, receipt, log, value credit, or state change is
+recorded. This includes `REVERT` and exceptional EVM failures such as an out-of-gas in the target
+call.
 
-```solidity
-error InboundApplicationReverted(bytes revertData);
-```
+The failed lookup makes the Ethereum proxy call revert with the verified application data. If the
+outer Ethereum transaction catches that revert and succeeds, the action is processed. That
+transaction must be the final trigger in the candidate. If the outer transaction reverts, that
+bundle prefix is ineligible.
 
-The Rollup0 executor treats this error as a completed failed protocol transaction only when the
-candidate expected that application failure. Its receipt has status `0`. The outer revert rolls
-back all state changes, proxy creation, value movement, and logs from the transaction. Therefore
-the state root after the failed action equals the state root before it. The transaction and receipt
-roots still distinguish this action from a block that did not include it. The corresponding result
-on Ethereum is an EEZ failed lookup with the same revert data.
-
-Any other `EEZL2` revert, including an authorization error, malformed entry, hash mismatch,
-unexpected application result, or out-of-gas in the outer `EEZL2` call, makes the candidate
-block invalid.
-
-!!! note "TO BE DISCUSSED: failed inbound calls"
-    Rollup0 currently selects option 3. Clients must use this option unless a later specification
-    changes it.
-
-    1. **Let `executeIncomingCrossChainCall` return normally after a verified target revert.** This
-       works with the current reference behavior, but temporary tables, proxy creation, and failed
-       call value can remain in `EEZL2`. The full Rollup0 state root can change.
-    2. **Have the Rollup0 executor discard a failed protocol transaction's state checkpoint.** This
-       keeps the state root unchanged without changing `EEZL2`, but moves rollback rules into every
-       execution client even though the EVM call returned successfully.
-    3. **Make `EEZL2` return a dedicated verified-failure error.** The EVM performs the rollback,
-       failed value returns to the protocol-transaction source, and clients can distinguish an
-       expected application revert from a protocol failure. This requires the
-       `eez-core-protocol` version selected for genesis to include the behavior.
-
-    The exact error name and ABI remain open until the production `EEZL2` artifact is selected.
+An authorization error, malformed entry, hash mismatch, unexpected application result, or
+out-of-gas in a protocol transaction that was expected to succeed makes the candidate invalid.
 
 !!! note "TO BE DISCUSSED: protocol failures"
     Rollup0 currently selects option 1. Clients must use this option unless a later specification
@@ -263,9 +273,8 @@ block invalid.
     or repair a candidate after its settlement bundle has been selected.
 
 Let `managerBalanceBefore` be the `EEZL2` balance immediately before a protocol transaction. The
-balance after a successful call must equal `managerBalanceBefore`. A verified failed call reverts
-its complete frame and therefore also restores `managerBalanceBefore`. A balance mismatch is a
-protocol failure and invalidates the candidate.
+balance after the successful call must equal `managerBalanceBefore`. A balance mismatch is a
+protocol failure and invalidates the candidate. Failed actions do not call `EEZL2`.
 
 The Rollup0 genesis sets the `EEZL2` balance to zero. Unsolicited ETH received later is not part of
 the protocol's value supply and cannot fund an EEZ action.
@@ -291,27 +300,26 @@ action. The resulting increase in Rollup0 native value must be backed by the cor
 held on Ethereum. Any verified value movement out of Rollup0 is accounted for separately and can
 offset that increase.
 
-If the application call fails with the expected verified-failure error, the EVM revert returns
-`v` to the system caller. Rollup0 then discards the checkpoint, including the exact credit. The
-caller balance, native supply, and all application balances remain as they were before the call.
-The failed receipt and the transaction's used gas remain part of the block, as for an ordinary
-failed Ethereum transaction. A composer cannot choose `v`: it is bound to the accepted EEZ action
-and checked by the proof or validator policy.
+If the simulated application call fails, Rollup0 does not open the checkpoint, credit the system
+caller, or create a protocol transaction. The failed proxy call on Ethereum rolls back its value
+transfer. Rollup0 balances and native supply remain unchanged. A composer cannot choose `v`: it is
+bound to the failed lookup and checked by the proof or validator policy.
 
 !!! note "TO BE DISCUSSED: protocol-transaction value source"
     Rollup0 currently selects option 1. Clients must use this option unless a later specification
     changes it.
 
-    1. **Credit the system caller immediately before the call.** This preserves ordinary EVM
-       `CALL` and `msg.value` behavior without a funded private key. A failed call removes the
-       unused credit.
+    1. **Credit the system caller immediately before a successful call.** This preserves ordinary
+       EVM `CALL` and `msg.value` behavior without a funded private key. Failed actions never reach
+       this step.
     2. **Prefund the system caller.** This avoids a protocol-level credit, but the reserve can run
        out and does not directly bind issued Rollup0 value to value held on Ethereum.
     3. **Create value inside a special EVM call.** This avoids a caller balance, but changes normal
        EVM value-transfer behavior and makes execution harder to reproduce with standard tooling.
 
-    The exact Ethereum custody contract and complete backing invariant remain to be defined before
-    production genesis.
+    Initial Rollup0 uses the existing EEZ pooled-custody contract and its per-rollup
+    `etherBalance`. Chapter 5 defines the selected backing rule. A dedicated Rollup0 vault remains
+    under discussion for a later version.
 
 ## 3.4 Call Rules
 

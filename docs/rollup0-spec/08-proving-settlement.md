@@ -74,7 +74,9 @@ A candidate is applicable only when:
 
 The first applicable candidate advances the Rollup0 cursor to the exact block variant selected by
 Ethereum execution. If `k` synchronous actions were processed, the cursor becomes the number,
-block hash, and state root of `B[k]`. Later candidates are evaluated against this updated cursor.
+block hash, and state root of `B[k]`. If action `k` was a caught Rollup0 failure, it must also be
+the candidate's final action `n`. A shorter selected prefix with `k < n` contains only successful
+Rollup0 actions. Later candidates are evaluated against this updated cursor.
 
 A stale or invalid candidate does not advance the cursor. A reverted submission does not reserve a
 position or prevent a later candidate from winning.
@@ -93,7 +95,8 @@ position or prevent a later candidate from winning.
 A candidate is settled only when its Ethereum inclusion establishes `R0` for Rollup0. A successful
 Rollup0 action is evidenced by its retained EEZ consumption and state update. A caught Rollup0
 revert is evidenced by deterministic replay of the exact Ethereum trigger against the canonical L1
-state. The final settled endpoint is `B[k]`, not necessarily the candidate's full intended variant.
+state, and it can advance the action prefix only as the candidate's final action. The final settled
+endpoint is `B[k]`, not necessarily the candidate's full intended variant.
 
 Inclusion of the settlement transaction or a matching state-root event alone is insufficient. A
 follower filters evidence by EEZ contract address and Rollup0 ID, preserves transaction and log

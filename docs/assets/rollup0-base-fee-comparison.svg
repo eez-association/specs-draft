@@ -1,0 +1,154 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="620" viewBox="0 0 1200 620"
+     role="img" aria-labelledby="title description">
+  <title id="title">Comparison of EIP-1559 parameters for Rollup0</title>
+  <desc id="description">
+    The first chart compares the next-block base-fee response of 2/50, 2/8, and 6/250
+    at gas use from zero to 30 million. The second chart compares cumulative base-fee
+    increases during twelve seconds of full blocks. Rollup0 2/50 closely follows one
+    twelve-second Ethereum 2/8 adjustment, while Rollup0 2/8 rises much faster.
+  </desc>
+
+  <rect width="1200" height="620" fill="#ffffff"/>
+  <text x="32" y="38" fill="#212529" font-family="Inter, Arial, sans-serif"
+        font-size="24" font-weight="700">Why Rollup0 uses 2/50</text>
+  <text x="32" y="62" fill="#495057" font-family="Inter, Arial, sans-serif"
+        font-size="14">30M gas limit, 2-second blocks</text>
+
+  <rect x="30" y="80" width="555" height="470" rx="8" fill="#ffffff" stroke="#ced4da"/>
+  <text x="55" y="114" fill="#212529" font-family="Inter, Arial, sans-serif"
+        font-size="18" font-weight="700">A. Response by gas used</text>
+  <text x="55" y="138" fill="#495057" font-family="Inter, Arial, sans-serif"
+        font-size="13">Change applied to the next block's base fee</text>
+
+  <g stroke="#e9ecef" stroke-width="1">
+    <line x1="105" y1="194.3" x2="550" y2="194.3"/>
+    <line x1="105" y1="232.9" x2="550" y2="232.9"/>
+    <line x1="105" y1="271.4" x2="550" y2="271.4"/>
+    <line x1="105" y1="310" x2="550" y2="310"/>
+    <line x1="105" y1="348.6" x2="550" y2="348.6"/>
+    <line x1="105" y1="387.1" x2="550" y2="387.1"/>
+    <line x1="105" y1="425.7" x2="550" y2="425.7"/>
+    <line x1="105" y1="175" x2="105" y2="445"/>
+    <line x1="179.2" y1="175" x2="179.2" y2="445"/>
+    <line x1="253.3" y1="175" x2="253.3" y2="445"/>
+    <line x1="327.5" y1="175" x2="327.5" y2="445"/>
+    <line x1="401.7" y1="175" x2="401.7" y2="445"/>
+    <line x1="475.8" y1="175" x2="475.8" y2="445"/>
+    <line x1="550" y1="175" x2="550" y2="445"/>
+  </g>
+
+  <g fill="#495057" font-family="Inter, Arial, sans-serif" font-size="12">
+    <text x="94" y="198.3" text-anchor="end">+12%</text>
+    <text x="94" y="236.9" text-anchor="end">+8%</text>
+    <text x="94" y="275.4" text-anchor="end">+4%</text>
+    <text x="94" y="314" text-anchor="end">0%</text>
+    <text x="94" y="352.6" text-anchor="end">-4%</text>
+    <text x="94" y="391.1" text-anchor="end">-8%</text>
+    <text x="94" y="429.7" text-anchor="end">-12%</text>
+    <text x="105" y="465" text-anchor="middle">0</text>
+    <text x="179.2" y="465" text-anchor="middle">5</text>
+    <text x="253.3" y="465" text-anchor="middle">10</text>
+    <text x="327.5" y="465" text-anchor="middle">15</text>
+    <text x="401.7" y="465" text-anchor="middle">20</text>
+    <text x="475.8" y="465" text-anchor="middle">25</text>
+    <text x="550" y="465" text-anchor="middle">30</text>
+    <text x="327.5" y="490" text-anchor="middle" font-size="13">Gas used (millions)</text>
+    <text x="45" y="310" text-anchor="middle" font-size="13"
+          transform="rotate(-90 45 310)">Next-block change</text>
+  </g>
+
+  <line x1="179.2" y1="175" x2="179.2" y2="445" stroke="#1c7ed6"
+        stroke-width="1.5" stroke-dasharray="5 5"/>
+  <line x1="327.5" y1="175" x2="327.5" y2="445" stroke="#087f5b"
+        stroke-width="1.5" stroke-dasharray="5 5"/>
+  <text x="185" y="188" fill="#1c7ed6" font-family="Inter, Arial, sans-serif"
+        font-size="11">6/250 target: 5M</text>
+  <text x="333" y="204" fill="#087f5b" font-family="Inter, Arial, sans-serif"
+        font-size="11">2/50 target: 15M</text>
+
+  <path d="M 105 430.5 L 327.5 310 L 550 189.5" fill="none" stroke="#c92a2a"
+        stroke-width="3" stroke-linecap="round"/>
+  <path d="M 105 329.3 L 327.5 310 L 550 290.7" fill="none" stroke="#087f5b"
+        stroke-width="4" stroke-linecap="round"/>
+  <path d="M 105 313.9 L 179.2 310 L 550 290.7" fill="none" stroke="#1c7ed6"
+        stroke-width="3" stroke-dasharray="8 6" stroke-linecap="round"/>
+
+  <circle cx="179.2" cy="310" r="4" fill="#1c7ed6"/>
+  <circle cx="327.5" cy="310" r="4" fill="#087f5b"/>
+  <text x="520" y="181" fill="#c92a2a" font-family="Inter, Arial, sans-serif"
+        font-size="12" font-weight="700">2/8</text>
+  <text x="514" y="282" fill="#087f5b" font-family="Inter, Arial, sans-serif"
+        font-size="12" font-weight="700">2/50</text>
+  <text x="225" y="301" fill="#1c7ed6" font-family="Inter, Arial, sans-serif"
+        font-size="12" font-weight="700">6/250</text>
+
+  <rect x="615" y="80" width="555" height="470" rx="8" fill="#ffffff" stroke="#ced4da"/>
+  <text x="640" y="114" fill="#212529" font-family="Inter, Arial, sans-serif"
+        font-size="18" font-weight="700">B. Full blocks over 12 seconds</text>
+  <text x="640" y="138" fill="#495057" font-family="Inter, Arial, sans-serif"
+        font-size="13">Cumulative base-fee increase</text>
+
+  <g stroke="#e9ecef" stroke-width="1">
+    <line x1="690" y1="445" x2="1135" y2="445"/>
+    <line x1="690" y1="383.6" x2="1135" y2="383.6"/>
+    <line x1="690" y1="322.3" x2="1135" y2="322.3"/>
+    <line x1="690" y1="260.9" x2="1135" y2="260.9"/>
+    <line x1="690" y1="199.5" x2="1135" y2="199.5"/>
+    <line x1="690" y1="175" x2="690" y2="445"/>
+    <line x1="764.2" y1="175" x2="764.2" y2="445"/>
+    <line x1="838.3" y1="175" x2="838.3" y2="445"/>
+    <line x1="912.5" y1="175" x2="912.5" y2="445"/>
+    <line x1="986.7" y1="175" x2="986.7" y2="445"/>
+    <line x1="1060.8" y1="175" x2="1060.8" y2="445"/>
+    <line x1="1135" y1="175" x2="1135" y2="445"/>
+  </g>
+
+  <g fill="#495057" font-family="Inter, Arial, sans-serif" font-size="12">
+    <text x="679" y="449" text-anchor="end">0%</text>
+    <text x="679" y="387.6" text-anchor="end">25%</text>
+    <text x="679" y="326.3" text-anchor="end">50%</text>
+    <text x="679" y="264.9" text-anchor="end">75%</text>
+    <text x="679" y="203.5" text-anchor="end">100%</text>
+    <text x="690" y="465" text-anchor="middle">0</text>
+    <text x="764.2" y="465" text-anchor="middle">2</text>
+    <text x="838.3" y="465" text-anchor="middle">4</text>
+    <text x="912.5" y="465" text-anchor="middle">6</text>
+    <text x="986.7" y="465" text-anchor="middle">8</text>
+    <text x="1060.8" y="465" text-anchor="middle">10</text>
+    <text x="1135" y="465" text-anchor="middle">12</text>
+    <text x="912.5" y="490" text-anchor="middle" font-size="13">Elapsed seconds</text>
+    <text x="630" y="310" text-anchor="middle" font-size="13"
+          transform="rotate(-90 630 310)">Cumulative increase</text>
+  </g>
+
+  <path d="M 690 445 L 764.2 414.3 L 838.3 379.8 L 912.5 341 L 986.7 297.3
+           L 1060.8 248.1 L 1135 192.8"
+        fill="none" stroke="#c92a2a" stroke-width="4" stroke-linecap="round"
+        stroke-linejoin="round"/>
+  <path d="M 690 445 L 764.2 440.1 L 838.3 435.1 L 912.5 430 L 986.7 424.8
+           L 1060.8 419.5 L 1135 414"
+        fill="none" stroke="#087f5b" stroke-width="4" stroke-linecap="round"
+        stroke-linejoin="round"/>
+  <path d="M 690 445 L 1135 414.3" fill="none" stroke="#495057" stroke-width="2.5"
+        stroke-dasharray="8 6" stroke-linecap="round"/>
+
+  <text x="1010" y="226" fill="#c92a2a" font-family="Inter, Arial, sans-serif"
+        font-size="12" font-weight="700">Rollup0 2/8: +102.7%</text>
+  <text x="900" y="406" fill="#087f5b" font-family="Inter, Arial, sans-serif"
+        font-size="12" font-weight="700">Rollup0 2/50: +12.6%</text>
+  <text x="742" y="429" fill="#495057" font-family="Inter, Arial, sans-serif"
+        font-size="12">Ethereum 2/8: +12.5%</text>
+
+  <g font-family="Inter, Arial, sans-serif" font-size="13">
+    <line x1="42" y1="585" x2="76" y2="585" stroke="#087f5b" stroke-width="4"/>
+    <text x="86" y="590" fill="#212529">Rollup0 2/50 (selected)</text>
+    <line x1="300" y1="585" x2="334" y2="585" stroke="#c92a2a" stroke-width="4"/>
+    <text x="344" y="590" fill="#212529">Rollup0 2/8</text>
+    <line x1="486" y1="585" x2="520" y2="585" stroke="#1c7ed6" stroke-width="3"
+          stroke-dasharray="8 6"/>
+    <text x="530" y="590" fill="#212529">Rollup0 6/250</text>
+    <line x1="696" y1="585" x2="730" y2="585" stroke="#495057" stroke-width="2.5"
+          stroke-dasharray="8 6"/>
+    <text x="740" y="590" fill="#212529">Ethereum 2/8 at 12-second blocks</text>
+  </g>
+</svg>
