@@ -81,8 +81,11 @@ On an Ethereum reorganization, a follower:
 2. removes candidate evidence from orphaned Ethereum blocks;
 3. retreats the safe and finalized Rollup0 views to the last surviving endpoint;
 4. restores the RANDAO seed established by the last surviving anchor;
-5. discards conflicting unsafe descendants; and
+5. removes conflicting unsafe descendants from the active view; and
 6. derives the replacement Ethereum branch in order.
+
+A follower may retain removed branches as noncanonical data. It must not expose one as the current
+safe or unsafe view unless later canonical Ethereum settlement makes that branch current again.
 
 !!! note "TO BE DEFINED"
     A reorganization beyond retained history or a displacement of finalized Ethereum settlement

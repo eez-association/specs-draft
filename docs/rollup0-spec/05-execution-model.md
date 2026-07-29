@@ -60,13 +60,29 @@ also present for a pure-L2 anchor that has no synchronous action. The blob conta
 Rollup0 block range; the state delta records only its combined effect on the state root. EEZ does
 not decode the Rollup0 blocks.
 
-The proof or validator signatures bind both the immediate entry and the selected blob hashes.
-Validators reconstruct the published blocks from `A`, verify that they form the claimed chain,
-and accept the entry only when replay produces `R0`.
+The proof or validator signatures bind the bytes of the leading entry and the selected blob
+hashes. Validators reconstruct the published blocks from `A`, verify that they form the claimed
+chain, and accept the entry only when replay produces `R0`. The fixed EEZ proof digest does not,
+however, bind the dispatch count that makes this entry immediate.
 
 Every anchor contains at least one post-genesis block. Because EIP-2935 is active from genesis and
 stores a new parent block hash in every block, `R0` differs from `A` even when the range contains
 no user transaction.
+
+!!! warning "FIXED EEZ LIMITATION: dispatch counts are not signed"
+    A Rollup0 batch requires `transientExecutionEntryCount = 1` and
+    `transientLookupCallCount = 0`. The first value makes the leading `A -> R0` entry immediate.
+    The second keeps synchronous failed lookups available to their later Ethereum triggers.
+
+    The fixed EEZ public-input hash excludes both fields. A relayer or builder can therefore
+    change them without invalidating the proof or validator signatures. This can defer the anchor
+    entry, change which later entries are published, or change lookup availability.
+
+    Followers can detect the changed calldata and resulting state transition, but detection does
+    not prevent EEZ state from changing on Ethereum. This is a production blocker. Rollup0 must
+    define a settlement restriction that enforces the two values and prevents the same proof from
+    bypassing that restriction through a direct EEZ call, or it must state an explicit trusted
+    submission assumption. The EL cannot fix this behavior.
 
 !!! note "TO BE DISCUSSED: applying the anchor root"
     Rollup0 currently selects the leading `A -> R0` entry described above. The exact
@@ -87,10 +103,8 @@ no user transaction.
     2. **Use a Rollup0 settlement wrapper.** The wrapper calls `postAndVerifyBatch`, reads the
        resulting Rollup0 root, and reverts unless it equals `R0`. This gives the anchor
        transaction atomic success or failure without changing EEZ, but adds a Rollup0-specific
-       contract and integration path.
-    3. **Change EEZ immediate-entry handling.** EEZ can make the required checkpoint entry fatal
-       when it fails. This gives the clearest contract behavior, but changes the shared EEZ
-       contract and may remove behavior that another EEZ network wants.
+       contract and integration path. The Rollup0 proof policy must also make the wrapper
+       mandatory; otherwise the same proof can be submitted directly to EEZ.
 
     Until this is selected, followers must check the actual stored-root transition and its
     correctly ordered `L2ExecutionPerformed` event. They must not infer settlement from

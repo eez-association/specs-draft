@@ -40,6 +40,10 @@ validity failure:
 - the candidate is a sibling of another valid candidate; or
 - another valid candidate arrived first.
 
+Initial Rollup0 also trusts every validator/prover that receives a signed Ethereum trigger to keep
+it private and not submit it outside an approved candidate bundle. Chapter 6 describes this
+confidentiality assumption.
+
 !!! note "TO BE DEFINED"
     The production validator/prover membership, threshold, keys, and key-rotation rules are not yet
     selected. Chapter 8 defines the ECDSA attestation mechanism.
@@ -47,7 +51,8 @@ validity failure:
 ### Relayer
 
 Any account or contract MAY relay a completed candidate. A relayer cannot change the candidate
-bytes covered by its proof or signatures.
+bytes covered by its proof or signatures. A relayer that receives private signed trigger
+transactions is trusted not to disclose or submit them outside an approved candidate bundle.
 
 ### Follower
 

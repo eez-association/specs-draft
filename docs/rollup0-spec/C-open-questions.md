@@ -40,6 +40,8 @@ The EEZ call hash and proof digest do not by themselves state every deployment p
 - Should duplicate rejection be enforced by Rollup0 validation or by the EEZ contract?
 - Who pays inclusion fees?
 - How does a relayer submit a candidate without gaining composer privileges?
+- How does Rollup0 enforce its required transient execution-entry and lookup counts while
+  preventing the same proof from bypassing that check through direct EEZ submission?
 
 ## C.4 Adversarial Gas, DA, and Recovery
 

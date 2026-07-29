@@ -52,6 +52,12 @@ while choosing an unsafe view; it is not part of validity after a block settles 
 The current peer-to-peer representation does not contain a standardized producer-signature
 envelope. This prevents portable signature-based filtering and prioritization.
 
+The current implementation names its main block-production loop the sequencer and uses the
+composer mainly for Sync-block contents and settlement. The Rollup0 specification uses
+**composer** for the party that constructs complete blocks and candidates, and **sequencer** for a
+node that syncs and distributes blocks and provides RPC service. Implementers must follow the
+protocol roles, not the current internal type names.
+
 ## E.3 Inbound Transactions and Test Verification
 
 The current client represents privileged inbound execution as an ordinary signed legacy
@@ -111,6 +117,11 @@ for each possible trigger prefix, and the contracts do not implement a persisten
 mechanism. It expects every included outer trigger transaction to succeed, as the target design
 does, but it does not offer shorter successful prefixes when a longer choice fails.
 
+The current remote-validator path receives one realized Rollup0 block window. It does not receive
+and validate the complete ordered trigger manifest, every terminal variant `B[0]` through `B[n]`,
+or every proposed Ethereum prefix bundle. Production validators must check that complete candidate
+before providing its single proof or signature set.
+
 The current client does not enforce the rule that a failed action ends the candidate manifest.
 The current EEZ contract also has no unified cursor across successful execution entries and failed
 lookups. A failed lookup remains reusable while its state-root pins match. The terminal-failure
@@ -134,6 +145,11 @@ The current EEZ contract catches and skips an immediate entry that fails its che
 outer `postAndVerifyBatch` call continues. `BatchPosted` can therefore be emitted without applying
 the Rollup0 anchor root. Until Rollup0 selects contract-level enforcement, followers must require
 the actual ordered root update and must not treat `BatchPosted` as anchor acceptance.
+
+The fixed EEZ public-input hash does not include `transientExecutionEntryCount` or
+`transientLookupCallCount`. This is EEZ behavior, not an EL implementation bug. Rollup0 requires
+the values `1` and `0`, respectively, but the current proof or signatures cannot prevent a
+submitter from changing them. A Rollup0-specific mitigation remains a production blocker.
 
 The current contracts and client accept duplicate cross-chain call hashes in one candidate.
 Identical calls can consequently be indistinguishable to the EEZ execution queue. The protocol
@@ -171,6 +187,11 @@ The current client uses an EEZ batch without Ethereum settlement context. Its va
 therefore do not commit the target timestamp and parent Ethereum block hash. Builder-side target
 parameters do not provide this contract-level binding. Rollup0 batches use the EEZ current-settlement
 context described in Chapter 4.
+
+The current remote-validator path does not prove that the first supplied Rollup0 block extends the
+current Ethereum-confirmed Rollup0 cursor. It checks a supplied block window, but does not bind the
+window's first parent block number and hash to canonical Ethereum settlement evidence. Production
+validators may pre-validate speculative work, but must perform this binding before signing.
 
 The current client puts zero in `prevRandao` for every Rollup0 block. Production Rollup0 derives a
 different value for every block from the seed established by the latest successful canonical

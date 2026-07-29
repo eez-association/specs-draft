@@ -43,7 +43,8 @@ Rollup0 uses Ethereum blobs for anchored chain data. The format must encode or c
 4. every pure-L2 and protocol-derived transaction in exact block order;
 5. all non-derived header inputs;
 6. the EEZ objects and Ethereum origin data for every synchronous effect; and
-7. the ordered Ethereum trigger manifest.
+7. the ordered Ethereum trigger manifest; and
+8. every non-derived input needed to reconstruct terminal variants `B[0]` through `B[n]`.
 
 The manifest must end at its first failed action.
 

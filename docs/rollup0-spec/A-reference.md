@@ -37,6 +37,7 @@ This appendix summarizes values defined in the main chapters. The chapter text t
 | Candidate production | open |
 | Candidate relay | permissionless |
 | Candidate selection | first applicable candidate in canonical Ethereum transaction order |
+| Candidate lifetime | one intended Ethereum child slot |
 | Failed application call | Final candidate action; L1 EEZ failed lookup; no Rollup0 transaction or receipt; block and state root unchanged |
 | `EEZL2` genesis balance | `0` |
 | `EEZL2` inbound transaction balance rule | post-call balance equals pre-call balance |
@@ -98,7 +99,9 @@ The restored draft uses these development defaults. Production must either confi
   contains a pure-L2 transaction prefix followed by zero or more successful synchronous actions.
 - **Protocol transaction:** an unsigned EIP-2718 transaction derived from a successful
   Ethereum-to-Rollup0 action and included after the Sync block's pure-L2 prefix.
-- **Settled cursor:** the exact Rollup0 parent identity established by canonical Ethereum history.
+- **Ethereum-confirmed cursor (settled cursor):** the exact Rollup0 parent identity established by
+  canonical Ethereum history. It is safe but not necessarily finalized and can retreat after an
+  Ethereum reorganization.
 - **Sibling:** one of several candidates built from the same settled parent.
 - **Applicable:** valid and based on the current settled cursor when evaluated on Ethereum.
 - **Stale:** based on a cursor that an earlier applicable candidate has superseded.

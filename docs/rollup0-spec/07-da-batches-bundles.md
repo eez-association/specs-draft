@@ -104,6 +104,10 @@ occurred and returned the committed revert data. A successful Ethereum receipt a
 `eth_sendBundle` is a builder API, not an Ethereum consensus rule. A public-mempool submission is
 not a valid replacement for the required same-block ordering.
 
+The exact signed trigger transactions remain private before inclusion. Validators, relayers, and
+builders that receive them are trusted not to leak or submit them separately. Chapter 6 states the
+consequences and scope of this trust assumption.
+
 !!! caution "TO BE DEFINED: prefix bundle submission"
     Rollup0 requires one strict successful trigger prefix, but the exact builder submission method
     is not yet selected.

@@ -16,6 +16,9 @@
 - **Builder dependency:** composers request one of several ordered prefixes through
   `eth_sendBundle`. The API does not prevent a builder from repackaging the signed transactions.
   The builder trust assumption or a contract-enforced alternative is still under discussion.
+- **Private trigger trust:** validators, relayers, and builders receive signed Ethereum trigger
+  transactions before inclusion. Initial Rollup0 trusts them not to leak or submit those
+  transactions outside an approved bundle.
 - **Duplicate call identity:** the rule for identical top-level cross-chain call hashes is not yet
   selected.
 - **Trusted manager:** the Rollup0 manager selects the proof policy and retains the EEZ
@@ -27,6 +30,9 @@
 - **Simulation parity:** a composer and every validator/prover must simulate the exact selected EVM
   fork and protocol-transaction semantics. A mismatch makes an apparently valid candidate fail on
   Ethereum or derive a different Rollup0 block.
+- **Unsigned EEZ dispatch counts:** the fixed EEZ proof digest does not bind the transient
+  execution-entry or lookup counts. Rollup0 requires exact values, but a relayer can change them
+  without invalidating validator signatures. The mitigation is not yet selected.
 
 ## 12.2 Undefined Production Choices
 
@@ -51,6 +57,7 @@ The following need exact definitions before production:
 - whether a later version permits actions after a caught failure by trusting exact builder ordering
   or by adding a unified on-chain action cursor;
 - enforcement that the leading anchor-root transition either applies or reverts;
+- enforcement of the fixed Rollup0 transient dispatch counts without changing EEZ;
 - the duplicate top-level cross-chain call rule;
 - enforcement of one Rollup0 settlement per Ethereum block;
 - maximum payload size, transaction count, and gas;

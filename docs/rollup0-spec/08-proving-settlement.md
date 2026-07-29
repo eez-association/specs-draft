@@ -12,6 +12,10 @@ accepted proof systems, verification keys, and threshold. The
 interface and digest. [EEZ Wire Formats](../eez-protocol-spec/05-wire-formats.md) defines the
 encoding and proof-system fold.
 
+The threshold proof or signature set covers one complete candidate. The authenticated candidate
+data commits the ordered trigger manifest and all deterministic terminal variants `B[0]` through
+`B[n]`. Rollup0 does not require a separate proof or signature set for each possible prefix.
+
 !!! note "TO BE DEFINED"
     The production values of `M`, `N`, the member keys, and the rotation procedure are not yet
     selected.
@@ -41,8 +45,8 @@ When a validator/prover accepts a candidate for full validation, it:
 
 1. authenticates the complete candidate and its referenced Ethereum and Rollup0 data;
 2. independently executes it;
-3. checks the EEZ batch, Rollup0 blocks, DA payload, pure-L2 prefix, every synchronous prefix, and
-   intended prefix bundles;
+3. checks the EEZ batch, Rollup0 blocks, DA payload, pure-L2 prefix, every terminal variant
+   `B[0]` through `B[n]`, and the intended prefix bundles;
 4. signs or proves it if and only if it is valid; and
 5. remains free to check other candidates for the same parent.
 
@@ -67,6 +71,7 @@ Process candidate settlements in canonical Ethereum transaction order.
 A candidate is applicable only when:
 
 - its exact named Rollup0 parent is the current settled cursor;
+- its target timestamp and parent Ethereum block hash match the current settlement context;
 - its proof or signatures satisfy the Rollup0 proof policy;
 - its EEZ batch is valid;
 - its Rollup0 DA and range are valid; and

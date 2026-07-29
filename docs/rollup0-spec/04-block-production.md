@@ -186,11 +186,14 @@ The range begins at the last Ethereum-confirmed Rollup0 head. Its first block is
 in Chapter 7.
 
 !!! note "TO BE DEFINED"
-    The exact block commitment for every possible synchronous prefix is not yet selected. The
-    published data must be enough to reconstruct each prefix block, but the team still needs to
-    decide whether validators sign every possible block hash or derive the selected hash from the
-    number of processed actions. The commitment must distinguish different prefix lengths even
-    when their state roots are equal.
+    One proof or signature set covers all synchronous prefixes. The published data must be enough
+    to reconstruct every terminal variant, but the blob format still needs to choose between
+    carrying an explicit ordered vector of terminal block hashes and deriving that vector entirely
+    from the authenticated block inputs. Any carried hash is checked against replay.
+
+    The candidate must also commit the action count and ordered trigger manifest. A block hash
+    alone cannot distinguish two prefix lengths when a failed action adds no Rollup0 transaction
+    and leaves the terminal block unchanged.
 
 ## 4.4 Unsafe Blocks
 
@@ -198,8 +201,9 @@ A composer MAY publish an unsafe candidate before Ethereum selects it. Several c
 publish different valid unsafe siblings.
 
 Only canonical Ethereum settlement advances the safe Rollup0 chain. A composer whose candidate
-loses or is not included MUST discard the conflicting unsafe blocks before building on the
-canonical settled parent.
+loses or is not included MUST stop extending its conflicting unsafe branch and build from the new
+canonical settled parent. It MAY retain the old branch as noncanonical data in case an Ethereum
+reorganization makes it relevant again.
 
 ---
 
