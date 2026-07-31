@@ -181,13 +181,13 @@ messaging across many chains; Rollup0 scales *composition* between one L2 and it
 Because Rollup0 adopts **OP-Stack defaults** for its under-pinned parameters
 ([Appendix B §B.7](B1-reference.md)), a field-level comparison is useful. The striking
 convergence: Rollup0's *planned* type-`0x7E` system transaction ([§4.4](04-evm-and-proxies.md))
-is exactly OP's deposit-transaction type, and OP's L1-origin-derived `prev_randao` is exactly
-Rollup0's §5.5 end-state — so adopting OP defaults aligns the header/fee/DA mechanics with a
-deployed L2 while keeping the synchronous-composability core OP lacks.
+is exactly OP's deposit-transaction type. OP's L1-origin-derived `prev_randao` is also the closest
+deployed comparison for Rollup0's live-anchor-derived seed, although the current Rollup0 draft
+domain-separates a distinct value for every L2 block instead of copying the seed unchanged.
 
 | Aspect | OP Stack | Rollup0 |
 |---|---|---|
-| **`prev_randao`** | Copied from the **L1 origin block's `prev_randao`** (EIP-4399, since Bedrock). | End-state identical: the anchored L1 block's RANDAO ([§5.5](05-block-production.md)); currently `0` ([App A](A1-implementation-deviations.md)). |
+| **`prev_randao`** | Copied unchanged from the **L1 origin block's `prev_randao`**; it repeats for every L2 block in that origin's epoch. | The latest canonical live anchor supplies one seed; the current draft hashes that seed with the chain ID and L2 block number, producing distinct but equally predictable values ([§4.2](../docs/rollup0-spec/04-block-production.md#live-anchor-scoped-prevrandao)). The client still uses `0`. |
 | **L1 context into L2** | **L1-attributes deposited tx** (type `0x7E`), the first tx of every L2 block, → `L1Block` predeploy `0x42…0015`. | No `L1Block` predeploy; the composer/deriver reconstruct L1 context, and the Sync-block system tx delivers *cross-chain calls* (not generic L1 attributes) ([§4.4](04-evm-and-proxies.md), [§12](12-derivation-following.md)). |
 | **`parentBeaconBlockRoot`** | The L1 origin's beacon root (Ecotone+). | `Some(0x0)` when Cancun-active — the L2 has no beacon chain ([§5.1](05-block-production.md)). |
 | **Inbound / system tx** | **Unsigned** deposit tx, type `0x7E`, fields `(sourceHash, from, to, mint, value, gas, isSystemTx, data)`; mints via `mint`, backed by L1 `OptimismPortal` escrow. | **Signed legacy** tx from `SYSTEM_ADDRESS` today (mints via `msg.value`); the **type-`0x7E` unsigned envelope is the planned end-state** that removes the deriver's key dependency ([§4.4](04-evm-and-proxies.md), [§16](16-rollup1-roadmap.md), [App A](A1-implementation-deviations.md)) — i.e. Rollup0 is *converging on OP's exact mechanism*. |
