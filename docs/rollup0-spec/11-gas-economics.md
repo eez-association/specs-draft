@@ -53,6 +53,10 @@ candidate production is profitable.
 Rollup0 publishes anchored chain data in Ethereum blobs. Cost follows Ethereum blob-gas pricing and
 the number of blobs used by a candidate.
 
+After a long anchoring outage, several catch-up anchors can be needed. Their total DA and
+settlement cost grows with the backlog. The recovery-rate and transaction-intake rules are the
+open discussion in Chapter 7.
+
 The production design must select:
 
 - a maximum payload size;

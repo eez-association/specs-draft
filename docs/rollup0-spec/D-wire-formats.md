@@ -48,6 +48,10 @@ Rollup0 uses Ethereum blobs for anchored chain data. The format must encode or c
 
 The manifest must end at its first failed action.
 
+The terminal block timestamp and authenticated current Ethereum settlement context determine
+whether an anchor is live or catch-up. The format does not need a separate anchor-mode flag. A
+catch-up payload has no synchronous effect and an empty trigger manifest.
+
 !!! note "TO BE DEFINED"
     The byte-exact encoding, field limits, multi-blob rules, and conformance vectors are not yet
     defined. The previous calldata RLP draft is not the Rollup0 blob format and must not be used by

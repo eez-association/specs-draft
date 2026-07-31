@@ -18,7 +18,9 @@ from putting significant value on it.
 | Data availability | Ethereum blobs; the exact format is **to be defined** |
 
 Composers build the continuous L2 chain. Sequencers sync and distribute those blocks. Blocks do not
-have to be posted every Ethereum slot. An anchor includes every L2 block since the previous anchor.
+have to be posted every Ethereum slot. An anchor contains the complete contiguous range from the
+block after the previous settled endpoint through its new endpoint. Historical catch-up anchors
+can publish a backlog over several Ethereum blocks.
 
 This specification uses the [EEZ specification](../eez-protocol-spec/index.md) for the shared
 contracts, cross-chain execution, proofs, settlement, proxies, and wire formats. This document

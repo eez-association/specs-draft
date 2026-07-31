@@ -60,6 +60,10 @@ also present for a pure-L2 anchor that has no synchronous action. The blob conta
 Rollup0 block range; the state delta records only its combined effect on the state root. EEZ does
 not decode the Rollup0 blocks.
 
+For Rollup0, a catch-up anchor has only this leading state transition. It has `n = 0`, no
+synchronous execution entry, no failed lookup, and an empty Ethereum trigger manifest. Its `R0`
+is the state root of its historical terminal Sync block.
+
 The proof or validator signatures bind the bytes of the leading entry and the selected blob
 hashes. Validators reconstruct the published blocks from `A`, verify that they form the claimed
 chain, and accept the entry only when replay produces `R0`. The fixed EEZ proof digest does not,

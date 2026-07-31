@@ -72,6 +72,7 @@ A candidate is applicable only when:
 
 - its exact named Rollup0 parent is the current settled cursor;
 - its target timestamp and parent Ethereum block hash match the current settlement context;
+- its terminal Sync timestamp follows the live or catch-up rule in Chapter 4;
 - its proof or signatures satisfy the Rollup0 proof policy;
 - its EEZ batch is valid;
 - its Rollup0 DA and range are valid; and
@@ -81,21 +82,31 @@ The first applicable candidate advances the Rollup0 cursor to the exact block va
 Ethereum execution. If `k` synchronous actions were processed, the cursor becomes the number,
 block hash, and state root of `B[k]`. If action `k` was a caught Rollup0 failure, it must also be
 the candidate's final action `n`. A shorter selected prefix with `k < n` contains only successful
-Rollup0 actions. Later candidates are evaluated against this updated cursor.
+Rollup0 actions. A catch-up candidate always advances to `B[0]`. Later candidates are evaluated
+against this updated cursor.
 
 A stale or invalid candidate does not advance the cursor. A reverted submission does not reserve a
 position or prevent a later candidate from winning.
 
-!!! caution "TO BE DEFINED: one settlement per Ethereum block"
-    Rollup0 permits at most one settled candidate for a Rollup0 Sync timestamp. The current EEZ
-    contract stores the Rollup0 state root but not its block hash or number. It can accept a second
-    same-rollup batch in one Ethereum block when the expected state root still matches, for example
-    after an empty or reverting first candidate.
+!!! caution "TO BE DEFINED: one Rollup0 batch per Ethereum block"
+    At most one EEZ batch that contains Rollup0 may execute in each Ethereum block, whether its
+    candidate is a live or catch-up anchor. The current EEZ contract does not enforce this rule.
 
-    Candidate proofs cannot resolve this after several valid siblings have already been signed.
-    The team must decide how the settlement contract enforces the rule. The direct options are to
-    reject a second Rollup0 batch in the same Ethereum block or to store and check the exact
-    Rollup0 cursor.
+    A first valid anchor changes the Rollup0 state root, including when it has no user
+    transaction. A later sibling therefore cannot apply its stale leading state transition. A
+    chained second candidate is also invalid because validators may sign only from the
+    Ethereum-confirmed cursor, not from the result of an earlier transaction in the same
+    unconfirmed Ethereum block.
+
+    The remaining problem is queue replacement. A second proven EEZ batch for Rollup0 can still
+    execute in the same Ethereum block, emit `BatchPosted`, delete the first batch's unconsumed
+    execution and lookup queues, and publish its own queues even when its leading anchor
+    transition was skipped. Later trigger transactions can then see different prepared actions.
+
+    The team must either enforce the stronger one-batch rule in a settlement path that cannot be
+    bypassed, enforce equivalent queue integrity, or accept compatible builder behavior as an
+    explicit trust assumption. Storing and checking an exact Rollup0 cursor is another design only
+    if the settlement layer can be changed.
 
 A candidate is settled only when its Ethereum inclusion establishes `R0` for Rollup0. A successful
 Rollup0 action is evidenced by its retained EEZ consumption and state update. A caught Rollup0

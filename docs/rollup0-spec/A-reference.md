@@ -29,15 +29,22 @@ This appendix summarizes values defined in the main chapters. The chapter text t
 | `parentBeaconBlockRoot` | 32 zero bytes |
 | EIP-4788 beacon-roots update | disabled |
 | `requestsHash` | `sha256("")` |
-| `prevRandao` refresh | after each successful canonical anchor |
+| `prevRandao` refresh | after each successful canonical live anchor |
 | Refreshed RANDAO source | post-block Ethereum beacon-state RANDAO mix |
 | Refreshed seed activation | first Rollup0 block after the anchored endpoint |
+| `prevRandao` mapping | per-block derivation in the current draft; direct copy under discussion |
 | `extraData` | zero to 32 composer-selected bytes |
 | DA channel | Ethereum blobs |
 | Candidate production | open |
 | Candidate relay | permissionless |
 | Candidate selection | first applicable candidate in canonical Ethereum transaction order |
 | Candidate lifetime | one intended Ethereum child slot |
+| Rollup0 batch limit | one EEZ batch that contains Rollup0 per Ethereum block |
+| EEZ batch `blockNumber` | `2^64 - 1` (current settlement context) |
+| Live-anchor endpoint | Sync timestamp equal to containing Ethereum block timestamp |
+| Catch-up-anchor endpoint | older Sync timestamp; no synchronous action |
+| Catch-up RANDAO behavior | retain the seed from the latest live anchor |
+| EEZ batch scope | Rollup0-only SHOULD; restricted shared batches allowed |
 | Failed application call | Final candidate action; L1 EEZ failed lookup; no Rollup0 transaction or receipt; block and state root unchanged |
 | `EEZL2` genesis balance | `0` |
 | `EEZL2` inbound transaction balance rule | post-call balance equals pre-call balance |
@@ -97,6 +104,11 @@ The restored draft uses these development defaults. Production must either confi
 - **Live block:** an ordinary Rollup0 block in a nominal interval.
 - **Sync block:** the block at the scheduled final Rollup0 position for an Ethereum slot. It
   contains a pure-L2 transaction prefix followed by zero or more successful synchronous actions.
+- **Live anchor:** an anchor whose terminal Sync timestamp equals the containing Ethereum block
+  timestamp. It can contain synchronous actions and refreshes the RANDAO seed after inclusion.
+- **Catch-up anchor:** an anchor whose terminal Sync timestamp is older than the containing
+  Ethereum block timestamp. It contains only pure-L2 execution and does not refresh the RANDAO
+  seed.
 - **Protocol transaction:** an unsigned EIP-2718 transaction derived from a successful
   Ethereum-to-Rollup0 action and included after the Sync block's pure-L2 prefix.
 - **Ethereum-confirmed cursor (settled cursor):** the exact Rollup0 parent identity established by

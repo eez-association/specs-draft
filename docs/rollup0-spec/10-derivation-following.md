@@ -2,7 +2,7 @@
 
 Rollup0 publishes enough data on Ethereum for a follower to reconstruct the selected Rollup0 chain
 without trusting a composer. A follower also reads Ethereum consensus data for the RANDAO seed
-created by each accepted anchor.
+created by each accepted live anchor.
 
 ## 10.1 Canonical Input
 
@@ -36,15 +36,18 @@ For each applicable candidate, the follower:
 7. replays the ordered Ethereum triggers and derives the processed action prefix from their
    execution, receipts, and retained EEZ logs;
 8. recomputes every state, transaction, receipt, and header commitment for that prefix;
-9. compares the executed endpoint with canonical settlement evidence; and
-10. commits the accepted range and advances its cursor.
+9. checks whether the terminal timestamp makes the candidate a live or catch-up anchor and applies
+   the corresponding action and RANDAO rules;
+10. compares the executed endpoint with canonical settlement evidence; and
+11. commits the accepted range and advances its cursor.
 
 The follower MUST reject missing, extra, reordered, or malformed transactions and sidecar data. It
 MUST NOT trust a candidate's claimed endpoint without replay.
 
-After accepting an anchor, the follower reads the post-block RANDAO mix from the corresponding
+After accepting a live anchor, the follower reads the post-block RANDAO mix from the corresponding
 canonical Ethereum beacon state. It activates that seed at the first Rollup0 block after the
-anchored endpoint. Scheduled Sync positions without an accepted anchor do not change the seed.
+anchored endpoint. A catch-up anchor and a scheduled Sync position without an accepted anchor do
+not change the seed.
 
 ## 10.3 Competing Candidates
 
@@ -80,7 +83,7 @@ On an Ethereum reorganization, a follower:
 1. finds the canonical common ancestor;
 2. removes candidate evidence from orphaned Ethereum blocks;
 3. retreats the safe and finalized Rollup0 views to the last surviving endpoint;
-4. restores the RANDAO seed established by the last surviving anchor;
+4. restores the RANDAO seed established by the last surviving live anchor;
 5. removes conflicting unsafe descendants from the active view; and
 6. derives the replacement Ethereum branch in order.
 

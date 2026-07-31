@@ -45,9 +45,21 @@ The EEZ call hash and proof digest do not by themselves state every deployment p
 
 ## C.4 Adversarial Gas, DA, and Recovery
 
+- Should `prevRandao` keep the current chain- and block-separated derivation, or copy the
+  live-anchor seed unchanged until the next refresh?
 - Can synchronous execution consume enough of the common block gas pool to make useful prefixes
   impractical?
 - Which payload-size and fee rules prevent blob-cost griefing?
+- What per-block, per-interval, and per-candidate DA limits guarantee that at least one complete
+  interval fits in a catch-up anchor?
+- How much faster than new L2 data production must catch-up publication be?
+- At what lag must composers reduce or stop pure-L2 transaction intake?
+- Which catch-up and backpressure rules are consensus validity rules, and which are operational
+  policy?
+- Does Rollup0 accept that a catch-up block's timestamp proves its scheduled position but not when
+  it was first produced?
+- If not, what timely attestation or precommitment proves historical production without making an
+  anchoring outage unrecoverable?
 - Is re-inclusion safe when an Ethereum reorganization removes the trigger but leaves the candidate
   available for resubmission?
 - Will a later version move backing from pooled EEZ custody to a dedicated vault, and what liquidity

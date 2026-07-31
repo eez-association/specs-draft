@@ -49,26 +49,84 @@ the final action in the manifest.
 
 `R[0]` means `R0`, the state root of `B[0]`.
 
+A live candidate has a terminal timestamp equal to its intended Ethereum settlement timestamp. A
+catch-up candidate has an older terminal timestamp, only the `B[0]` variant, and an empty trigger
+manifest. It contains no inbound protocol transaction or failed lookup. A terminal timestamp later
+than the intended Ethereum settlement timestamp is invalid. The relationship between the two
+timestamps determines the anchor form; the blob does not need a separate mode flag.
+
 The following must agree:
 
 - the number of encoded block boundaries equals `toNumber - fromBlock.number`;
 - the first encoded block is `fromBlock.number + 1`;
 - the last encoded block has number `toNumber`;
-- every `B[i].timestamp` equals the intended Ethereum settlement timestamp;
+- the terminal timestamp follows the live or catch-up rule above;
 - every user transaction appears once in its selected block;
 - every required L2 entry corresponds to one exact successful EEZ action;
 - every failed action corresponds to one exact failed EEZ lookup and no L2 transaction; and
 - replay from `fromBlock` produces every `B[i]` and `R[i]`.
 
-!!! note "TO BE DEFINED"
-    The maximum anchor range and blob payload size are not yet selected.
+!!! caution "TO BE DISCUSSED: catch-up capacity and backpressure"
+    Historical catch-up works only when each published range fits the Ethereum blob limits and the
+    backlog drains faster than new Rollup0 data is created. At minimum, the data for one complete
+    six-position interval must always fit in one valid catch-up candidate. Otherwise no catch-up
+    anchor can advance the cursor.
+
+    The byte-exact blob format must set per-block, per-interval, and per-candidate data limits. It
+    must also leave enough publication capacity during recovery for old data to be published
+    faster than composers create new unsafe data. These limits are not yet defined.
+
+    If one interval cannot be guaranteed to fit, the team must either lower Rollup0's data limits
+    or permit smaller historical ranges that do not end at a Sync position. The second option
+    would change the anchor rule in Chapter 4 and is not part of the current design.
+
+    If the available rate is too low, block positions and timestamps still advance. Until an
+    objective validity limit is selected, a composer that wants its unsafe view to remain
+    anchorable SHOULD reduce or stop pure-L2 transaction intake until the lag shrinks. It cannot
+    force other open composers to do the same. Synchronous actions cannot settle through a
+    catch-up anchor. The team must decide the lag thresholds, how clients report them, and which
+    backpressure rules are protocol validity rules rather than operational policy.
+
+!!! caution "TO BE DISCUSSED: historical production evidence"
+    The current rules prove that a catch-up range forms a valid chain with the scheduled
+    timestamps. They do not prove that its blocks were produced or gossiped at those times. An
+    open composer can build a competing historical range later and include transactions that it
+    received after the claimed block timestamps. If Ethereum selects that candidate, applications
+    observe those scheduled historical timestamps through the EVM.
+
+    A local first-seen rule cannot solve this because different nodes can see different blocks.
+    The direct options are to accept that a Rollup0 timestamp is a scheduled chain position rather
+    than proof of publication time, require timely attestations that are retained through an
+    outage, or precommit block data to Ethereum or another agreed timestamping system. Timely
+    attestations add a new availability and trust requirement. Precommitment adds cost and may be
+    unavailable during the same outage. Initial Rollup0 has not selected an option.
 
 ## 7.3 EEZ Batch
 
 The settlement transaction carries the batch object defined by
 [EEZ Proving and Settlement](../eez-protocol-spec/04-proving-and-settlement.md).
-Rollup0 requires:
+An initial Rollup0 batch SHOULD contain only Rollup0. This keeps candidate validation and failure
+handling independent from other EEZ networks.
 
+A batch MAY also contain another EEZ network when all of these conditions hold:
+
+- `transientExecutionEntryCount` remains exactly `1`, and the one transient entry is Rollup0's
+  leading `A -> R0` entry;
+- `transientLookupCallCount` remains exactly `0`;
+- every entry, lookup, state delta, and queue item that names, pins, routes to, or changes Rollup0
+  is part of the Rollup0 candidate and follows this specification;
+- data for another network cannot change the Rollup0 block range, action order, state sequence, or
+  selected endpoint;
+- every included network accepts the shared `blockNumber = 2^64 - 1` current context; and
+- every proof required by the shared EEZ batch succeeds.
+
+These rules allow cost sharing but do not enable execution-network-to-execution-network calls in
+initial Rollup0. A network that needs another transient layout cannot share this batch.
+
+Every Rollup0 batch also requires:
+
+- `blockNumber = 2^64 - 1` to select the authenticated current Ethereum settlement context;
+- no other EEZ batch that contains Rollup0 in the same Ethereum block;
 - the selected blobs to be referenced by the batch;
 - no duplicate or unrelated blob index;
 - proof context bound to the intended Ethereum settlement domain;
@@ -89,6 +147,12 @@ bundle[k] = [postAndVerifyBatch, trigger1, ..., triggerK]
 `postAndVerifyBatch` publishes and verifies the candidate and establishes `R0`. Each `trigger`
 is an exact Ethereum transaction whose cross-chain proxy call can consume the next prepared EEZ
 action.
+
+A Rollup0-only catch-up candidate has `n = 0`, so its only bundle is
+`[postAndVerifyBatch]`. A Rollup0-only live candidate without a synchronous action uses the same
+one-transaction bundle. In a permitted shared batch, Rollup0 contributes no trigger transaction
+in either case. Transactions required by another network follow that network's specification and
+must not affect Rollup0.
 
 The intended settlement is the exact atomic inclusion of one submitted `bundle[k]`. Every included
 outer trigger transaction must succeed. Deterministic replay must show that each one made its exact

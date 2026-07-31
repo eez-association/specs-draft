@@ -29,9 +29,21 @@ before its zero or more successful synchronous actions. Each successful action i
 an unsigned transaction derived from its Ethereum trigger. A failed action is represented on
 Ethereum by an EEZ failed lookup and adds no Rollup0 transaction.
 
-Every anchor contains every L2 block since the previous anchor, including empty blocks. A composer
-must anchor when a synchronous transaction occurs. It should also anchor after the operational
-maximum interval without a synchronous transaction.
+Every anchor contains every L2 block after the previous settled endpoint through its new endpoint,
+including empty blocks. A composer must anchor when a synchronous transaction occurs. It should
+also anchor after the operational maximum interval without a synchronous transaction.
+
+Rollup0 has two anchor forms:
+
+- a **live anchor** ends at the Sync position whose timestamp equals the containing Ethereum
+  block's timestamp. It can contain synchronous actions; and
+- a **catch-up anchor** ends at an older Sync position. It contains only pure-L2 execution and
+  lets Rollup0 publish a backlog over several Ethereum blocks.
+
+Both forms extend the current settled cursor without skipping a Rollup0 block. A catch-up anchor
+is submitted and signed for the current Ethereum slot even though its Rollup0 endpoint is older.
+It cannot process a synchronous action. Synchronous service resumes when a live anchor reaches the
+current Ethereum timestamp.
 
 !!! note "TO BE DEFINED"
     The maximum time between anchors is not yet selected. It is an operational target, not a
@@ -101,9 +113,10 @@ not equivocation and carries no slashing risk.
 
 Each signature is for one intended Ethereum settlement context: the target child-slot timestamp and
 the known parent Ethereum block hash. The future child block hash is not known when validators sign.
-The first applicable candidate that lands in that context wins. A missed target or changed parent
-requires a new candidate and new signatures. Signatures for candidates that still name an old
-Rollup0 parent can no longer advance Rollup0.
+The first applicable candidate that lands in that context wins. This context always names the
+current Ethereum slot; it is separate from the Rollup0 endpoint timestamp of a catch-up anchor. A
+missed target or changed parent requires a new candidate and new signatures. Signatures for
+candidates that still name an old Rollup0 parent can no longer advance Rollup0.
 
 Rollup0 has no force-inclusion path. A valid empty candidate can win while excluding pending
 transactions. Force inclusion and TEE-backed validators are possible features for Rollup0.x, not

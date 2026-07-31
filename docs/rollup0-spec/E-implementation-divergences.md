@@ -11,6 +11,12 @@ The current client builds an anchor for every Ethereum head that it observes. Ro
 requires an anchor when synchronous execution occurs and after the configured maximum unanchored
 period. That maximum period is still to be defined.
 
+The current client does not implement production historical catch-up anchors. Rollup0 can settle
+several contiguous old pure-L2 ranges over successive Ethereum blocks. Each range ends at an old
+Sync position, has no synchronous action, and keeps the seed from the latest live anchor. The
+current development catch-up scheduler is only local scheduling behavior and does not provide
+these settlement and RANDAO rules.
+
 The current client publishes its Rollup0 payload in Ethereum calldata. Rollup0 will publish chain
 data in Ethereum blobs. The current payload is not the Rollup0 blob format and does not bind an
 exact, ordered trigger manifest to the blob. The final blob format must contain enough information
@@ -162,10 +168,11 @@ transaction. Production Rollup0 permits exactly one such top-level action in the
 complete execution trace. Validators and composers must inspect the full trace, including calls
 made through intermediate Ethereum contracts, and reject a candidate containing a second action.
 
-The current EEZ contract can accept more than one same-rollup batch in one Ethereum block when the
-stored state root still matches. It does not store the Rollup0 block hash or number needed to make a
-later sibling dynamically stale. Rollup0 requires a contract-level rule for one settlement per
-Sync timestamp or an exact on-chain cursor check.
+The current EEZ contract can verify more than one batch that contains Rollup0 in one Ethereum
+block. A later sibling cannot apply its stale anchor-root transition, but the later batch still
+replaces Rollup0's execution and lookup queues. Rollup0 requires at most one such batch per
+Ethereum block, or another mechanism that prevents queue replacement. The enforcement mechanism
+is not yet selected.
 
 Some development fallback paths submit or execute the settlement transaction and its trigger
 transactions separately. They do not provide same-block atomic transaction inclusion in the
@@ -186,7 +193,7 @@ derive Sync positions from the genesis-aligned timestamp and block-number grid.
 The current client uses an EEZ batch without Ethereum settlement context. Its validator signatures
 therefore do not commit the target timestamp and parent Ethereum block hash. Builder-side target
 parameters do not provide this contract-level binding. Rollup0 batches use the EEZ current-settlement
-context described in Chapter 4.
+context described in Chapter 4 by setting `blockNumber = 2^64 - 1`.
 
 The current remote-validator path does not prove that the first supplied Rollup0 block extends the
 current Ethereum-confirmed Rollup0 cursor. It checks a supplied block window, but does not bind the
@@ -194,10 +201,10 @@ window's first parent block number and hash to canonical Ethereum settlement evi
 validators may pre-validate speculative work, but must perform this binding before signing.
 
 The current client puts zero in `prevRandao` for every Rollup0 block. Production Rollup0 derives a
-different value for every block from the seed established by the latest successful canonical
+different value for every block from the seed established by the latest successful canonical live
 anchor. The client does not yet read the post-block RANDAO mix from the corresponding Ethereum
-beacon state, activate it after the anchored endpoint, or restore the preceding seed during an
-anchor reorganization.
+beacon state, activate it after a live anchored endpoint, preserve it across catch-up anchors, or
+restore the preceding seed during a live-anchor reorganization.
 
 ## E.6 Fee Market
 

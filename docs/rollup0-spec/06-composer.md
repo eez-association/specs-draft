@@ -56,11 +56,15 @@ composer cannot alter a signed user transaction.
 
 A candidate is valid for exactly one intended Ethereum child slot. Its authenticated settlement
 context contains that slot's timestamp and known parent Ethereum block hash. The future child block
-hash is not known and is not part of the candidate.
+hash is not known and is not part of the candidate. A live candidate ends at that timestamp. A
+catch-up candidate can end at an older Sync timestamp but is still bound to the current child slot.
 
-If the target slot is missed or the Ethereum parent changes, the candidate expires. A composer may
-reuse transactions that remain valid, but it must build the new timestamp-dependent Rollup0
-endpoint and obtain a new proof or signature set.
+If the target slot is missed or the Ethereum parent changes, the candidate expires. A live
+candidate cannot reuse its synchronous variants. If its settled Rollup0 parent is still current,
+its exact pure-L2 `B[0]` range may instead become a catch-up candidate. A catch-up composer may
+also propose the same historical range again. In either case, it must bind the candidate to the
+new settlement context and obtain a new proof or signature set. Transactions reused in a newly
+built live endpoint must remain valid.
 
 The composer MAY perform these steps with any internal architecture. The resulting candidate MUST
 be independently verifiable from its published inputs.
@@ -72,6 +76,8 @@ A validator/prover checks at least:
 - the candidate's parent block number, block hash, and state root equal the current
   Ethereum-confirmed Rollup0 cursor in the candidate's bound Ethereum settlement context;
 - the target timestamp and parent Ethereum block hash name the intended child slot;
+- a live endpoint equals the target timestamp, or a catch-up endpoint is older and contains no
+  synchronous action;
 - the block range and terminal Sync position follow Chapter 4;
 - replay reproduces every complete block and its exact block hash;
 - every transaction executes from the claimed parent state;
