@@ -100,6 +100,24 @@ search. Each entry is consumed exactly once, in posted order. Consuming an entry
 `L2ToL1Calls` through the flat processor, accumulates the rolling hash and ether, then applies its
 state deltas.
 
+For a matched top-level proxy entry, EEZ emits:
+
+```solidity
+ExecutionConsumed(
+    bytes32 indexed crossChainCallHash,
+    uint256 indexed rollupId,
+    uint256 indexed cursor
+)
+```
+
+`rollupId` is the destination rollup whose queue supplied the entry, and `cursor` is that entry's
+zero-based queue position. EEZ emits this event after selecting and advancing past the matching
+entry but before applying it. Each `L2ExecutionPerformed` event produced by that entry therefore
+follows its `ExecutionConsumed` event in the same transaction. Other execution-detail events may
+appear between them. If entry execution or the surrounding transaction reverts, the consumption
+event and every resulting state-update event are rolled back together. Only retained logs are
+canonical consumption evidence.
+
 ## 3.4 Verification at consumption
 
 After processing an entry's calls, the manager asserts:

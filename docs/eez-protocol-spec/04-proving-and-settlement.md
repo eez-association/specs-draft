@@ -113,7 +113,8 @@ hash, or the complete `postAndVerifyBatch` call reverts `InvalidProof`.
   block in which a batch already touched that rollup.
 
 `postAndVerifyBatch` emits `BatchPosted` and, per consumed state delta,
-`L2ExecutionPerformed`.
+`L2ExecutionPerformed`. A later top-level proxy consumption emits `ExecutionConsumed` before the
+state-update events produced by that entry, under the retained-log rule in Chapter 3.
 
 ## 4.5 Settlement rule
 
