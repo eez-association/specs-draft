@@ -87,6 +87,7 @@ nav:
       - "Appendix D: Rollup0 Wire Format": rollup0-spec/D-wire-formats.md
       - "Appendix E: Current Implementation Differences": rollup0-spec/E-implementation-divergences.md
       - "Appendix F: Inbound Transaction Design": rollup0-spec/F-system-transaction-design.md
+      - "Appendix G: Blob Payload Design": rollup0-spec/G-blob-payload-design.md
   - Gnosis Chain: gnosis-chain-spec/index.md
 
 plugins:
