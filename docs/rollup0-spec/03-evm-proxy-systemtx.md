@@ -7,13 +7,22 @@ behavior is provided by contracts and protocol-derived transactions.
 
 Rollup0 starts with the execution-layer rules of the Ethereum Fusaka hardfork, whose execution
 fork is Osaka. Every Ethereum execution fork through Osaka is active at genesis. Rollup0 adopts
-later Ethereum execution forks through explicit Rollup0 hardforks.
+each later Ethereum execution fork at that fork's Ethereum mainnet activation timestamp.
 
 Rollup0 has no beacon chain. It keeps the post-Cancun header shape but does not execute the
 EIP-4788 beacon-roots contract update. Chapter 4 fixes `parentBeaconBlockRoot` to zero.
 
-!!! note "TO BE DEFINED"
-    The activation rule and schedule for post-Fusaka hardforks are not yet selected.
+!!! success "DECISION: Ethereum-aligned hardfork timestamps"
+    If Ethereum mainnet activates an execution fork at Unix timestamp `T`, Rollup0 applies that
+    fork's execution rules to every block with `timestamp >= T`. Rollup0 clients must publish and
+    adopt an explicit chain-spec and client release that contains `T` before activation. The need
+    for a release does not create a separate Rollup0 activation vote or permit a different
+    timestamp.
+
+    Rollup0 adopts execution-layer behavior only. Its explicit rules for the absence of a beacon
+    chain, empty withdrawals and requests, `prevRandao`, and protocol transactions continue to
+    apply. If a future Ethereum fork introduces another consensus-layer dependency, the Rollup0
+    specification and clients must define its Rollup0 behavior before `T`.
 
 Rollup0 activates the
 [EIP-2935 block-hash history contract](https://eips.ethereum.org/EIPS/eip-2935) at genesis. Before
@@ -25,6 +34,19 @@ contract at `0x0000F90827F1C53a10cb7A02335B175320002935`.
 
 The EIP-2935 write is part of the state transition. Consequently, every non-genesis Rollup0 block
 changes the state root even when it contains no transaction.
+
+Rollup0 does not support ordinary EIP-4844 blob transactions. A node must reject transaction type
+`0x03` from its transaction pool and `eth_sendRawTransaction`. A Rollup0 block that contains a blob
+transaction or a transaction with a non-empty blob-versioned-hash list is invalid.
+
+Rollup0 retains the post-Cancun execution header fields. The genesis values of `blobGasUsed` and
+`excessBlobGas` are zero. Every later block has `blobGasUsed = 0` and derives `excessBlobGas` from
+its parent under the active Ethereum execution fork. It therefore remains zero. `BLOBBASEFEE`
+returns the standard value for that header, and `BLOBHASH` returns zero for every index in every
+valid Rollup0 transaction.
+
+This rule does not affect Rollup0 data availability. The Ethereum settlement transaction publishes
+Rollup0 data in blobs on L1; that transaction is not part of a Rollup0 block.
 
 ## 3.2 EEZ Proxies
 
@@ -43,7 +65,7 @@ Rollup0 does not change the selected contract's ABI, bytecode, storage layout, p
 execution-table lifecycle. The production genesis binds its exact runtime bytecode and constructor
 settings to the predeploy address.
 
-!!! note "TO BE DEFINED: EEZL2 artifact"
+!!! note "GENESIS PARAMETER: EEZL2 artifact"
     Rollup0 will use the latest `eez-core-protocol` `EEZL2` version selected when the production
     genesis is finalized. The final genesis specification must state its bytecode hash, Rollup0
     rollup ID, and system caller. A later `EEZL2` version requires a Rollup0 hardfork.
@@ -88,26 +110,79 @@ SYSTEM_ADDRESS = 0xfffffffffffffffffffffffffffffffffffffffe
 
 The same address is stored as the `EEZL2` system caller and is the protocol transaction's EVM
 sender. It has no protocol private key and needs no prefunded balance. The transaction has no nonce
-field and does not change the system caller's account nonce.
+field and does not change the system caller's account nonce. The composer derives the transaction
+bytes. Validators sign the candidate, not this transaction; no composer, relayer, or separate
+service signs on behalf of `SYSTEM_ADDRESS`.
 
 The protocol transaction uses this EVM environment:
 
 | Field | Rollup0 rule |
 |---|---|
 | `tx.origin` | `SYSTEM_ADDRESS` |
-| initial `msg.sender` | `SYSTEM_ADDRESS` |
+| `EEZL2` frame `msg.sender` | `SYSTEM_ADDRESS` |
 | chain ID | the Rollup0 chain ID |
 | access list | empty |
 | blob versioned hashes | empty |
 | authorization list | empty |
-| gas price | TO BE DISCUSSED with the protocol-transaction fee model |
+| gas price | `0` |
+
+The protocol transaction's sender is not the original caller on Ethereum. The following identities
+have different purposes:
+
+- the envelope's `chainId` is the Rollup0 EVM chain ID;
+- `sourceRollup` in the `EEZL2` calldata is the source network's EEZ rollup ID; the settlement L1
+  uses the reserved value `0`; and
+- the transaction's source identifier binds the settlement chain ID and EEZ deployment. Candidate
+  validation uses these values to separate the L2 transaction identity between settlement domains,
+  even though they do not need separate EVM execution fields.
+
+`sourceRollup` is an EEZ network identifier, not an EVM chain ID. For the initial Ethereum-to-
+Rollup0 path, the settlement chain ID is the Ethereum chain ID. A development deployment uses its
+configured settlement chain ID instead, such as Chiado's. This value is included in the
+source-identifier calculation. It SHOULD NOT also be encoded as a second top-level transaction
+field. Duplicating a fixed value would add a new mismatch case without changing execution. An RPC
+implementation MAY expose it as derived metadata. For a future L2 source, `sourceRollup` is the
+identity used by EEZ; its EVM chain ID does not replace that registry ID.
+
+The inbound call has the following caller path:
+
+```text
+SYSTEM_ADDRESS
+    -> EEZL2.executeIncomingCrossChainCall(..., sourceAddress, sourceRollup, ...)
+    -> proxy(sourceAddress, sourceRollup).executeOnBehalf(destination, data)
+    -> destination
+```
+
+| EVM frame | `msg.sender` | `tx.origin` |
+|---|---|---|
+| `EEZL2.executeIncomingCrossChainCall` | `SYSTEM_ADDRESS` | `SYSTEM_ADDRESS` |
+| `proxy(sourceAddress, sourceRollup).executeOnBehalf` | `EEZL2` | `SYSTEM_ADDRESS` |
+| application destination | `proxy(sourceAddress, sourceRollup)` | `SYSTEM_ADDRESS` |
+
+The protocol transaction is not only a marker for an already-applied state change. It is the EVM
+transaction that makes `EEZL2` load the verified execution data and run the application call. Its
+execution consumes block gas and produces the application state changes, logs, trace, and receipt.
+The EEZ calldata and source proxy provide the cross-chain caller identity during that execution.
+
+The `sourceAddress` is the address whose call reached the cross-chain proxy on the source network.
+It is the source-side `msg.sender`, which can be a user account or a contract. It is not the
+source-side `tx.origin`. The destination observes the deterministic
+`proxy(sourceAddress, sourceRollup)` as `msg.sender`; `tx.origin` remains `SYSTEM_ADDRESS` for the
+complete Rollup0 transaction. Applications that need an end-user identity behind a source contract
+must carry and authenticate that identity in application calldata. Applications MUST authenticate
+the remote caller through the expected proxy and MUST NOT treat `tx.origin` as the remote caller.
+
+The full `sourceAddress` and `sourceRollup` values are already present in the `EEZL2` calldata and
+execution entry, both of which the transaction root commits. The envelope must not duplicate them.
+Candidate validation checks that the calldata, execution entry, Ethereum trigger, and independently
+replayed call all agree.
 
 An empty access list does not restrict state access. It means that no additional account or storage
 slot is prewarmed; the selected Ethereum fork's ordinary warm-access rules still apply. Normal
 Rollup0 transactions can use access lists under the transaction rules of that fork.
 
 `BLOBHASH` returns zero for every index during the protocol transaction because its blob-hash list
-is empty.
+is empty, as it is for every valid Rollup0 transaction.
 Other block-context opcodes, including `CHAINID`, `BASEFEE`, and `BLOBBASEFEE`, use the ordinary
 Rollup0 block environment.
 
@@ -117,9 +192,8 @@ Ethereum trigger order. Each one has its own transaction execution context. Pers
 an earlier transaction remains visible, while transient storage, warmed addresses, gas refunds, and
 other transaction-scoped state reset.
 
-!!! note "TO BE DISCUSSED: protocol-transaction grouping"
-    Rollup0 currently selects option 1. Clients must use this option unless a later specification
-    changes it.
+!!! success "DECISION: one protocol transaction per successful trigger"
+    Rollup0 selects option 1. Clients must use this option unless a later specification changes it.
 
     1. **One protocol transaction per successful Ethereum trigger.** This gives each successful
        action its own execution context and gas budget. It also maps each delivered state transition
@@ -132,21 +206,38 @@ other transaction-scoped state reset.
        structure, but does not map cleanly to Ethereum transactions when EEZ contains nested or
        reentrant calls.
 
-!!! note "TO BE DEFINED: protocol transaction envelope"
-    The transaction representation is selected, but its type byte, byte-exact payload, unique
-    source identifier, transaction hash vectors, and RPC extensions are not yet defined. The
-    receipt uses the same EIP-2718 type as the transaction and contains the standard status,
+!!! success "DECISION: type `0x45` RLP envelope"
+    Envelope version `0` uses transaction type `0x45`, the ASCII byte for `E`, and the exact RLP
+    payload defined in Appendix F. Its transaction hash is the Keccak-256 hash of the complete typed
+    transaction bytes. The matching type-`0x45` receipt contains only the standard status,
     cumulative gas used, log bloom, and logs fields.
 
-    The source identifier must distinguish two otherwise identical actions and prevent replay
-    between domains. It can use only values known before the candidate is encoded and signed. The
-    exact Ethereum chain, EEZ deployment, Rollup0 instance, protocol version, signed trigger
-    transaction hash, and manifest-position fields included in that identifier are still to be
-    selected. It cannot use the trigger's actual Ethereum inclusion block hash or transaction
-    index, because the builder selects those after candidate construction.
+!!! danger "PRODUCTION BLOCKER: transaction conformance"
+    Rollup0 must still publish transaction, receipt, execution, RPC, and invalid-input conformance
+    vectors for the fixed Appendix F schema. The blob format must carry the authenticated
+    non-derived inputs from which every type-`0x45` field and the exact serialized envelope are
+    reconstructed. It must not duplicate the derived envelope bytes.
+
+!!! success "DECISION: protocol transaction source identity"
+    The `sourceHash` calculation in Appendix F is fixed for envelope version `0`. It binds the
+    settlement chain ID, L1 EEZ address, EEZ Rollup0 ID, Rollup0 chain ID, envelope version,
+    intended settlement timestamp, known Ethereum parent hash, action-manifest index, and EEZ
+    cross-chain call hash. It cannot use the actual L1 child block hash, transaction index, or log
+    index because the builder selects those after candidate construction.
+
+    The calculation intentionally omits the outer Ethereum transaction hash and nonce. Rollup0
+    identifies the action by its ordered call, not by the exact transaction carrying it. Every
+    validator and follower must recompute `sourceHash` and reject a mismatch.
+
+    This source identifier does not replace the candidate domain folded into the EEZ
+    `publicInputsHash`. Chapter 8 and Appendix D define that separate settlement-signature domain.
+
+    The current proxy observes the call hash, and the successful EEZ queue assigns a match to its
+    next ordered position. A different outer transaction that produces the next expected call is
+    intentionally the same Rollup0 action. Chapter 7 defines the resulting prefix rule.
 
     [Appendix F](F-system-transaction-design.md) explains why Rollup0 selected a protocol-derived
-    transaction and discusses the `0x7e` compatibility question.
+    transaction, defines its envelope, and compares it with OP's `0x7e` deposit.
 
 Protocol transactions and ordinary transactions use the same block gas pool. Rollup0 does not
 reserve a separate system gas pool. Under the Fusaka rules, every transaction has the EIP-7825
@@ -191,8 +282,8 @@ An out-of-gas in the simulated target application is a failed action. It is hand
 failed lookup on Ethereum and does not produce a Rollup0 protocol transaction. An out-of-gas in a
 protocol transaction that was expected to succeed makes the candidate invalid.
 
-!!! note "TO BE DISCUSSED: shared block gas"
-    Rollup0 currently uses one gas pool for ordinary and protocol-derived transactions. This keeps
+!!! success "DECISION: shared block gas"
+    Rollup0 uses one gas pool for ordinary and protocol-derived transactions. This keeps
     the block's execution bound and `gasUsed` accounting close to Ethereum. Pure-L2 transactions
     can leave less gas for synchronous execution, so composers must check the complete candidate
     before submission.
@@ -201,37 +292,24 @@ protocol transaction that was expected to succeed makes the candidate invalid.
     but would increase the maximum work in one block and require separate accounting. Unlimited
     execution is not an option because Ethereum does not meter the Rollup0 target's EVM execution.
 
-Gas metering does not decide who pays for an inbound protocol transaction. It has no user signature
-that authorizes ordinary fee deduction from an L2 payer. The system caller is also not prefunded
-for an ordinary EIP-1559 upfront gas purchase.
+Gas metering is separate from payment. The inbound protocol transaction has no user signature that
+authorizes a fee deduction, and the system caller is not prefunded for an ordinary EIP-1559 upfront
+gas purchase.
 
-!!! note "TO BE DISCUSSED: protocol-transaction fees"
-    Rollup0 has not selected a production fee mechanism for synchronous execution.
+!!! success "DECISION: no V1 protocol-transaction fee"
+    Type-`0x45` consumes the common block gas pool and contributes its exact intrinsic, calldata-
+    floor, and execution gas to the receipt and block `gasUsed`. It pays no L2 fee. Clients MUST
+    skip the ordinary fee-cap, signed-payer upfront-balance, fee-deduction, and refund checks for
+    this type. They MUST NOT burn a fee, credit the block beneficiary, or deduct from the action's
+    `msg.value`.
 
-    1. **Charge no L2 execution fee.** The call still consumes block gas. This is simple, but
-       composers and infrastructure subsidize synchronous execution and have no protocol-level
-       reimbursement.
-    2. **Charge through the Ethereum trigger or settlement flow.** This can make the party
-       requesting synchronous execution pay, but requires a quote, custody and refund rules, and a
-       defined recipient.
-    3. **Charge a Rollup0 account.** This resembles an ordinary user transaction, but the protocol
-       transaction has no user signature identifying an authorized payer. Rollup0 would need a
-       separate authorization and funding mechanism.
-    4. **Charge the composer or relayer.** This can reimburse the network directly, but requires a
-       funded protocol account or settlement bond and may discourage open candidate production.
+    The EVM transaction gas price is zero, so `GASPRICE` returns `0`. JSON-RPC reports
+    `gasPrice = 0` for the transaction and `effectiveGasPrice = 0` for its receipt. Gas consumption
+    still affects the block's `gasUsed` and therefore the next block's EIP-1559 base fee.
 
-    The final rule must define the payer, asset, price calculation, recipient, refund behavior, and
-    the values returned by the EVM `GASPRICE` opcode and receipt `effectiveGasPrice`. It must not
-    silently deduct the application call's `msg.value`.
-
-    A failed inbound action has no Rollup0 protocol transaction, consumes no Rollup0 block gas, and
-    cannot debit or credit an L2 fee. Any charge for simulating and proving that failure must occur
-    through the Ethereum settlement flow.
-
-    This is also a transaction-validity rule. Rollup0 must either bypass the ordinary fee-cap,
-    upfront-balance, fee-deduction, and refund checks for this derived transaction type, or define
-    the exact fee fields and funded account that satisfy them. Clients cannot infer this from the
-    block's base fee.
+    A failed inbound action creates no protocol transaction and has no Rollup0 fee. Rollup0 also
+    defines no reimbursement for its simulation or validation. Adding a payer, fee fields, or a
+    protocol-level debit requires a later envelope version and a Rollup0 hardfork.
 
 The Sync block begins with an ordered pure-L2 transaction prefix. These transactions are fixed for
 the candidate and execute regardless of which later Ethereum trigger transactions succeed. The
@@ -242,23 +320,22 @@ When the target application succeeds, the `EEZL2` call returns normally after it
 execution entry. The protocol transaction has receipt status `1`.
 
 When the simulated Rollup0 application returns `success = false`, the L1 EEZ batch contains one
-failed lookup with the exact action hash, pre-state root, and revert data. The proof or validator
-signatures bind that lookup and the trigger manifest. No Rollup0 protocol transaction is created,
-no `EEZL2` table is loaded, and no L2 gas, nonce, receipt, log, value credit, or state change is
-recorded. This includes `REVERT` and exceptional EVM failures such as an out-of-gas in the target
-call.
+failed lookup with the exact action hash, pre-action block-hash commitment, and revert data. The
+proof or validator signatures bind that lookup and the action manifest. No Rollup0 protocol
+transaction is created, no `EEZL2` table is loaded, and no L2 gas, nonce, receipt, log, value credit,
+or state change is recorded. This includes `REVERT` and exceptional EVM failures such as an
+out-of-gas in the target call.
 
 The failed lookup makes the Ethereum proxy call revert with the verified application data. If the
 outer Ethereum transaction catches that revert and succeeds, the action is processed. That
 transaction must be the final trigger in the candidate. If the outer transaction reverts, that
-bundle prefix is ineligible.
+transaction leaves no retained EEZ effect and does not advance the selected successful prefix.
 
 An authorization error, malformed entry, hash mismatch, unexpected application result, or
 out-of-gas in a protocol transaction that was expected to succeed makes the candidate invalid.
 
-!!! note "TO BE DISCUSSED: protocol failures"
-    Rollup0 currently selects option 1. Clients must use this option unless a later specification
-    changes it.
+!!! success "DECISION: protocol failures invalidate the candidate"
+    Rollup0 selects option 1. Clients must use this option unless a later specification changes it.
 
     1. **Invalidate the candidate block.** Authorization failures, malformed inputs, verification
        mismatches, unexpected application outcomes, unconsumed execution data, and outer
@@ -279,9 +356,8 @@ protocol failure and invalidates the candidate. Failed actions do not call `EEZL
 The Rollup0 genesis sets the `EEZL2` balance to zero. Unsolicited ETH received later is not part of
 the protocol's value supply and cannot fund an EEZ action.
 
-!!! note "TO BE DISCUSSED: EEZL2 balance"
-    Rollup0 currently selects option 1. Clients must use this option unless a later specification
-    changes it.
+!!! success "DECISION: per-transaction EEZL2 balance neutrality"
+    Rollup0 selects option 1. Clients must use this option unless a later specification changes it.
 
     1. **Require balance neutrality for every protocol transaction.** The pre-call and post-call
        `EEZL2` balances must match. This prevents one action from leaving value for another while
@@ -305,9 +381,8 @@ caller, or create a protocol transaction. The failed proxy call on Ethereum roll
 transfer. Rollup0 balances and native supply remain unchanged. A composer cannot choose `v`: it is
 bound to the failed lookup and checked by the proof or validator policy.
 
-!!! note "TO BE DISCUSSED: protocol-transaction value source"
-    Rollup0 currently selects option 1. Clients must use this option unless a later specification
-    changes it.
+!!! success "DECISION: temporary protocol credit"
+    Rollup0 selects option 1. Clients must use this option unless a later specification changes it.
 
     1. **Credit the system caller immediately before a successful call.** This preserves ordinary
        EVM `CALL` and `msg.value` behavior without a funded private key. Failed actions never reach

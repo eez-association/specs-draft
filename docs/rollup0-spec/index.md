@@ -8,14 +8,20 @@ from putting significant value on it.
 | Status | Draft |
 | Settlement network | Ethereum |
 | L2 block interval | 2 seconds |
+| EVM hardforks | Fusaka at genesis; later Ethereum execution forks at mainnet timestamps |
+| L2 blob transactions | Not supported; blobs are used only for L1 data availability |
 | Ethereum alignment | Six L2 block positions per Ethereum slot, including missed slots |
-| Anchoring | For a synchronous transaction, or after a maximum interval that is **to be defined** |
-| Block production and composition | Open; no composer allowlist |
-| Block syncing, P2P, and RPC | Open; no sequencer allowlist |
+| Anchoring | For a synchronous transaction, or after a 15-minute operational target |
+| Block production and candidate composition | Open; no composer or sequencer allowlist |
+| Unsafe block attribution | Producer-signed; no Rollup0 signer allowlist |
+| Block syncing, relay, and RPC | Open; peers may relay producer-signed blocks |
 | Candidate validation | Permissioned validators provide a best-effort validation service |
+| Validator threshold | Dynamic set; `floor(2M / 3) + 1` active members |
 | Candidate selection | The first applicable candidate in canonical Ethereum order wins |
 | Inbound execution | Unsigned protocol-derived EIP-2718 transactions |
-| Data availability | Ethereum blobs; the exact format is **to be defined** |
+| EEZ state commitment | Terminal Rollup0 block hash |
+| Data availability | Ethereum blobs; normative raw, uncompressed, columnar V0 payload |
+| Late synchronization | Standard Rollup0 `eth` block sync and `snap` state sync |
 
 Composers build the continuous L2 chain. Sequencers sync and distribute those blocks. Blocks do not
 have to be posted every Ethereum slot. An anchor contains the complete contiguous range from the
@@ -26,7 +32,8 @@ This specification uses the [EEZ specification](../eez-protocol-spec/index.md) f
 contracts, cross-chain execution, proofs, settlement, proxies, and wire formats. This document
 defines the choices made by Rollup0.
 
-Unfinished parts are marked **To be defined** and collected in
+Decisions, production blockers, open interoperability work, genesis parameters, and trust
+assumptions use distinct labels. Unresolved items are collected in
 [Chapter 12](12-open-issues.md).
 
 ## Reading Order
@@ -52,3 +59,4 @@ Appendices:
 - [Appendix D: Rollup0 Wire Format](D-wire-formats.md)
 - [Appendix E: Current Implementation Differences](E-implementation-divergences.md)
 - [Appendix F: Inbound Transaction Design](F-system-transaction-design.md)
+- [Appendix G: Blob Payload Design](G-blob-payload-design.md)

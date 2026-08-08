@@ -50,20 +50,21 @@ The child block hash cannot be known before submission. A terminal Rollup0 times
 the intended Ethereum timestamp is invalid.
 
 Every Rollup0 batch MUST set its EEZ `blockNumber` field to `2^64 - 1`, the latest-context
-sentinel. For that value, the Rollup0 manager contributes
-`abi.encode(block.timestamp, blockhash(block.number - 1))` to the authenticated proof input.
-`block.timestamp` is the containing Ethereum block's timestamp. `blockhash(block.number - 1)` is
-its known parent hash. Zero or an explicit historical block number does not provide this complete
-context and is invalid for Rollup0 settlement.
+sentinel. For that value, the production Rollup0 manager contributes the complete candidate-domain
+value defined in Appendix D to the authenticated proof input. This value includes
+`block.timestamp`, the containing Ethereum block's timestamp, and
+`blockhash(block.number - 1)`, its known parent hash. The manager rejects zero or an explicit
+historical block number for Rollup0 settlement.
 
 If the target Ethereum slot is missed, or if the named Ethereum parent changes, the candidate and
 its signatures expire. For a live candidate, the composer can retain its pure-L2 `B[0]` as an
-unsafe block, but it discards the unaccepted synchronous variants. If the settled Rollup0 parent
-is still current, the composer can propose that exact pure-L2 range as a catch-up candidate for a
-later Ethereum slot. It cannot reuse the synchronous variants or triggers. For an expired
-catch-up candidate, the same historical range can also be proposed again. In both cases, the
-candidate needs a new settlement context and new signatures. Any encoded bytes that commit the
-expired context must be rebuilt. Only a canonical anchor makes the retained range safe.
+unsafe block after a producer signs its block hash under Appendix D; it discards the unaccepted
+synchronous variants. If the settled Rollup0 parent is still current, the composer can propose that
+exact pure-L2 range as a catch-up candidate for a later Ethereum slot. It cannot reuse the
+synchronous variants or triggers. For an expired catch-up candidate, the same historical range can
+also be proposed again. In both cases, the candidate needs a new settlement context and new
+validator signatures. Any encoded bytes that commit the expired context must be rebuilt. Only a
+canonical anchor makes the retained range safe.
 
 Chiado is a development settlement network only. Its nominal 5-second interval contains five
 1-second Rollup0 positions: four Live positions followed by one Sync position. Chiado values are
@@ -96,19 +97,35 @@ The fixed header choices are:
 | `extraData` | zero to 32 bytes selected by the composer |
 | `difficulty` | zero |
 | `nonce` | eight zero bytes |
-| `beneficiary` | TO BE DEFINED and carried in the authenticated blob payload |
+| `beneficiary` | composer-selected address carried in the authenticated blob payload |
 | `prevRandao` | anchor-scoped derivation defined below |
 | `baseFeePerGas` | EIP-1559 value derived from the parent with elasticity `2` and denominator `50` |
 | `withdrawals` | present and empty when required by the selected EVM fork |
 | `parentBeaconBlockRoot` | 32 zero bytes |
 | `requestsHash` | SHA-256 of the empty byte string |
-| transaction, receipt, state, and blob fields | exact execution-derived or parent-derived values required by the selected EVM fork |
+| `blobGasUsed` | zero |
+| `excessBlobGas` | standard parent-derived value with zero blob use; zero from genesis |
+| transaction, receipt, and state fields | exact execution-derived values required by the selected EVM fork |
 
-!!! note "TO BE DEFINED: block beneficiary"
-    The blob format must carry the exact `beneficiary` whenever it is not fixed by the protocol.
-    Rollup0 still needs to choose between a composer-selected address, one deployment-wide fee
-    recipient, and the zero address. The choice affects the `COINBASE` opcode, the block hash, and
-    any priority-fee routing.
+The Rollup0 genesis block uses `baseFeePerGas = 1,000,000,000` wei. Every later block derives its
+base fee from its parent with the `2/50` rule above.
+
+!!! success "DECISION: composer-selected block beneficiary"
+    The composer selects one 20-byte `beneficiary` for each block, including the zero address if it
+    chooses. The authenticated blob data must carry the exact address for every anchored block so
+    all clients reconstruct the same header.
+
+    This is a per-block value, not one value for the complete anchor batch. A catch-up batch can
+    contain historical blocks from different composers. The Rollup0 blob payload uses the canonical
+    run-length encoding defined in Appendix D, and decoding produces one exact `beneficiary` for
+    every block.
+
+    All terminal Sync-block variants for one block position use the same `beneficiary`; only their
+    transaction-derived header values differ.
+
+    `COINBASE` returns this address. Ordinary signed transactions use Ethereum's fee routing: the
+    base fee is burned and the priority fee is credited to `beneficiary`. Type-`0x45` protocol
+    transactions consume gas but pay no fee and do not credit `beneficiary`.
 
 Rollup0 has no beacon chain. It retains the post-Cancun header field without changing the header
 encoding, but fixes `parentBeaconBlockRoot` to 32 zero bytes in every block. Protocol transactions
@@ -127,11 +144,16 @@ requestsHash = sha256("") =
 0xe3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 ```
 
+Rollup0 does not extract EIP-6110 deposit requests and does not execute the EIP-7002 withdrawal or
+EIP-7251 consolidation request system calls. These operations exist to pass requests to an
+Ethereum consensus layer, which Rollup0 does not have. The corresponding request contracts are not
+Rollup0 protocol predeploys.
+
 The EIP-2935 parent-block-hash update defined in Chapter 3 is independent of a beacon chain and
 executes before the block's transactions.
 
-The composer-selected `extraData` is part of the block hash and must be available in the published
-block data so followers reconstruct the same header.
+The composer-selected `beneficiary` and `extraData` are part of the block hash and must be available
+in the published block data so followers reconstruct the same header.
 
 ### Live-Anchor-Scoped `prevRandao`
 
@@ -141,36 +163,29 @@ reorganization that leaves the latest Rollup0 live anchor in the canonical chain
 block rebuilding solely because of a RANDAO seed change. Normal anchor selection can still change
 safe Rollup0 history.
 
-For block `b`, define:
+For every Rollup0 block `b` before the next seed refresh:
 
 ```text
-DOMAIN = keccak256(UTF8("ROLLUP0_PREVRANDAO_V1"))
-
-prevRandao(b) = keccak256(
-    DOMAIN
-    || uint256_be(rollup0ChainId)
-    || currentSeed
-    || uint256_be(b.number)
-)
+prevRandao(b) = currentSeed
 ```
 
-`uint256_be(x)` is the 32-byte, unsigned, big-endian encoding of `x`. `currentSeed` is 32 bytes.
-The initial `currentSeed` is selected in the production genesis.
+`currentSeed` is 32 bytes. Its initial value is the `prevRandao` in the header of the finalized
+Ethereum reference block selected by the Rollup0 genesis configuration.
 
-When a live anchor becomes canonical on Ethereum, its next seed is the current-epoch RANDAO mix in
-the Ethereum beacon state after processing the beacon block that contains the accepted anchor. The
-next seed becomes `currentSeed` for the first Rollup0 block after the anchored endpoint. The
-anchored terminal block itself uses the previous seed because the next seed is not available until
-its Ethereum block is published.
+When a live anchor becomes canonical on Ethereum, its next seed is the `prevRandao` field in the
+authenticated header of the Ethereum execution block that contains the accepted anchor. That value
+becomes `currentSeed` for the first Rollup0 block after the anchored endpoint. The anchored terminal
+block itself uses the previous Rollup0 seed; the refresh applies only after Ethereum selects the
+anchor. The containing Ethereum block's `prevRandao` may be known before inclusion, so this rule
+does not claim fresh or unpredictable entropy from the anchor block's later beacon-chain reveal.
 
 A catch-up anchor retains `currentSeed` for the first block after its endpoint. Existing unsafe
 descendants can therefore remain valid while several historical ranges become safe. When a later
 live anchor catches up to the current Ethereum timestamp, that live anchor refreshes the seed for
 its descendants.
 
-Every Live and Sync block uses the same formula. Blocks between two anchors have different
-`prevRandao` values because their block numbers differ, but they share one source of entropy.
-Rollup0 does not repeatedly hash the preceding Rollup0 block's `prevRandao`.
+Every Live and Sync block copies the same value until the seed refreshes. Rollup0 does not hash the
+seed with the block number and does not repeatedly hash the preceding block's `prevRandao`.
 
 If an Ethereum reorganization removes the latest live anchor, Rollup0 restores the seed from the
 last surviving live anchor and rebuilds the affected descendants. Removing a catch-up anchor
@@ -178,50 +193,36 @@ retreats the settled cursor but does not change the seed. Neither case adds a ne
 condition: removing an anchor already requires Rollup0 to retreat to the preceding settled cursor.
 
 Applications MUST NOT use `prevRandao` as secure same-block randomness. Once `currentSeed` is
-known, every derived value until the next live anchor is predictable. The hash gives each block a
-separate value but does not add entropy. Secure application randomness requires a delayed
-commitment to a future live-anchor seed.
+known, every block exposes that same value until the next live anchor. Secure application randomness
+requires a delayed commitment to a future live-anchor seed.
 
-!!! note "TO BE DISCUSSED: per-block `prevRandao` mapping"
-    The seed-refresh rule and the mapping from one seed to L2 header values are independent
-    decisions. Holding the refresh rule fixed, Rollup0 can use either of the following mappings:
+!!! success "DECISION: direct-copy `prevRandao` mapping"
+    Rollup0 copies `currentSeed` directly into every block until the next successful canonical live
+    anchor refreshes it. Exact repetition makes the absence of fresh entropy visible and does not
+    offer a menu of different derived values within one seed interval.
 
-    - **Per-block derivation (current draft).** The formula above gives every block a distinct,
-      chain- and height-separated value. This avoids exact repeats for applications that use
-      `prevRandao` as a per-block salt. It is a Rollup0-specific consensus rule, however, and a
-      changing value can be mistaken for fresh randomness. Once `currentSeed` is public, a
-      composer, user, or contract can calculate every value until the next refresh. A composer can
-      therefore delay a transaction to a favorable known block when an application incorrectly
-      makes its result depend on the derived value.
+    Hashing the seed with the chain ID and block number would give each block a distinct value but no
+    additional entropy. Rollup0 does not use that mapping. Applications that need a unique per-block
+    salt can combine `prevRandao` with `block.number`, `block.chainid`, and application-specific
+    context. That still does not turn a known seed into secure randomness.
 
-    - **Direct copy (OP Stack style).** Set `prevRandao(b) = currentSeed` for every block until the
-      seed refreshes. The OP Stack similarly copies the L1 origin's `prev_randao` into each L2
-      block, so the value repeats for all L2 blocks with that origin and changes when the origin
-      advances. This rule is simpler, matches a deployed L2 convention, makes the lack of fresh
-      entropy visible, and offers no menu of different `prevRandao` values within one seed
-      interval. Its cost is exact repetition: an application that uses only `prevRandao` receives
-      the same result in consecutive blocks, and multiple chains can expose the same raw L1 value.
-      Applications that need a unique per-block salt can include `block.number`, `block.chainid`,
-      and application-specific context themselves.
+!!! warning "Review before production: RANDAO refresh cadence"
+    Live-anchor-only refreshes are the selected Rollup0 rule and are not a production blocker. They
+    avoid rebuilding L2 history for Ethereum reorganizations that do not remove a Rollup0 anchor,
+    but the seed can remain known and unchanged for the complete period between live anchors,
+    including a long catch-up period.
 
-    Neither mapping adds entropy, repairs bias in the L1 seed, changes when the seed becomes
-    predictable, or changes which Ethereum reorganizations require rebuilding Rollup0 history.
-    Those properties are controlled by the seed source and refresh cadence. The choice is therefore
-    between explicit repetition and deterministic diversification, not between weak and strong
-    randomness.
+    The team may revisit more frequent Ethereum-derived refreshes or a separate delayed-randomness
+    mechanism before genesis. If it does not, the live-anchor-only rule remains in force. Changing
+    the rule after genesis requires a Rollup0 hardfork.
 
-!!! note "TO BE DISCUSSED: RANDAO refresh cadence"
-    The anchor-scoped design may be suboptimal. It avoids making every Ethereum reorganization an
-    L2 reorganization, but the seed can remain known and unchanged for the complete period between
-    live anchors, including a long catch-up period.
+!!! success "DECISION: copy the genesis reference block's RANDAO"
+    Rollup0 copies the `prevRandao` of its designated finalized Ethereum reference block directly
+    into the genesis `currentSeed`. This avoids an arbitrary constant and uses the same direct-copy
+    rule as later live-anchor refreshes.
 
-    Before production, the team should compare this rule with more frequent Ethereum-derived
-    refreshes and a separate delayed-randomness mechanism. The comparison must cover freshness,
-    manipulation and censorship, Ethereum reorganization behavior, consensus-layer data
-    requirements, and the maximum time between anchors.
-
-!!! note "TO BE DEFINED: genesis RANDAO seed"
-    The production genesis must select the initial 32-byte `currentSeed`.
+    The reference block number and hash are genesis parameters. The final Rollup0 genesis block
+    cannot be calculated until that Ethereum block is finalized.
 
 ## 4.3 Sync Blocks and Candidate Ranges
 
@@ -235,7 +236,7 @@ An anchor range:
 - publishes enough boundary data to reconstruct every block in the range.
 
 The range begins at the last Ethereum-confirmed Rollup0 head. Its first block is
-`fromBlock.number + 1`. Its terminal position contains the variants `B[0]` through `B[n]` described
+`fromBlock.number + 1`. Its terminal position contains the variants `B[0]` through `B[s]` described
 in Chapter 7.
 
 For a live anchor, the terminal timestamp equals the target Ethereum timestamp and `n` can be zero
@@ -243,15 +244,15 @@ or greater. For a catch-up anchor, the terminal timestamp is earlier than the ta
 timestamp, `n = 0`, and the complete range contains no inbound protocol transaction or failed
 lookup. Consecutive catch-up anchors can advance through old ranges over several Ethereum blocks.
 
-!!! note "TO BE DEFINED"
-    One proof or signature set covers all synchronous prefixes. The published data must be enough
-    to reconstruct every terminal variant, but the blob format still needs to choose between
-    carrying an explicit ordered vector of terminal block hashes and deriving that vector entirely
-    from the authenticated block inputs. Any carried hash is checked against replay.
+!!! success "DECISION: terminal block hashes are EEZ commitments"
+    One proof or signature set covers all synchronous prefixes. Rollup0 derives every terminal
+    block hash from the authenticated block inputs. `H[0]` and each successful `H[k]` appear in the
+    Rollup0 state deltas of the EEZ batch, so the blob does not carry a second hash vector.
 
-    The candidate must also commit the action count and ordered trigger manifest. A block hash
-    alone cannot distinguish two prefix lengths when a failed action adds no Rollup0 transaction
-    and leaves the terminal block unchanged.
+    The candidate also commits the action count and ordered action manifest. A failed terminal
+    action adds no Rollup0 transaction or block variant, so the block hash alone cannot distinguish
+    a caught terminal failure from an omitted proposed trigger. Rollup0 derivation need not
+    distinguish them; the endpoint depends only on the successful-action count `k`.
 
 ## 4.4 Unsafe Blocks
 

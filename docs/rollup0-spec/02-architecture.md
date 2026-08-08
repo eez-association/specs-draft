@@ -13,9 +13,10 @@ Composition is open. Composer identity is not a validity input and gives no sett
 
 ### Sequencer
 
-A sequencer syncs and distributes Rollup0 blocks over peer-to-peer protocols and can provide RPC
-services. It can build pure-L2 blocks and delegate Sync-block composition to a composer. A sequencer
-can also perform the composer role itself.
+A sequencer builds and signs unsafe Rollup0 blocks and may distribute them over peer-to-peer
+protocols and provide RPC services. It can delegate Sync-block composition to a composer and can
+also perform the composer role itself. Other peers may relay a signed unsafe block unchanged and
+may serve canonically settled blocks and state.
 
 When pure-L2 transaction simulation reaches a cross-network proxy, an initial Rollup0 sequencer
 should reject the transaction instead of adding it to a pure-L2 block. Rejection does not consume
@@ -23,7 +24,11 @@ the sender's nonce or charge an on-chain fee. Sequencers may rate limit or ban c
 simulation resources. Forwarding these transactions to a composer for outbound synchronous
 execution belongs to Rollup0.x.
 
-Sequencing is open. Rollup0 has no sequencer allowlist.
+Sequencing is open. Rollup0 has no sequencer signer allowlist. A follower MUST require the Appendix
+D producer signature before adopting an announced block into its unsafe view, but any key may
+produce that signature. The signature authenticates producer identity so peers can apply local
+filtering and fork-choice policy; it does not grant protocol authority. A valid block selected by
+canonical Ethereum settlement becomes safe regardless of who produced or previously announced it.
 
 ### Validator/Prover
 
@@ -44,20 +49,29 @@ Initial Rollup0 also trusts every validator/prover that receives a signed Ethere
 it private and not submit it outside an approved candidate bundle. Chapter 6 describes this
 confidentiality assumption.
 
-!!! note "TO BE DEFINED"
-    The production validator/prover membership, threshold, keys, and key-rotation rules are not yet
-    selected. Chapter 8 defines the ECDSA attestation mechanism.
+!!! success "DECISION: dynamic strict-two-thirds validator set"
+    Let `M` be the number of active validator/prover proof systems when a settlement transaction
+    executes. The required threshold is `N = floor(2M / 3) + 1`. Membership is not fixed at
+    genesis. The EEZ team Safe can add, remove, or rotate members.
+
+    A change to `M` and the corresponding change to `N` must execute atomically in one Ethereum
+    transaction. Membership changes take effect in canonical Ethereum transaction order. Chapter 8
+    defines the exact policy and its trust assumption.
 
 ### Relayer
 
-Any account or contract MAY relay a completed candidate. A relayer cannot change the candidate
-bytes covered by its proof or signatures. A relayer that receives private signed trigger
-transactions is trusted not to disclose or submit them outside an approved candidate bundle.
+Any account or contract MAY relay a completed candidate through the active Rollup0 settlement
+wrapper. The wrapper does not grant composer privileges. A relayer cannot change the candidate
+bytes covered by its proof or signatures or the V1 transient-prefix values enforced by the wrapper.
+A relayer that receives private signed trigger transactions is trusted not to disclose or submit
+them outside an approved candidate bundle.
 
 ### Follower
 
-A follower reconstructs Rollup0 from canonical Ethereum data. It maintains unsafe, safe, and
-finalized Rollup0 views as described in [Chapter 10](10-derivation-following.md).
+A follower obtains the settled Rollup0 block hash from canonical Ethereum data. It can derive
+recent anchors from their blobs or use normal Rollup0 execution-layer block and state
+synchronization from that exact checkpoint. It maintains unsafe, safe, and finalized Rollup0 views
+as described in [Chapter 10](10-derivation-following.md).
 
 ## 2.2 Contracts and Interfaces
 
