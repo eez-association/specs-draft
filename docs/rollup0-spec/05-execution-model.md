@@ -8,7 +8,8 @@ See [EEZ Execution Model](../eez-protocol-spec/03-execution-model.md).
 
 Rollup0 selects this subset:
 
-- exactly one top-level state-changing Ethereum-to-Rollup0 action in each trigger transaction;
+- exactly one top-level state-changing Ethereum-to-Rollup0 action in each proposed trigger
+  transaction;
 - one return value;
 - no cross-network lookup, including `STATICCALL`;
 - no direct execution-network-to-execution-network action;
@@ -16,14 +17,23 @@ Rollup0 selects this subset:
 - no nested cross-network action; and
 - no synchronous action originating on Rollup0.
 
-The one-action rule covers the complete Ethereum execution trace. The action may be reached through
-a Safe, router, or any other ordinary Ethereum call chain; it does not need to occur at EVM call
-depth zero. In this chapter, *top-level* means that the action has no parent EEZ action. A second
-Ethereum-to-Rollup0 action anywhere in the same trigger transaction makes the candidate invalid,
-including when the caller catches its revert.
+For a proposed trigger, the one-action rule covers the complete Ethereum execution trace. The
+action may be reached through a Safe, router, or any other ordinary Ethereum call chain; it does not
+need to occur at EVM call depth zero. In this chapter, *top-level* means that the action has no
+parent EEZ action. A second Ethereum-to-Rollup0 action anywhere in a proposed trigger makes that
+delivery proposal invalid, including when the caller catches its revert.
+
+An equivalent carrier transaction is not pre-authenticated by the candidate. The production L1 EEZ
+path therefore enforces the state-relevant rule directly: one outer transaction can successfully
+consume at most one ordered Rollup0 action. Additional mismatched or failed calls that create no
+Rollup0 transition are L1-only behavior and do not affect Rollup0 derivation.
+
+A trigger MUST NOT be an EIP-4844 blob transaction or otherwise require a blob sidecar. This
+restriction applies to the proposed delivery transaction and any equivalent transaction that
+performs an ordered action. The separate `submitCandidate` settlement transaction is blob-carrying.
 
 Ordinary nested calls that remain on one network are allowed. An Ethereum transaction with no
-Rollup0 action is not a trigger transaction and is not part of the candidate's trigger manifest.
+Rollup0 action is not a trigger transaction and is not part of the candidate's action manifest.
 
 These restrictions keep the initial Rollup0 execution profile small. They are not restrictions on
 EEZ. A later Rollup0.x version is expected to enable nested composability in both directions,
@@ -41,105 +51,157 @@ nonce in the same way as any other included Ethereum-style transaction, and the 
 does not by itself make the block invalid. A candidate is invalid only if it claims that such an
 outbound action was successfully resolved as part of the initial Rollup0 protocol.
 
-## 5.2 Rollup0 State Transition
+## 5.2 Rollup0 Block-Hash Commitment and Transition
 
-Let `A` be the Rollup0 state root currently stored by EEZ. Let `R0` be the state root after
-executing the complete anchored block range through the terminal block's pure-L2 transaction
-prefix, but before executing any synchronous action.
+For terminal variant `B[k]`, where `k` is the number of successful synchronous actions, define:
+
+```text
+H[k] = the Rollup0 block hash of B[k]
+R[k] = the EVM state root in the header of B[k]
+```
+
+`R0` is another name for `R[0]`, the state root after the complete anchored block range and the
+terminal block's pure-L2 transaction prefix, but before any synchronous action.
+
+Rollup0 uses `H[k]`, not `R[k]`, as its 32-byte EEZ state commitment. The block hash commits the
+parent, block number, state root, transaction root, receipt root, and the other header fields. A
+follower can fetch the exact header by this hash and use its `stateRoot` to verify full or snap
+state synchronization.
+
+This choice also distinguishes two valid terminal variants when their execution produces the same
+EVM state root. EIP-2935 does not remove that need. The state of `B[k]` contains its parent block
+hash because the EIP-2935 system call runs before the block's transactions. It cannot contain
+`H[k]` without creating a circular dependency, and every sibling variant writes the same parent
+hash. EIP-2935 therefore helps verify the parent chain, while `H[k]` remains the exact terminal
+checkpoint.
+
+The EEZ contracts treat this value as opaque bytes, so this choice does not change their encoding
+or execution. In every EEZ object for Rollup0, fields named `stateRoot`, `currentState`,
+`newState`, or `ExpectedStateRootPerRollup.stateRoot` contain a Rollup0 block hash.
+
+!!! note "LEGACY TERMINOLOGY: EEZ calls the commitment `stateRoot`"
+    The EEZ Solidity identifiers describe this opaque commitment as a state root. That name is
+    misleading for Rollup0 and does not clearly describe networks that use a block hash or another
+    state commitment.
+
+    A later EEZ revision SHOULD rename these identifiers to `stateCommitment`,
+    `currentCommitment`, and `newCommitment`, including related lookup pins, events, errors, and the
+    manager escape function. This rename is not a Rollup0 production prerequisite: the fields are
+    opaque `bytes32` values and the current encoding is unambiguous. Rollup0 clients MUST treat
+    their state-named values as block hashes. Comparing one with an EVM header's `stateRoot` is
+    incorrect.
+
+`Hparent` is the parent Rollup0 block hash: the hash of the latest Rollup0 block accepted through
+canonical Ethereum and currently stored by EEZ. It is not an Ethereum block hash. Every candidate
+must extend this exact Rollup0 block.
 
 Every Rollup0 anchor starts its EEZ batch with one immediate execution entry. This entry has:
 
 - `proxyEntryHash = 0`;
 - `destinationRollupId` equal to the Rollup0 EEZ rollup ID;
-- one Rollup0 state delta from `A` to `R0`;
+- one Rollup0 state delta from `Hparent` to `H[0]`;
 - `etherDelta = 0`; and
 - no calls, lookups, return data, or rolling-hash effects.
 
 The entry is part of the transient prefix, so EEZ applies it during `postAndVerifyBatch`. It is
 also present for a pure-L2 anchor that has no synchronous action. The blob contains the complete
-Rollup0 block range; the state delta records only its combined effect on the state root. EEZ does
-not decode the Rollup0 blocks.
+Rollup0 block range; the state delta records its exact terminal block commitment. EEZ does not
+decode the Rollup0 blocks.
 
-For Rollup0, a catch-up anchor has only this leading state transition. It has `n = 0`, no
-synchronous execution entry, no failed lookup, and an empty Ethereum trigger manifest. Its `R0`
-is the state root of its historical terminal Sync block.
+For Rollup0, a catch-up anchor has only this leading commitment transition. It has `n = 0`, no
+synchronous execution entry, no failed lookup, and an empty action manifest. `H[0]` is
+the hash of its historical terminal Sync block and `R0` is that block's EVM state root.
 
 The proof or validator signatures bind the bytes of the leading entry and the selected blob
-hashes. Validators reconstruct the published blocks from `A`, verify that they form the claimed
-chain, and accept the entry only when replay produces `R0`. The fixed EEZ proof digest does not,
-however, bind the dispatch count that makes this entry immediate.
+hashes. Validators reconstruct the published blocks after `Hparent`, verify that they form the
+claimed chain, and accept the entry only when replay produces both `R0` and `H[0]`. The fixed EEZ
+proof digest does not, however, bind the transient-prefix length that makes this entry immediate.
 
-Every anchor contains at least one post-genesis block. Because EIP-2935 is active from genesis and
-stores a new parent block hash in every block, `R0` differs from `A` even when the range contains
-no user transaction.
+Every anchor contains at least one post-genesis block, so `H[0]` differs from `Hparent`. Because
+EIP-2935 is active from genesis and stores a new parent block hash in every block, `R0` also differs
+from the parent block's state root even when the range contains no user transaction.
 
-!!! warning "FIXED EEZ LIMITATION: dispatch counts are not signed"
+!!! warning "FIXED EEZ LIMITATION: transient-prefix lengths are not signed"
     A Rollup0 batch requires `transientExecutionEntryCount = 1` and
-    `transientLookupCallCount = 0`. The first value makes the leading `A -> R0` entry immediate.
-    The second keeps synchronous failed lookups available to their later Ethereum triggers.
+    `transientLookupCallCount = 0`. These fields are array split points, not counts of synchronous
+    actions or Rollup0 protocol transactions.
+
+    The first value makes only the leading `Hparent -> H[0]` anchor entry immediate. Successful
+    synchronous entries remain deferred for their corresponding Ethereum trigger transactions.
+    The second value keeps every synchronous failed lookup deferred for its later Ethereum trigger.
+    A separate candidate rule requires exactly one Rollup0 protocol transaction for each successful
+    trigger.
 
     The fixed EEZ public-input hash excludes both fields. A relayer or builder can therefore
     change them without invalidating the proof or validator signatures. This can defer the anchor
     entry, change which later entries are published, or change lookup availability.
 
-    Followers can detect the changed calldata and resulting state transition, but detection does
-    not prevent EEZ state from changing on Ethereum. This is a production blocker. Rollup0 must
-    define a settlement restriction that enforces the two values and prevents the same proof from
-    bypassing that restriction through a direct EEZ call, or it must state an explicit trusted
-    submission assumption. The EL cannot fix this behavior.
+    Followers can detect changed calldata and resulting state transitions, but detection alone
+    does not prevent EEZ state from changing on Ethereum. Initial Rollup0 therefore enforces the
+    two values through the manager-gated settlement wrapper defined in Appendix D. The manager
+    rejects a direct EEZ submission that bypasses that wrapper.
 
-!!! note "TO BE DISCUSSED: applying the anchor root"
-    Rollup0 currently selects the leading `A -> R0` entry described above. The exact
-    contract-level failure rule is still to be selected.
+!!! success "DECISION: derive anchor acceptance from the applied commitment"
+    Rollup0 accepts an anchor only when canonical Ethereum execution applies the leading
+    `Hparent -> H[0]` commitment transition. Followers must verify the actual transition and its
+    correctly ordered `L2ExecutionPerformed` event. They must then derive any later synchronous
+    transitions in the bundle in order.
 
-    The current EEZ contract catches a failed immediate entry and continues
-    `postAndVerifyBatch`. The transaction can therefore succeed and emit `BatchPosted` even when
-    the `A -> R0` transition was not applied. `BatchPosted` alone never proves that a Rollup0
-    anchor was accepted.
+    `BatchPosted` identifies a publication attempt. It does not prove that Rollup0 accepted the
+    anchor. If EEZ catches or skips the leading entry, no Rollup0 anchor is accepted even when
+    `postAndVerifyBatch` succeeds.
 
-    The available enforcement choices are:
+!!! success "DECISION: make anchor application atomic through the settlement wrapper"
+    The current immutable EEZ contract catches a failed immediate entry and continues
+    `postAndVerifyBatch`. The settlement transaction can therefore succeed and emit `BatchPosted`
+    without applying `Hparent -> H[0]`.
 
-    1. **Check the applied result during derivation.** Keep the current contracts and treat the
-       candidate as settled only when the exact settlement transaction actually changes the
-       stored Rollup0 root from `A` to `R0`. This needs no contract change, but a skipped entry
-       does not revert the settlement transaction and can still affect temporary EEZ batch
-       bookkeeping.
-    2. **Use a Rollup0 settlement wrapper.** The wrapper calls `postAndVerifyBatch`, reads the
-       resulting Rollup0 root, and reverts unless it equals `R0`. This gives the anchor
-       transaction atomic success or failure without changing EEZ, but adds a Rollup0-specific
-       contract and integration path. The Rollup0 proof policy must also make the wrapper
-       mandatory; otherwise the same proof can be submitted directly to EEZ.
-
-    Until this is selected, followers must check the actual stored-root transition and its
-    correctly ordered `L2ExecutionPerformed` event. They must not infer settlement from
-    `BatchPosted`.
+    The Rollup0 settlement wrapper checks the stored commitment after `postAndVerifyBatch` and
+    reverts unless EEZ applied the exact leading transition. The Rollup0 manager accepts
+    `getCustomData` during settlement only after the active wrapper authorizes the transaction, so
+    the same proof cannot bypass the check through a direct EEZ call. Followers still apply the
+    observed-commitment rule above rather than trusting `BatchPosted`.
 
 For each candidate, the composer and every validator/prover independently:
 
 1. execute every nonterminal block after the named Rollup0 parent;
 2. execute the terminal block's pure-L2 transaction prefix and record `R0`;
-3. execute each synchronous action in its intended Ethereum trigger order, stopping after the first
+3. execute each synchronous action in manifest order, stopping after the first
    failed action;
-4. construct `B[i]` and record `R[i]` after each action `i`;
+4. construct `B[k]` and record both `H[k]` and `R[k]` after each successful action `k`; a failed
+   terminal action creates no variant;
 5. represent a successful Ethereum-side result with its EEZ execution entry and a reverting result
    with its failed lookup;
 6. derive the state deltas, return data, and value changes for every prefix; and
-7. require the EEZ state sequence to be `R0, R[1], ..., R[n]`.
+7. require the EEZ commitment sequence to be `H[0], H[1], ..., H[s]`, where `s` is the candidate's
+   successful-action count.
 
 The corresponding L1 EEZ batch contains:
 
-- the leading immediate entry from `A` to `R0`;
-- one execution entry from `R[i - 1]` to `R[i]` for each successful synchronous action `i`;
+- the leading immediate entry from `Hparent` to `H[0]`;
+- one execution entry from `H[k - 1]` to `H[k]` for each successful synchronous action `k`;
   and
-- zero or one failed lookup pinned to `R[n - 1]`, with no state delta, when the final synchronous
-  action `n` fails.
+- zero or one failed lookup pinned to `H[s]`, with no state delta, when the final manifest action
+  fails.
 
-The proof or signatures authenticate every intermediate block and root inside a multi-block
-pure-L2 range. Those intermediate roots do not need separate EEZ state deltas.
+The terminal variants are siblings: every `B[k]` has the same Rollup0 parent block. The EEZ
+transition `H[k - 1] -> H[k]` records progressive selection by successful Ethereum triggers; it
+does not mean that `B[k]` is a child of `B[k - 1]`.
+
+There is no circular block hash. The L2 `EEZL2` entry inside a protocol transaction contains no L1
+state delta and no `H[k]`. The composer first constructs and hashes `B[k]`, then writes `H[k]` into
+the separate L1 EEZ batch. A future protocol-transaction field must not depend on the hash of the
+block that contains that transaction.
+
+The proof or signatures authenticate `H[0]` in the leading EEZ state delta. Because every Rollup0
+header contains its parent's hash, `H[0]` transitively commits every intermediate header in the
+multi-block pure-L2 range, and each intermediate header commits its own state root. Those
+intermediate values do not need separate blob fields or EEZ state deltas.
 
 For a successful action, the L1 EEZ entry and the L2 `EEZL2` entry are different objects. The L1
-entry returns the precomputed result to the Ethereum trigger and updates EEZ's stored Rollup0 root.
-The L2 entry is part of the protocol transaction and executes the application call on Rollup0.
+entry returns the precomputed result to the Ethereum trigger and updates EEZ's stored Rollup0
+commitment. The L2 entry is part of the protocol transaction and executes the application call on
+Rollup0.
 
 The two entries keep separate rolling hashes because they describe different execution frames.
 Under the initial one-way profile, the L1 entry executes no Rollup0-to-Ethereum child call, so its
@@ -150,6 +212,11 @@ and return data. The two rolling hashes are not required to be equal.
 Candidate validation must still prove that both entries describe the same action. The L1 action
 hash and returned result, the L2 entry and rolling hash, and the independently replayed call must
 agree on the source, destination, value, calldata, success result, and return data.
+
+In particular, the explicit `destination`, `value`, `data`, `sourceAddress`, and `sourceRollup`
+arguments to `EEZL2.executeIncomingCrossChainCall` must equal the corresponding fields in the first
+`incomingCalls` item. That item must also satisfy the initial Rollup0 rules for a non-static
+top-level call. The `EEZL2` action-hash check does not replace this field-for-field candidate rule.
 
 The protocol transaction keeps the `EEZL2` array-based ABI. All table data supplied by a valid
 transaction must be consumed by that transaction. Under the initial Rollup0 rules, a successful
@@ -163,17 +230,18 @@ That version must define how every additional object is reached and consumed. Un
 remains invalid in every version.
 
 For a failed Ethereum-to-Rollup0 action, there is no Rollup0 protocol transaction or L2 execution
-table. The composer and every validator/prover execute the call temporarily from `R[i - 1]`, verify
-the exact failure and revert data, and discard the complete result. The L1 EEZ batch contains one
-failed lookup pinned to `R[i - 1]`. The trigger manifest and proof or signatures bind that lookup
-to the exact Ethereum transaction and action position.
+table. The composer and every validator/prover execute the call temporarily from `R[s]`, where `s`
+is the number of preceding successful actions, verify the exact failure and revert data, and discard
+the complete result. The L1 EEZ batch contains one failed lookup pinned to `H[s]`. The action
+manifest and proof or signatures bind that lookup to its ordered call position, not to an exact
+outer Ethereum transaction.
 
 Under the initial one-way, non-nested profile, that L1 lookup has:
 
 - `failed = true`;
 - the exact action hash and Rollup0 destination ID;
 - the original application revert data in `returnData`;
-- exactly one state-root pin, for Rollup0 at `R[i - 1]`;
+- exactly one commitment pin, encoded in the EEZ `stateRoot` field, for Rollup0 at `H[s]`;
 - no calls, expected reentrant calls, or nested lookups;
 - `callCount = 0`; and
 - `rollingHash = 0`.
@@ -181,18 +249,18 @@ Under the initial one-way, non-nested profile, that L1 lookup has:
 It is a persistent lookup made available to its Ethereum trigger later in the settlement block,
 not part of the immediate lookup prefix.
 
-`R0` is the Sync-block root when no synchronous action is processed. For a successful action
-`i`, its EEZ entry requires `R[i - 1]` and produces `R[i]`. A failed action adds no transaction and
-no receipt to the Sync block. Therefore both `B[i]` and `R[i]` equal their preceding values. It
-consumes no Rollup0 block gas and causes no L2 nonce, value, fee, log, or state change.
+`R0` is the Sync-block state root when no synchronous action is processed. For successful action
+`k`, its EEZ entry requires `H[k - 1]` and produces `H[k]`; replay separately moves the EVM state
+from `R[k - 1]` to `R[k]`. A failed action adds no transaction or receipt and creates no additional
+`B`, `H`, or `R` variant. It consumes no Rollup0 block gas and causes no L2 nonce, value, fee, log,
+or state change.
 
 A successful action always has an execution entry, including when the complete Rollup0 world state
-does not change. In that case, the entry's current and new state roots are equal and its
-`etherDelta` is zero. The protocol transaction has no sender nonce or L2 fee state change. It still
-consumes block gas and remains in the transaction and receipt roots. It can return data and emit
-logs, and its Ethereum trigger can change Ethereum state. Validators must verify the exact entry,
-transaction position, receipt, and block hash because an equal state root alone cannot distinguish
-this success from a failed action.
+does not change. In that case, `R[k]` can equal `R[k - 1]`, but `H[k]` differs because the protocol
+transaction and its receipt are present in `B[k]`. The entry's `etherDelta` is zero. The protocol
+transaction has no sender nonce or L2 fee state change. It still consumes block gas, remains in the
+transaction and receipt roots, and can return data or emit logs. The block-hash commitment therefore
+distinguishes this success from a failed action without pretending that the EVM state root changed.
 
 The transaction root commits the exact protocol transaction and its position. The receipt root
 commits its status, cumulative gas use, bloom, and logs. Exact return or revert data remains
@@ -200,10 +268,11 @@ committed by the EEZ execution data and is checked by deterministic replay; Ethe
 receipts do not contain return data.
 
 The DA payload does not need to repeat execution-derived header fields. It supplies the exact
-transaction bytes and order, block boundaries, parent, and every header input that cannot be
-derived from the protocol rules. Validators and followers then derive the transaction root,
-receipts, receipt root, logs bloom, gas used, state root, and block hash. A block hash carried in
-the payload is only a claimed value and must equal the hash produced by replay.
+pure-L2 transaction bytes, the authenticated inputs that uniquely derive protocol-transaction
+bytes, transaction order, block boundaries, parent, and every header input that cannot be derived
+from the protocol rules. Validators and followers then derive the transaction root, receipts,
+receipt root, logs bloom, gas used, state root, and block hash. A block hash carried in the payload
+is only a claimed value and must equal the hash produced by replay.
 
 The proof or signatures cover the EEZ public-input hash, including commitments to the execution
 entries, lookups, and Rollup0 DA payload. A supplied root or return value is not trusted without
@@ -211,24 +280,34 @@ re-execution. Every value that can change candidate validity or a resulting Roll
 either be derived uniquely from prior canonical state and this specification, or be authenticated
 by the EEZ public-input hash. Validator-only side data must not affect the accepted result.
 
-!!! note "TO BE DEFINED: candidate domain and blob encoding"
-    The blob-format specification must define the exact encoding and placement of every
-    non-derived input. It must also define how the authenticated candidate is bound to the
-    Ethereum chain, EEZ deployment, Rollup0 ID, protocol version, blob-format version, parent, and
-    settlement context. Some values can be carried by the EEZ batch or manager `customData`
-    instead of being repeated in the blob, but none can remain unauthenticated.
+!!! success "DECISION: manager-bound candidate domain"
+    The production Rollup0 manager binds each candidate to the Rollup0 protocol version, Ethereum
+    chain, EEZ deployment, manager, EEZ rollup ID, Rollup0 chain ID, target Ethereum timestamp,
+    and parent Ethereum block hash through its authenticated `customData`. Appendix D defines the
+    exact value.
+
+    The leading EEZ entry separately binds `Hparent`, and the authenticated blob envelope carries
+    its format version. These values do not need unauthenticated side data or duplicate fields.
+
+!!! danger "PRODUCTION BLOCKER: exact blob encoding"
+    Appendix D defines the V0 linear codec and initial codec vectors. Complete action-manifest,
+    transaction-bearing, terminal-variant, and derivation vectors are still required. EEZ Core owns
+    the unchanged physical packing and multi-blob rules. An independent client cannot claim
+    production Rollup0 conformance until the remaining vectors are complete.
 
 ## 5.3 Required Invariants
 
 A valid candidate preserves all EEZ invariants, including:
 
-- the current state in each state delta equals the state committed before the effect;
-- state deltas form one continuous state transition;
+- the `currentState` block hash in each state delta equals the Rollup0 commitment before the
+  effect;
+- state deltas form one continuous block-hash commitment sequence;
 - `R0` contains the complete pure-L2 prefix and no synchronous effect;
-- every trigger transaction contains exactly one top-level Rollup0 action in its complete trace;
-- no trigger follows a failed action in the candidate manifest;
-- every `B[i]` contains protocol transactions for exactly the successful actions among the first
-  `i` Ethereum triggers;
+- every proposed trigger transaction contains exactly one top-level Rollup0 action in its complete
+  trace;
+- no trigger is an EIP-4844 blob transaction or otherwise requires a blob sidecar;
+- no action follows a failed action in the candidate manifest;
+- every `B[k]` contains exactly the first `k` successful protocol transactions;
 - each L1 and L2 rolling hash matches the calls executed in its own frame;
 - the L1 action record, L2 entry, and replayed result describe the same action and result;
 - every expected successful call is consumed in replay;
@@ -251,40 +330,36 @@ Rollup0 does not include or charge an L2 transaction for the failed action. Any 
 simulation, validation, or proving must occur through the Ethereum settlement flow.
 
 When the outer Ethereum trigger transaction reverts, any EEZ consumption and state update in that
-transaction also reverts. Under the intended atomic-bundle rule, a bundle containing that trigger is
-ineligible and a selected shorter bundle contains no later trigger. Chapter 7 describes the current
-builder trust assumption and the unresolved enforcement design.
+transaction also reverts. The successful queue therefore remains at the same expected ordered call.
+Chapter 7 defines this rule.
 
-!!! note "TO BE DISCUSSED: actions after a caught failure"
-    Initial Rollup0 ends a candidate's trigger manifest at its first failed action. This prevents a
+!!! success "DECISION: a caught failure ends the candidate manifest"
+    Initial Rollup0 ends a candidate's action manifest at its first failed action. This prevents a
     failed lookup, which has no consumption cursor, from being skipped while a later prepared
     execution entry still advances Rollup0.
 
-    Two alternatives remain open for a later Rollup0 version:
+    A later Rollup0.x version may permit actions after a caught failure only after it adds one
+    ordered cursor for successful entries and failed lookups, plus a compatible way to acknowledge
+    caught failures. If action `i` were omitted or its outer transaction reverted, action `i + 1`
+    would remain blocked; clients would not simulate every possible subset. However, the current
+    proxy reports an application failure with `REVERT`, which also rolls back any cursor increment.
+    An EEZ contract and data-model change alone cannot retain that progress. This design also needs
+    an acknowledgement after the caller catches the failure, a transaction wrapper, different
+    proxy semantics, or an EVM change. No design that preserves transparent dApp behavior has been
+    selected. Trusting a builder to preserve the sequence is not an acceptable substitute.
 
-    1. **Trust the Ethereum builder to preserve the exact submitted trigger prefix.** This permits
-       later actions without changing EEZ, but a proof or signature cannot stop the builder from
-       omitting the failed trigger and including a later transaction.
-    2. **Add one ordered cursor for successful entries and failed lookups, plus a compatible way to
-       acknowledge caught failures.** The cursor would allow only prefixes. If action `i` were
-       omitted or its outer transaction reverted, action `i + 1` would remain blocked; clients
-       would not simulate every possible subset. However, the current proxy reports an application
-       failure with `REVERT`, which also rolls back any cursor increment. An EEZ contract and data
-       model change alone cannot retain that progress. This option also needs an acknowledgement
-       after the caller catches the failure, a transaction wrapper, different proxy semantics, or
-       an EVM change. No design that preserves transparent dApp behavior has been selected.
+    Candidate protocol V1 does not advance the successful-action count or create a block variant for
+    that failure. Reusing the failed lookup cannot change the Rollup0 endpoint or unlock a suffix.
+    A Rollup0 follower need not record its canonical L1 occurrence.
 
-    The selected terminal-failure rule does not solve general bundle repackaging or duplicate call
-    hashes. Chapter 7 tracks those separate issues.
-
-The candidate remains valid only when every composer-supplied result, `B[i]`, and prefix root
+The candidate remains valid only when every composer-supplied result, `B[k]`, `H[k]`, and `R[k]`
 exactly matches independent execution.
 
 ## 5.5 Native-Value Backing
 
-Initial Rollup0 uses the existing L1 EEZ custody model. A cross-chain proxy does not retain
-`msg.value`; it forwards the value to the EEZ contract. EEZ holds the pooled ETH and accounts for
-Rollup0 separately in its per-rollup `etherBalance`.
+Rollup0's native currency is ETH. Initial Rollup0 uses the existing L1 EEZ custody model. A
+cross-chain proxy does not retain `msg.value`; it forwards the value to the EEZ contract. EEZ holds
+the pooled ETH and accounts for Rollup0 separately in its per-rollup `etherBalance`.
 
 For a successful Ethereum-to-Rollup0 action carrying value `v`:
 
@@ -293,9 +368,9 @@ For a successful Ethereum-to-Rollup0 action carrying value `v`:
 - the Rollup0 protocol transaction creates exactly `v` of temporary protocol credit; and
 - the application call distributes that value while `EEZL2` ends with its pre-transaction balance.
 
-A successful Rollup0-to-Ethereum value release performs the reverse accounting: EEZ decreases the
-Rollup0 `etherBalance` and transfers the same value through the proxy to the Ethereum target. The
-ledger cannot become negative. A failed action changes neither side.
+Any Rollup0 withdrawal must perform the reverse accounting: the backing attributed to Rollup0
+decreases by the exact ETH amount released on Ethereum. The ledger cannot become negative. A failed
+withdrawal changes neither side.
 
 The ETH balance of the L1 EEZ contract must be at least the sum of its per-rollup
 `etherBalance` values. ETH forced into the contract without a valid EEZ action is surplus and does
@@ -306,7 +381,28 @@ Rollup0 genesis gives no ordinary account a native balance. Any faucet or operat
 enter through a collateralized EEZ deposit. Genesis can still install contract code and storage,
 including the predeploys defined in Chapter 3, without assigning those accounts native value.
 
-!!! note "TO BE DISCUSSED: dedicated Rollup0 vault"
+Initial Rollup0 requires an asynchronous ETH withdrawal path. A normal signed Rollup0 transaction
+transfers or locks ETH in a withdrawal escrow or outbox and records a unique request. After the
+containing anchor reaches the required Ethereum confirmation level, the user or another party can
+prove and claim the backed ETH on Ethereum. The L1 claim atomically marks the request spent,
+decreases Rollup0's EEZ `etherBalance`, and releases exactly the requested amount.
+
+!!! success "DECISION: V1 withdrawals are asynchronous only"
+    Initial Rollup0 does not add a bridge-only exception to the one-way call profile and does not
+    support a synchronous ETH withdrawal. A later Rollup0.x version may add an Ethereum-initiated
+    claim against ETH previously locked in an L2 withdrawal escrow. That direction-preserving
+    design still needs an authenticated request, payout, and replay protocol and is not valid by
+    convention under V1.
+
+!!! danger "PRODUCTION BLOCKER: ETH withdrawal protocol"
+    The asynchronous outbox, request identifier, qualifying confirmation level, claim proof, L1
+    payout path, and replay rules are not yet defined.
+
+    The design must work with EEZ's pooled custody. A launch implementation must release ETH only
+    when the authenticated Rollup0 execution removes or locks the same amount and must prevent the
+    same withdrawal from being paid twice.
+
+!!! question "ROLLUP0.X DESIGN: dedicated Rollup0 vault"
     A later Rollup0 or EEZ version can keep Rollup0 backing in a dedicated vault instead of the
     shared EEZ balance. A chain-specific vault provides clearer isolation and can deploy some funds
     into liquidity positions or other approved strategies.
