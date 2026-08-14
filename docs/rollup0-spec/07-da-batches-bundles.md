@@ -10,47 +10,79 @@ The published data must let an independent follower recover:
 - the exact settled parent named by the candidate;
 - every Rollup0 block and block boundary in the anchored range;
 - every signed pure-L2 transaction in block order, including those at the start of the Sync block;
-- the exact serialized bytes of every protocol-derived transaction in block order;
+- every authenticated input needed to derive the exact serialized bytes of each protocol-derived
+  transaction in block order;
 - every non-derived header input;
-- the EEZ objects and Ethereum origin data for every synchronous action;
-- the exact ordered manifest of intended Ethereum trigger transactions; and
+- the EEZ objects and origin fields for every synchronous action;
+- the ordered EEZ action brackets from which each manifest index, EEZ cross-chain call hash, and
+  expected outcome are derived; and
 - the format version.
 
 Execution-derived fields do not need separate encodings. A follower derives each transaction root,
 receipt, receipt root, logs bloom, gas-used value, state root, header, and block hash from the
 published inputs. Any redundant claimed value must equal the replayed value.
 
-The manifest binds each trigger by its Ethereum transaction hash and position. Validators receive
-the complete signed transactions and verify that they reproduce the manifest and the proposed
-`eth_sendBundle` payload. A transaction-hash commitment in the manifest does not make that hash
-available to the EEZ contract during execution.
+The action manifest identifies actions by ordered call, not by exact Ethereum transaction. It is
+not a separately encoded array: it is derived from the top-level EEZ action brackets in decoded
+message order. Bracket `i` has zero-based `manifestIndex = i`; its `Call` fields determine the EEZ
+cross-chain call hash, and its `ReturnSuccess` or `ReturnFail` determines the expected outcome. The
+corresponding authenticated EEZ execution entry or failed lookup must match that bracket. The
+candidate domain, manifest index, and call hash determine a successful action's Rollup0
+`sourceHash` as defined in Appendix F.
 
-!!! note "TO BE DEFINED"
-    The byte-exact blob format, its versioning rule, capacity limits, and conformance vectors are
-    not yet defined. It must also define the exact candidate-domain fields and how they are divided
-    between the blob, EEZ batch, and manager `customData`. Appendix D lists the required fields but
-    does not yet define an encoding.
+Every bracket's `InitiateCrossChainTransaction.tx_data` is empty. It does not carry a proposed
+Ethereum transaction or transaction hash. Appendix G explains why candidate protocol V1 identifies
+the ordered call independently of its replaceable delivery transaction.
+
+A composer separately supplies proposed signed Ethereum trigger transactions to validators,
+relayers, and builders. Each proposed trigger must execute exactly one manifest action, but its
+transaction hash is delivery data rather than Rollup0 action identity. A different Ethereum
+transaction that produces the candidate's next expected call is intentionally the same Rollup0
+action. The published candidate need not contain an omitted proposed trigger's signed bytes. A
+follower obtains the exact bytes of every trigger that actually executes from canonical Ethereum
+and reconstructs only the selected Rollup0 endpoint.
+
+An EIP-4844 blob transaction, transaction type `0x03`, MUST NOT be a trigger. More generally, a
+trigger must not require a blob sidecar. `submitCandidate` is the candidate's only required blob
+transaction.
+
+!!! danger "PRODUCTION BLOCKER: byte-exact blob format"
+    Appendix D defines the linear V0 codec and initial codec vectors. The complete action-manifest,
+    transaction-bearing, terminal-variant, and derivation vector suite remains unfinished.
+    Appendix G records the design rationale. Appendix D also defines the candidate domain
+    independently: the Rollup0 manager supplies the execution environment and settlement context,
+    while the authenticated blob envelope supplies its own format version.
 
 ## 7.2 Range Correspondence
 
-Let `fromBlock` be the candidate's named settled parent and `toNumber` its terminal block number.
+Let `fromBlock` be the settled parent derived from the candidate's first block header and the
+current settled cursor. It is not a separate blob field. Let `toNumber` be the terminal block
+number.
 The payload covers exactly:
 
 ```text
 (fromBlock.number, toNumber]
 ```
 
-The published data binds `fromBlock` and defines terminal variants `B[0]` through `B[n]`. Every
-variant has block number `toNumber`, the same timestamp, the same pure-L2 prefix, and exactly its
-protocol transactions for successful actions among the first `i` Ethereum triggers. A failed
-action adds no Rollup0 transaction, so adjacent variants can be identical. Candidate validation
-checks every variant against the current Ethereum-confirmed Rollup0 head. A failed action must be
-the final action in the manifest.
+The first block header binds `fromBlock`. Let `n` be the number of actions in the manifest and `s`
+the number of successful actions in the complete candidate. Because an optional failure must be
+terminal, `s` is either `n` or `n - 1`. The published data defines terminal variants `B[0]` through
+`B[s]`. Every variant has block number `toNumber`, the same timestamp, the same pure-L2 prefix, and
+exactly its first `k` successful protocol transactions. Candidate validation checks every variant
+against the current Ethereum-confirmed Rollup0 head. A failed action must be the final action in the
+manifest and does not create another block variant.
 
-`R[0]` means `R0`, the state root of `B[0]`.
+`H[k]` is the block hash of `B[k]`. It is the Rollup0 commitment used in EEZ state deltas.
+`R[k]` is the EVM state root in that block's header, and `R[0]` is also called `R0`.
+
+During canonical Ethereum execution, `k` is the number of successful Rollup0 actions consumed in
+order. If a later trigger receives and catches the candidate's terminal Rollup0 failure, that fact
+changes canonical Ethereum history but creates no Rollup0 transaction, commitment transition, or
+additional `B`, `H`, or `R` value. A Rollup0 follower does not need to establish whether that
+failure was reached. The Rollup0 endpoint is always `B[k]`.
 
 A live candidate has a terminal timestamp equal to its intended Ethereum settlement timestamp. A
-catch-up candidate has an older terminal timestamp, only the `B[0]` variant, and an empty trigger
+catch-up candidate has an older terminal timestamp, only the `B[0]` variant, and an empty action
 manifest. It contains no inbound protocol transaction or failed lookup. A terminal timestamp later
 than the intended Ethereum settlement timestamp is invalid. The relationship between the two
 timestamps determines the anchor form; the blob does not need a separate mode flag.
@@ -64,206 +96,232 @@ The following must agree:
 - every user transaction appears once in its selected block;
 - every required L2 entry corresponds to one exact successful EEZ action;
 - every failed action corresponds to one exact failed EEZ lookup and no L2 transaction; and
-- replay from `fromBlock` produces every `B[i]` and `R[i]`.
+- replay from `fromBlock` produces every `B[k]`, `H[k]`, and `R[k]` for `0 <= k <= s`.
 
-!!! caution "TO BE DISCUSSED: catch-up capacity and backpressure"
-    Historical catch-up works only when each published range fits the Ethereum blob limits and the
-    backlog drains faster than new Rollup0 data is created. At minimum, the data for one complete
-    six-position interval must always fit in one valid catch-up candidate. Otherwise no catch-up
-    anchor can advance the cursor.
+!!! success "DECISION: fill catch-up publication capacity"
+    A catch-up range MAY contain any positive number of complete six-position intervals, up to the
+    largest historical prefix that fits the blobs and all other limits selected for that candidate.
+    It is not capped at one nominal Ethereum interval.
 
-    The byte-exact blob format must set per-block, per-interval, and per-candidate data limits. It
-    must also leave enough publication capacity during recovery for old data to be published
-    faster than composers create new unsafe data. These limits are not yet defined.
+    A catch-up composer SHOULD use the largest blob allotment it can reasonably get included and
+    SHOULD fill that allotment with the longest valid historical prefix available from the settled
+    parent. This maximizes recovery speed, but maximality is not a validity rule: a smaller valid
+    range remains valid and competing composers can make different fee and inclusion choices.
 
-    If one interval cannot be guaranteed to fit, the team must either lower Rollup0's data limits
-    or permit smaller historical ranges that do not end at a Sync position. The second option
-    would change the anchor rule in Chapter 4 and is not part of the current design.
+    Blob hashes and contents are fixed before candidate signing, so "available" means the blob
+    allotment selected for that candidate under Ethereum's transaction and block limits. It does
+    not mean unused capacity discovered after the candidate has been signed.
 
-    If the available rate is too low, block positions and timestamps still advance. Until an
-    objective validity limit is selected, a composer that wants its unsafe view to remain
-    anchorable SHOULD reduce or stop pure-L2 transaction intake until the lag shrinks. It cannot
-    force other open composers to do the same. Synchronous actions cannot settle through a
-    catch-up anchor. The team must decide the lag thresholds, how clients report them, and which
-    backpressure rules are protocol validity rules rather than operational policy.
+    A candidate must fit its complete authenticated range into its selected blobs. Rollup0 adds no
+    lower candidate-wide block-count, transaction-count, or execution-gas cap. If a composer builds
+    an unsafe interval whose encoded range cannot fit a valid settlement candidate, that unsafe
+    branch cannot become safe. Another composer can rebuild a smaller sibling from the settled
+    cursor, omitting or reordering pure-L2 transactions as ordinary candidate competition permits.
+    This can replace unsafe history but cannot deadlock canonical Rollup0 history.
 
-!!! caution "TO BE DISCUSSED: historical production evidence"
-    The current rules prove that a catch-up range forms a valid chain with the scheduled
-    timestamps. They do not prove that its blocks were produced or gossiped at those times. An
-    open composer can build a competing historical range later and include transactions that it
-    received after the claimed block timestamps. If Ethereum selects that candidate, applications
-    observe those scheduled historical timestamps through the EVM.
+    Composers SHOULD therefore keep their unsafe branches anchorable and publish before accumulated
+    data exceeds the capacity they can reasonably obtain. Reducing an existing lag requires the
+    effective publication rate to exceed the six new Rollup0 positions scheduled per Ethereum
+    slot. If capacity or inclusion is lower, the lag can remain constant or grow even while every
+    catch-up anchor advances the cursor.
 
-    A local first-seen rule cannot solve this because different nodes can see different blocks.
-    The direct options are to accept that a Rollup0 timestamp is a scheduled chain position rather
-    than proof of publication time, require timely attestations that are retained through an
-    outage, or precommit block data to Ethereum or another agreed timestamping system. Timely
-    attestations add a new availability and trust requirement. Precommitment adds cost and may be
-    unavailable during the same outage. Initial Rollup0 has not selected an option.
+    Unsafe transaction backlog is local to each open composer, not a canonical chain obligation. A
+    composer MAY omit unanchored transactions and SHOULD reduce or stop new pure-L2 intake when that
+    helps its branch catch up. Synchronous actions cannot settle through a catch-up anchor.
+
+!!! success "DECISION: timestamps identify scheduled chain positions"
+    A catch-up range proves a valid chain whose timestamps occupy the scheduled Rollup0 positions.
+    It does not prove that those blocks were produced or gossiped at those historical times. An
+    open composer can construct a competing historical range later and include transactions that
+    it received after the scheduled timestamps. If Ethereum selects that candidate, applications
+    observe the scheduled timestamps through the EVM.
+
+    Initial Rollup0 accepts this limitation. It does not add local first-seen rules, timely
+    attestations, or external precommitments. Such mechanisms would add availability, trust, or
+    publication requirements and could be unavailable during the same outage that requires
+    catch-up. A Rollup0 timestamp therefore identifies a consensus position; Ethereum settlement
+    determines when that position becomes safe and finalized.
 
 ## 7.3 EEZ Batch
 
 The settlement transaction carries the batch object defined by
 [EEZ Proving and Settlement](../eez-protocol-spec/04-proving-and-settlement.md).
-An initial Rollup0 batch SHOULD contain only Rollup0. This keeps candidate validation and failure
-handling independent from other EEZ networks.
+Candidate protocol V1 requires a Rollup0-only batch. No other EEZ network may appear in its entries,
+lookups, state deltas, routing, or proof-policy mapping. This keeps candidate validation, transient
+prefixes, proof interaction, and failure handling independent from other networks. A later
+candidate protocol may define shared-batch cost sharing under a new domain tag.
 
-A batch MAY also contain another EEZ network when all of these conditions hold:
-
-- `transientExecutionEntryCount` remains exactly `1`, and the one transient entry is Rollup0's
-  leading `A -> R0` entry;
-- `transientLookupCallCount` remains exactly `0`;
-- every entry, lookup, state delta, and queue item that names, pins, routes to, or changes Rollup0
-  is part of the Rollup0 candidate and follows this specification;
-- data for another network cannot change the Rollup0 block range, action order, state sequence, or
-  selected endpoint;
-- every included network accepts the shared `blockNumber = 2^64 - 1` current context; and
-- every proof required by the shared EEZ batch succeeds.
-
-These rules allow cost sharing but do not enable execution-network-to-execution-network calls in
-initial Rollup0. A network that needs another transient layout cannot share this batch.
+The batch's `crossProofSystemInteractions` field MUST equal `bytes32(0)`. Candidate protocol V1 has
+no cross-network or cross-proof-system interaction for this opaque field to identify.
 
 Every Rollup0 batch also requires:
 
 - `blockNumber = 2^64 - 1` to select the authenticated current Ethereum settlement context;
+- submission through the active Rollup0 settlement wrapper;
 - no other EEZ batch that contains Rollup0 in the same Ethereum block;
 - the selected blobs to be referenced by the batch;
 - no duplicate or unrelated blob index;
-- proof context bound to the intended Ethereum settlement domain;
-- Rollup0 state deltas derived from `R0` and every successful synchronous action;
-- enough L2 entries and origin data to reconstruct every protocol transaction; and
+- the exact Rollup0 manager domain defined in Appendix D;
+- Rollup0 state deltas derived from `H[0]` and every successful synchronous action;
+- enough L2 entries and ordered-action data to reconstruct every protocol transaction; and
 - the proof or signatures required by Chapter 8.
 
 Rollup0 does not redefine the EEZ batch tuple or public-input hash.
 
+!!! success "DECISION: version the transient-prefix policy"
+    Candidate protocol V1 fixes `transientExecutionEntryCount = 1` and
+    `transientLookupCallCount = 0`. The active settlement wrapper enforces those values.
+
+    A later Rollup0.x version that enables top-level Rollup0-to-Ethereum actions may activate a
+    new wrapper and candidate-domain tag. Its execution prefix is expected to contain the anchor
+    followed by the leading top-level outbound entries. Nested calls inside an entry do not add
+    another prefix element. Appendix D defines the update path.
+
 ## 7.4 Ethereum Bundle
 
-Every settlement choice uses this order:
+For delivery, let `p` be the number of proposed triggers in a submitted bundle. Every settlement
+choice uses this order:
 
 ```text
-bundle[k] = [postAndVerifyBatch, trigger1, ..., triggerK]
+bundle[p] = [submitCandidate, trigger1, ..., triggerP]
 ```
 
-`postAndVerifyBatch` publishes and verifies the candidate and establishes `R0`. Each `trigger`
-is an exact Ethereum transaction whose cross-chain proxy call can consume the next prepared EEZ
-action.
+`submitCandidate` calls the active Rollup0 settlement wrapper. The wrapper enforces the candidate
+protocol policy, calls `EEZ.postAndVerifyBatch`, and establishes `H[0]` as Rollup0's EEZ commitment.
+A proposed `trigger` is one exact signed, non-blob Ethereum transaction supplied for bundle
+delivery. Its cross-chain proxy call must match the next prepared EEZ action. Canonical execution
+may instead use a different non-blob transaction that produces the same next ordered call.
 
-A Rollup0-only catch-up candidate has `n = 0`, so its only bundle is
-`[postAndVerifyBatch]`. A Rollup0-only live candidate without a synchronous action uses the same
-one-transaction bundle. In a permitted shared batch, Rollup0 contributes no trigger transaction
-in either case. Transactions required by another network follow that network's specification and
-must not affect Rollup0.
+A catch-up candidate has `n = 0`, so its only bundle is `[submitCandidate]`. A live candidate
+without a synchronous action uses the same one-transaction bundle.
 
-The intended settlement is the exact atomic inclusion of one submitted `bundle[k]`. Every included
-outer trigger transaction must succeed. Deterministic replay must show that each one made its exact
-expected proxy call and received the committed success or revert result. If `bundle[k]` is included
-without modification, the canonical endpoint is `B[k]` with state root `R[k]`. When trigger `k`
-contains a caught Rollup0 failure, it must also be trigger `n`, the final action in the candidate.
+A successful `submitCandidate` establishes `B[0]`. During the remainder of that Ethereum block,
+successful trigger transactions may move the retained Rollup0 commitment through `H[1]` to `H[k]`.
+At every point, the retained commitment must correspond to the first `k` successful actions in the
+authenticated action manifest. Every accepted trigger must succeed as an outer Ethereum
+transaction, make the next expected proxy call, and receive its committed success or terminal
+revert result. Other Ethereum transactions may be included in the block, but they must not consume
+an out-of-order prepared result or change the Rollup0 endpoint. A submitted bundle is a delivery
+request, not settlement evidence.
+
+The canonical endpoint is `B[k]`; EEZ stores its block hash `H[k]`, and its EVM state root is
+`R[k]`. A proposed prefix may also include the caught terminal failure as its last trigger. It does
+not advance the Rollup0 commitment or successful-action cursor.
 
 For a successful Rollup0 result, the follower checks the retained EEZ consumption and state-update
-logs. For a Rollup0 revert caught by the Ethereum caller, the failed EEZ frame leaves no retained
-log. The follower must replay the exact Ethereum transaction to verify that the expected proxy call
-occurred and returned the committed revert data. A successful Ethereum receipt alone is not enough.
+logs and reconstructs the resulting Rollup0 transaction and block. For a Rollup0 revert caught by
+the Ethereum caller, the failed EEZ frame leaves no retained log or Rollup0 effect. A Rollup0
+follower therefore need not replay or classify that transaction. An L1 application or indexer that
+wants to report the caught failure must replay the exact canonical Ethereum transaction; a
+successful Ethereum receipt alone does not reveal the inner revert.
 
-`eth_sendBundle` is a builder API, not an Ethereum consensus rule. A public-mempool submission is
-not a valid replacement for the required same-block ordering.
+`eth_sendBundle` is a builder API, not an Ethereum consensus rule. Composers SHOULD NOT broadcast
+`submitCandidate` and its proposed triggers independently through the public mempool: doing so
+provides no atomicity, same-block inclusion, or ordering guarantee. This is delivery guidance, not
+a validity prohibition. If canonical Ethereum execution nevertheless satisfies the Rollup0 rules,
+the candidate remains valid regardless of how its transactions reached the builder.
 
 The exact signed trigger transactions remain private before inclusion. Validators, relayers, and
-builders that receive them are trusted not to leak or submit them separately. Chapter 6 states the
-consequences and scope of this trust assumption.
+builders that receive them are trusted not to leak them. This confidentiality assumption is
+separate from validity: leaking or repackaging a transaction must not let an invalid sequence
+consume a Rollup0 result or advance the Rollup0 commitment. Chapter 6 describes the remaining harm
+that a leaked valid Ethereum transaction can cause on L1.
 
-!!! caution "TO BE DEFINED: prefix bundle submission"
-    Rollup0 requires one strict successful trigger prefix, but the exact builder submission method
-    is not yet selected.
+!!! success "DECISION: enforce ordered calls, not exact trigger transactions"
+    Rollup0 enforces the successful action prefix on chain. Builder cooperation is not part of the
+    validity or security model. Candidate protocol V1 requires all of the following:
 
-    1. **Submit one atomic bundle for every prefix and trust the builder.** The composer submits
-       `[post]`,
-       `[post, trigger1]`, `[post, trigger1, trigger2]`, and so on, without
-       `revertingTxHashes`. The shared settlement transaction prevents two submitted bundles from
-       being included as submitted, and any submitted bundle containing a reverted outer trigger is
-       invalid. This uses standard `eth_sendBundle` semantics, but sends `n + 1` overlapping bundles.
-       It also trusts the builder not to extract the signed trigger transactions and assemble a
-       sequence that the composer did not submit.
-    2. **Add a contract-enforced progress mechanism.** A single bundle could allow trigger reverts
-       if the protocol could persistently close the suffix after failure. The current EEZ contract
-       cannot do this with a simple flag because all writes made by a reverted outer transaction
-       also revert. A workable design would need a larger execution or finalization change.
-    3. **Use one bundle with every trigger in `revertingTxHashes`.** This is one request, but it does
-       not enforce the required prefix with the current contracts. It permits an Ethereum trigger
-       outcome that differs from the signed manifest without making settlement revert. This option
-       is not valid unless option 2 supplies the missing enforcement.
+    1. one successful settlement activates one authenticated candidate for the current block;
+    2. a successful consumption can apply only the candidate's next ordered call and transition;
+    3. a mismatched or out-of-order call cannot consume an unauthorized result or apply a Rollup0
+       transition;
+    4. a reverted outer transaction rolls back its consumption and cursor update, so the next
+       expected action does not change;
+    5. the retained commitment can be only `H[k]` after `k` successful actions, and stopping after
+       any prefix is allowed; and
+    6. the manager and wrapper permit at most one successful Rollup0 candidate activation in an
+       Ethereum block, so another batch cannot replace its manifest, queues, or progress cursor;
+    7. one outer Ethereum transaction can successfully consume at most one Rollup0 action; and
+    8. an EIP-4844 blob transaction cannot consume a Rollup0 action.
 
-    An `eth_sendBundle` request is not visible to the EVM. Even with option 1, a builder that has the
-    signed transactions can omit one trigger or add another transaction outside the submitted
-    bundle. A skipped successful execution entry remains at the EEZ queue head and blocks a later
-    trigger with a different call hash, even if that entry would not change the state root. A failed
-    lookup is not part of that queue and leaves no persistent cursor. Initial Rollup0 therefore
-    requires it to be the final prepared action. Duplicate call hashes can still let another
-    transaction receive a result prepared for the intended occurrence.
+    The successful EEZ queue already advances only in order and only when the current call hash
+    matches its next entry. An outer transaction revert rolls back that consumption. The production
+    manager and wrapper add the authenticated leading anchor transition and one-candidate-per-block
+    gate. Together these rules enforce the successful Rollup0 transition prefix.
 
-    A unified cursor would enforce prefixes without requiring all combinations of triggers or state
-    roots. It does not work by itself for caught failures: the proxy reports failure with `REVERT`,
-    which rolls back the cursor update. A compatible acknowledgement mechanism has not been
-    designed.
+    A failed lookup has no retained progress cursor because the proxy returns it with `REVERT`.
+    Initial Rollup0 therefore permits a failure only as the final manifest action and does not count
+    it as a Rollup0 commitment transition. The same failed lookup may be called again in the
+    settlement block, but it can neither change `H[k]` nor unlock a successful suffix. Its L1
+    occurrence is outside the Rollup0 endpoint derivation rule.
 
-    The team must either accept compatible builders as a Rollup0 trust assumption or design option
-    2. The selected builders, fee policy, and exact rule are production blockers. Candidate relay
-    remains permissionless.
+    `eth_sendBundle` may deliver one or more candidate prefixes, but correctness does not depend on
+    the builder preserving a proposed transaction list. A different transaction that produces the
+    next expected call is intentionally the same action. A mismatched call cannot consume the next
+    successful queue entry, and no action follows a terminal failed lookup. Candidate relay remains
+    permissionless.
 
-    `postAndVerifyBatch` must be submitted as an EIP-4844 blob transaction with its blob sidecar.
-    The selected relay and builder APIs must accept and simulate that sidecar together with every
-    prefix bundle. Support and size limits for this path are also production blockers.
+!!! danger "PRODUCTION BLOCKER: transaction-scoped trigger guard"
+    Validator simulation of a proposed trigger cannot constrain a different transaction carrying
+    the same ordered call. The production L1 EEZ path must therefore enforce the transaction-carrier
+    rules itself. It must reject a second successful Rollup0 consumption in one outer transaction
+    and reject a consumption when `BLOBHASH(0)` is nonzero.
 
-## 7.5 Identical Cross-Chain Calls
+    A transaction-scoped transient latch in EEZ can enforce the successful-consumption limit and
+    naturally resets at the end of the outer transaction; the exact contract change and conformance
+    tests are not yet defined. A failed lookup creates no Rollup0 transition and may remain reusable
+    under the terminal-failure rule. Synchronous production cannot rely on ordered-call substitution
+    until this guard is deployed.
+
+!!! note "DEPLOYMENT POLICY: bundle delivery"
+    The initial operator SHOULD submit `n + 1` overlapping strict-prefix bundles when its builder
+    API supports them, or use an equivalent smaller request set that preserves the desired prefix
+    opportunities. This is inclusion policy, not a validity rule. `submitCandidate` must be an
+    EIP-4844 blob transaction, and the selected relay and builder APIs must simulate its sidecar
+    together with each request. The exact API, builder set, fee policy, sidecar support, and request
+    size limits are deployment configuration.
+
+## 7.5 Ordered Call Identity
 
 The EEZ call hash identifies the target network, target address, value, calldata, source address,
-and source network. It does not identify the Ethereum transaction that made the call. Two
-occurrences with the same fields therefore have the same hash.
+and source network. It does not identify the Ethereum transaction that made the call. Rollup0
+intentionally defines action identity as:
 
-When two prepared actions have the same hash, EEZ cannot always select the intended occurrence. For
-example, a valid candidate can contain a successful action followed by a terminal failed action
-with the same hash. If a builder omits the first trigger, the terminal trigger can match the
-successful execution entry before the failed lookup and receive the wrong result. Under a
-single-bundle design that permits outer trigger reverts, a later identical trigger can also consume
-an earlier rolled-back entry.
+```text
+(authenticated settlement context, manifestIndex, crossChainCallHash)
+```
 
-!!! caution "TO BE DEFINED: duplicate call identity"
-    Rollup0 must select one of these rules before production:
+The settlement context identifies the candidate's intended Ethereum slot and parent. The manifest
+index identifies the next action position, and the call hash identifies the call semantics. The
+outer Ethereum transaction hash, sender nonce, and unrelated L1 effects are not Rollup0 action
+identity.
 
-    1. **Bind an entry to the Ethereum transaction hash.** This preserves normal application calls
-       and gives every occurrence an exact identity. Standard Ethereum execution does not expose
-       the current transaction hash or account nonce to contracts. A hash in the blob or proof
-       cannot make the EEZ queue compare against it. This option would require new Ethereum
-       execution context and is not currently available. It would solve occurrence identity, but
-       would not create the missing cursor for a skipped failed lookup.
-    2. **Reject duplicate top-level call hashes in one candidate.** The uniqueness check covers
-       both successful execution entries and failed lookups; zero-hash immediate entries are not
-       call identities. This works with standard Ethereum transactions and the current proxy
-       interface. Rollup0 validators and proofs can reject such a candidate while leaving EEZ
-       flexible for other networks. Alternatively, EEZ can reject duplicates while posting the
-       batch, which gives an on-chain check but adds gas and applies the restriction to every
-       affected EEZ network unless it is configurable. Identical calls remain valid in different
-       candidates.
-    Treating identical calls as interchangeable is not an option. Two occurrences can have
-    different results because they execute against different Rollup0 states. A later Ethereum
-    transaction could otherwise receive an earlier occurrence's result and continue with L1
-    behavior that was not validated for that transaction.
+Two manifest positions MAY have the same call hash. They remain distinct ordered actions because
+the successful-entry cursor assigns the first matching call to the first position and advances
+before the second can execute. Their prepared results may differ because they execute against
+different Rollup0 states. If a transaction originally proposed for a later identical position
+arrives first, it intentionally performs the current position and receives that position's result.
+Its ordinary Ethereum behavior is determined by canonical L1 execution.
 
-    Until the team selects a rule, candidates with duplicate top-level call hashes do not have a
-    complete Rollup0 settlement definition.
+An Ethereum transaction from a different effective source address normally produces a different
+call hash and cannot consume the entry. A different transaction from the same EOA, or a transaction
+routed through the same source contract, can produce the same hash; at the expected position it is
+intentionally equivalent for Rollup0. This rule preserves the current proxy and wallet call path
+while making clear that Rollup0 does not authenticate the outer transaction's nonce, fee payer, or
+unrelated L1 effects.
 
 ## 7.6 Canonical Evidence
 
 A follower uses canonical Ethereum transaction and receipt order. It verifies:
 
-- the exact settlement transaction and ordered trigger manifest;
+- the exact settlement transaction and authenticated ordered action manifest;
 - successful settlement execution;
 - logs from the selected EEZ deployment only;
 - the Rollup0 ID;
-- every processed action, `B[k]`, `R[k]`, and the resulting safe cursor; and
+- the successful-action count `k`, `B[k]`, `H[k]`, `R[k]`, and the resulting safe cursor; and
 - the candidate's position relative to competing candidates.
 
-An event name or matching state-root value by itself is not settlement evidence.
+An event name or matching block-hash value by itself is not settlement evidence.
 
 ---
 
