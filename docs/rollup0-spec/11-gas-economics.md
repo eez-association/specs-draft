@@ -24,29 +24,45 @@ block's `gasUsed`.
 Fusaka also limits the RLP-encoded execution block to `8,388,608` bytes under EIP-7934. A block
 must satisfy both this byte limit and the `30,000,000` gas limit.
 
-!!! note "TO BE DEFINED"
-    The genesis base fee, fee recipient, and treatment of base and priority fees are not yet
-    selected.
+Rollup0 does not admit L2 blob transactions and therefore charges no L2 blob gas. Every Rollup0
+block has zero `blobGasUsed`. Ethereum blob gas paid by a settlement transaction is an L1 data
+availability cost and is not part of Rollup0 block execution.
 
-Rollup0 has not yet selected whether ordinary transaction fees use the Ethereum base-fee burn and
-priority-fee recipient rules or route some fees to deployment-selected vaults.
+Ordinary signed transactions use Ethereum's fee rules. The base fee is burned and the priority fee
+is credited to the composer-selected block `beneficiary`. The Rollup0 genesis base fee is
+`1,000,000,000` wei (`1 gwei`), matching Ethereum's standard initial base fee.
+
+!!! success "DECISION: type-`0x45` pays no L2 fee"
+    Type-`0x45` inbound transactions have no fee fields or payer. They consume and report gas but
+    skip ordinary fee-cap, upfront-balance, deduction, and refund processing. `GASPRICE`, JSON-RPC
+    `gasPrice`, and receipt `effectiveGasPrice` are all zero. No base fee is burned and no priority
+    fee is credited for their gas.
 
 [Appendix B](B-gas-cost-analysis.md) explains why Rollup0 uses `2/50` rather than Ethereum's
 `2/8` or the earlier `6/250` proposal.
 
-## 11.2 Composer Costs
+## 11.2 Candidate Costs and Revenue
 
-A composer can pay for:
+Candidate production can create costs for several participants:
 
-- Rollup0 execution;
-- validation or proving;
-- blob publication;
-- the Ethereum settlement transaction;
-- the trigger transaction or bundle inclusion; and
-- retries for a candidate that loses or is not included.
+- composers bear block construction, Rollup0 execution, and retry costs;
+- validators or provers bear validation or proving costs;
+- the blob-transaction sender pays Ethereum DA and settlement-execution fees;
+- each trigger sender pays its Ethereum transaction fees; and
+- relayers, builders, or other parties may bear or receive private inclusion payments.
 
-Rollup0 does not currently guarantee reimbursement. Open composition therefore does not imply that
-candidate production is profitable.
+Ordinary signed Rollup0 transactions use the only protocol-level fee mechanism currently defined:
+their base fee is burned and their priority fee is paid to the block `beneficiary`. Rollup0 defines
+no protocol-level reimbursement for candidate construction, validation, proving, DA, settlement,
+failed candidates, or losing siblings. Participants may use private funding and payment
+arrangements, but open composition does not imply that candidate production is profitable.
+
+A planned permissioned Gnosis sister network, separate from Rollup0, may fund its
+sequencer/composer operationally and require that operator to use a Gnosis-designated
+`beneficiary`. Gnosis would receive the ordinary priority fees from blocks produced by that
+operator and use them to offset its funding costs. This illustrates an operational arrangement;
+it is not a Rollup0 reimbursement mechanism or profitability guarantee. Rollup0 itself retains
+open composition and the composer-selected-beneficiary rule.
 
 ## 11.3 Data Availability Cost
 
@@ -54,43 +70,54 @@ Rollup0 publishes anchored chain data in Ethereum blobs. Cost follows Ethereum b
 the number of blobs used by a candidate.
 
 After a long anchoring outage, several catch-up anchors can be needed. Their total DA and
-settlement cost grows with the backlog. The recovery-rate and transaction-intake rules are the
-open discussion in Chapter 7.
+settlement cost grows with the backlog. Recovery-rate reporting remains open. Pure-L2 intake
+backpressure is operational policy: composers SHOULD reduce or stop intake when that helps their
+branch catch up.
 
-The production design must select:
+V0 has no separate payload-size, block-count, or user-transaction-count cap below its natural
+uncompressed DA bound. Appendix G explains the early byte-availability checks that prevent
+declared counts from causing unbounded allocation. It also has no candidate-wide execution-work
+cap: each block remains subject to the existing block gas limit, regardless of how composers split
+the sequence into anchors.
 
-- a maximum payload size;
-- a maximum user-transaction count;
-- a maximum candidate range;
-- who pays the DA cost; and
-- whether Rollup0 charges users an explicit Ethereum-data fee.
+There is no separate maximum number of catch-up intervals. Within the authenticated payload and
+resource limits, a catch-up composer SHOULD use the largest blob allotment it can reasonably get
+included and fill it with the longest complete valid historical prefix. Maximality is not a
+validity rule, and a smaller candidate remains valid.
 
-!!! note "TO BE DEFINED"
-    The exact blob capacity and fee-allocation rules are not yet selected.
+!!! note "PHYSICAL DA AND OPERATIONAL PROVING LIMITS"
+    A validator or prover may reject or defer a request that exceeds its local capacity, but this
+    does not make the candidate invalid. A future proof system that cannot cover all valid V0
+    candidates needs an explicit activation rule. Rollup0 V1 does not add a protocol-level DA fee
+    or reimbursement mechanism; the Ethereum blob-transaction sender pays the canonical L1 fees.
+    A composer chooses whether a candidate is worth publishing, so an unwanted proposal cannot
+    force it to incur blob cost.
 
 ## 11.4 Settlement and Bundle Limits
 
 The settlement transaction, trigger, and all other transactions in their Ethereum block must fit
-within the Ethereum block gas limit. The candidate must also fit the limits of its selected proof
-system and inclusion mechanism.
+within the Ethereum block gas limit. The encoded proof or signatures and settlement calldata must
+fit the selected inclusion mechanism. A validator or prover may decline an oversized request, but
+its local capacity does not alter candidate validity.
 
-The draft budgets `4,000,000` Ethereum gas for `postAndVerifyBatch`. The maximum bundle capacity
-still depends on the final batch shape, proof threshold, trigger, and Ethereum block gas headroom.
+Rollup0 imposes no smaller settlement-transaction gas budget of its own. The active Ethereum
+per-transaction gas cap and the gas remaining in the containing Ethereum block are the validity
+limits. Practical bundle capacity still depends on the final batch shape, proof threshold,
+triggers, and the headroom a builder is willing to allocate.
 
 ## 11.5 Inbound Transaction Gas and Value
 
 Chapter 3 defines the common gas pool and the protocol credit used for inbound value. Every
 composer, validator or prover, and follower must reproduce the same gas use and value movement.
 
-!!! note "TO BE DEFINED"
-    Rollup0 must select one of the protocol-transaction fee approaches discussed in Chapter 3. The
-    choice must define who pays, which asset is charged, how the amount is calculated, where it
-    goes, how refunds work, what `GASPRICE` and `effectiveGasPrice` return, and how inbound value is
-    backed by value held on Ethereum.
+Type-`0x45` pays no L2 fee under the V1 rule in Chapter 3. Its inbound application value remains
+separate: that value is backed by ETH held on Ethereum and temporarily credited for the exact
+application call under Chapter 5.
 
-    A failed inbound action creates no Rollup0 transaction, consumes no Rollup0 block gas, and
-    cannot debit or credit fees in Rollup0 state. Its block and state root remain unchanged. Any
-    charge for simulating or proving that failure must occur in the Ethereum settlement flow.
+A failed inbound action creates no Rollup0 transaction, consumes no Rollup0 block gas, and cannot
+debit or credit fees in Rollup0 state. Its block hash and state root remain unchanged. Rollup0
+defines no fee or reimbursement for simulating or proving that failure; the participant bears the
+cost unless a private arrangement assigns it elsewhere.
 
 ---
 
