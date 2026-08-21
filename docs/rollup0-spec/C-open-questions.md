@@ -1,73 +1,36 @@
-# Appendix C. Open Questions
+# Appendix C. Remaining Production Work
 
-The following questions require protocol decisions. They are not left to client discretion.
+The main protocol choices reviewed through Chapter 12 are fixed. The following work still needs a
+normative specification, implementation, deployment selection, or measurement before production.
+It is not left to incompatible client convention.
 
-## C.1 Domain Separation and Replay
+## C.1 Conformance and Contract Work
 
-The EEZ call hash and proof digest do not by themselves state every deployment property.
+- Add transaction, receipt, execution, JSON-RPC, and invalid-input conformance vectors for the
+  fixed type-`0x45` envelope and RPC schema.
+- Add comprehensive canonical and invalid-input vectors for Appendix D's normative V0 payload.
+- Add canonical and invalid-signature vectors and a P2P message mapping for Appendix D's
+  unsafe-block announcement.
+- Implement and test the L1 EEZ transaction-scoped guard that allows at most one successful
+  Rollup0 consumption per outer transaction and rejects a nonzero `BLOBHASH(0)`.
+- Define deterministic failed-lookup construction and lowering from an authenticated candidate to
+  every type-`0x45` transaction.
 
-- What binds a signature to this Ethereum chain, EEZ deployment, and Rollup0 instance?
-- Is the EEZ proof-context block hash sufficient anti-replay protection?
-- What prevents a stale but otherwise valid batch from being resubmitted?
-- What structure must `crossProofSystemInteractions` have for Rollup0?
+## C.2 Asynchronous Withdrawals
 
-## C.2 Inbound Protocol Transaction
+- What proves or authorizes an asynchronous Rollup0 withdrawal?
+- How long must a request wait before Ethereum releases ETH?
+- How does the payout path atomically reduce Rollup0's EEZ backing and prevent replay?
+- Which fields and domain form the unique withdrawal identifier?
 
-- Will Rollup0 keep one protocol transaction per successful Ethereum trigger, or select another
-  grouping option from Chapter 3?
-- What transaction type and byte-exact payload will Rollup0 use?
-- Which fields make the source identifier unique and bind it to the Ethereum and Rollup0 domains?
-- Will the typed receipt use only the standard EIP-2718 receipt fields?
-- Will every protocol-level transaction failure continue to invalidate the complete candidate?
-- Will `EEZL2` continue to require balance neutrality rather than an absolute zero balance?
-- Will Rollup0 keep the protocol-credit value source selected in Chapter 3?
-- Will protocol transactions continue to share the ordinary block gas pool?
-- Who pays for protocol-transaction gas, in which asset, and who receives it?
-- Who pays for simulating and proving a failed action that creates no Rollup0 transaction?
-- What do `GASPRICE` and receipt `effectiveGasPrice` return?
-- Which extra transaction fields, if any, are exposed through JSON-RPC?
-- How does the blob format carry the exact protocol transaction and its authenticated origin data?
+## C.3 Deployment and Capacity Validation
 
-## C.3 Ethereum Inclusion
-
-- Will Rollup0 submit one strict atomic bundle for every trigger prefix?
-- Which builders support overlapping prefix bundles with one shared settlement transaction?
-- Is trusting those builders not to repackage signed transactions acceptable for Rollup0?
-- Is a contract-enforced progress mechanism needed instead?
-- Will a later version permit actions after a caught failure by trusting exact builder ordering or
-  by adding a unified on-chain action cursor?
-- Which duplicate-call rule from Chapter 7 will Rollup0 select?
-- Should duplicate rejection be enforced by Rollup0 validation or by the EEZ contract?
-- Who pays inclusion fees?
-- How does a relayer submit a candidate without gaining composer privileges?
-- How does Rollup0 enforce its required transient execution-entry and lookup counts while
-  preventing the same proof from bypassing that check through direct EEZ submission?
-
-## C.4 Adversarial Gas, DA, and Recovery
-
-- Should `prevRandao` keep the current chain- and block-separated derivation, or copy the
-  live-anchor seed unchanged until the next refresh?
-- Can synchronous execution consume enough of the common block gas pool to make useful prefixes
-  impractical?
-- Which payload-size and fee rules prevent blob-cost griefing?
-- What per-block, per-interval, and per-candidate DA limits guarantee that at least one complete
-  interval fits in a catch-up anchor?
-- How much faster than new L2 data production must catch-up publication be?
-- At what lag must composers reduce or stop pure-L2 transaction intake?
-- Which catch-up and backpressure rules are consensus validity rules, and which are operational
-  policy?
-- Does Rollup0 accept that a catch-up block's timestamp proves its scheduled position but not when
-  it was first produced?
-- If not, what timely attestation or precommitment proves historical production without making an
-  anchoring outage unrecoverable?
-- Is re-inclusion safe when an Ethereum reorganization removes the trigger but leaves the candidate
-  available for resubmission?
-- Will a later version move backing from pooled EEZ custody to a dedicated vault, and what liquidity
-  and loss rules would apply?
-- Who pays DA and proof costs?
-- How are fees distributed?
-- What automatic reorganization depth is supported?
-- Who can authorize recovery after a deeper reorganization or a finalized-history failure?
+- Which builders and relays support the selected blob-sidecar and prefix-bundle delivery strategy?
+- What exact API, fee policy, and request limits will the initial operator use?
+- Can synchronous inbound execution consume enough of the common Rollup0 block gas pool to make
+  useful action prefixes operationally impractical?
+- Which settled-lag, pending-range, publication-rate, and estimated-catch-up-time metrics should
+  clients expose?
 
 ---
 

@@ -15,20 +15,28 @@ This gives Rollup0:
 | Maximum gas per 2-second block | `30,000,000` |
 | Target gas per 12 seconds | `90,000,000` |
 | Maximum gas per 12 seconds | `180,000,000` |
-| Full-block base-fee increase | `2%` per block |
+| Full-block base-fee increase | approximately `2%` per block |
 | Empty-block base-fee decrease | `2%` per block, before integer rounding |
 
 The elasticity multiplier controls burst capacity. A value of `2` lets one block use twice the
 sustained target. It avoids treating a much larger burst allowance as normal capacity.
 
-The denominator controls how quickly the base fee changes. Ethereum uses `2/8`, which changes the
-base fee by up to `12.5%` once per 12-second block. Applying `2/8` to Rollup0's 2-second blocks
-would allow six such changes in the same time. Six consecutive full Rollup0 blocks would raise the
-fee by about `102.7%`.
+The denominator controls how quickly the base fee changes. Ethereum uses elasticity `2` and
+denominator `8`, which changes the base fee by up to `12.5%` once per 12-second block. Applying
+those parameters to Rollup0's 2-second blocks would allow six such changes in the same time. Six
+consecutive full Rollup0 blocks would raise the fee by about `102.7%`.
 
-With `2/50`, a full Rollup0 block raises the fee by `2%`. Six consecutive full blocks raise it by
-about `12.6%`, close to Ethereum's `12.5%` change over one full 12-second block. Six empty Rollup0
-blocks lower it by about `11.4%`.
+For parent base fee `f`, a full or empty Rollup0 block applies the EIP-1559 integer rules:
+
+```text
+full:  f_next = f + max(floor(f / 50), 1)
+empty: f_next = f - floor(f / 50)
+```
+
+Ignoring integer rounding, a full block therefore raises the fee by `2%`. Six consecutive full
+blocks raise it by about `12.6%`, close to Ethereum's `12.5%` change over one full 12-second block.
+Six empty Rollup0 blocks lower it by about `11.4%`. The percentages and chart are explanatory
+real-number approximations; block validation uses the active fork's exact integer calculation.
 
 The earlier `6/250` proposal also raises the fee by `2%` when a `30,000,000` gas block is full.
 However, it sets the target to only `5,000,000` gas per block and lowers the fee by only `0.4%`
@@ -47,46 +55,60 @@ These parameters do not prove that `90,000,000` target gas per 12 seconds is ope
 The deployment still needs load, execution, proving, and data-availability tests. The fixed
 `30,000,000` per-block limit bounds a single two-second burst while those measurements are made.
 
-## B.2 Candidate Cost
+## B.2 Candidate Participant Costs
 
-A candidate's direct cost is approximately:
+A candidate can create the following costs across different participants:
 
 ```text
-Rollup0 execution
-+ proof or validation
-+ Ethereum blobs
-+ Ethereum settlement execution
-+ ordered bundle inclusion
-+ expected retry cost
+composer             = construction + Rollup0 execution + expected retry cost
+validators/provers   = validation + signing or proving
+blob sender          = Ethereum blob gas + settlement-transaction execution
+trigger senders      = their Ethereum transaction execution
+private participants = any builder, relayer, or bundle-inclusion payments
 ```
 
-Open composition exposes each composer to losing-sibling risk. A composer can pay validation and
-submission costs even when another valid candidate settles first.
+Open composition exposes candidate participants to losing-sibling risk. Composers can lose their
+construction and retry costs, validators or provers can spend resources on an unselected sibling,
+and a relayer can incur submission costs even when another valid candidate settles first. Rollup0
+does not reimburse these costs at protocol level and does not assign every cost to one party.
+Private arrangements may redistribute them.
+
+A planned permissioned Gnosis sister network, separate from Rollup0, may fund its
+sequencer/composer and require that operator to use a Gnosis-designated block beneficiary.
+Ordinary priority-fee revenue from its blocks can offset that funding, but Rollup0 neither encodes
+this arrangement nor guarantees that the revenue covers the costs. On Rollup0 itself, an
+independent composer remains free to choose its block beneficiary.
 
 ## B.3 Data Availability
 
-For a candidate using `n` blobs, the DA cost is determined by the Ethereum blob base fee and the
-blob gas charged per blob:
+For a candidate using `b` blobs, the DA fee paid by the blob-transaction sender is determined by
+the containing Ethereum fork's blob gas per blob and that block's blob base fee:
 
 ```text
-DA_cost = n * blob_gas_per_blob * blob_base_fee
+DA_fee = b * blob_gas_per_blob * blob_base_fee
 ```
 
-The exact monetary cost also depends on settlement execution gas and any inclusion payment.
+Settlement-transaction execution fees and private inclusion payments are additional publication
+costs; they are not part of `DA_fee`.
 
-## B.4 Settlement Scaling
+## B.4 Settlement and Bundle Scaling
 
-Settlement cost grows with:
+The settlement transaction's gas use grows with:
 
 - encoded EEZ batch size;
 - number of execution entries and lookups;
 - validator/prover threshold and proof-system verification cost;
-- state reads and writes;
-- trigger execution; and
-- bundle inclusion overhead.
+- state reads and writes; and
+- settlement-wrapper and manager checks.
+
+The complete bundle's Ethereum block footprint additionally includes each selected trigger's gas
+and transaction bytes. Private builder or relayer payments affect monetary inclusion cost but do
+not themselves add a Rollup0 consensus gas budget.
 
 Production capacity limits require measurements against the final contracts, proof policy, and
-protocol-transaction format. This draft does not provide measured limits.
+protocol-transaction format. This draft does not provide measured limits. Rollup0 imposes no
+smaller settlement-transaction budget: the active Ethereum per-transaction cap and the gas
+remaining in the block are the validity limits.
 
 ---
 

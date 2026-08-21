@@ -1,79 +1,85 @@
 # 12. Limitations and Open Issues
 
-## 12.1 Protocol Limitations
+## 12.1 Accepted Protocol Limitations
 
-- **Permissioned validity:** candidate production and relay are open, but settlement depends on a
-  permissioned validator/prover set.
+- **Permissioned validity and Ethereum custody:** candidate production and relay are open, but
+  settlement depends on a permissioned validator/prover set. A conforming follower independently
+  executes an accepted candidate and halts if its claimed result is invalid, so the threshold
+  cannot silently fabricate the follower's Rollup0 history. It can nevertheless authorize
+  unjustified Ethereum-side EEZ results, corrupt dependent applications, and drain assets they
+  control. Threshold compromise is catastrophic and follower detection cannot reverse those L1
+  effects.
 - **No force inclusion:** the protocol does not guarantee that a valid candidate reaches or is
   included by Ethereum.
-- **No trustless exit:** a follower can detect invalid history but cannot reverse Ethereum
-  settlement or force a withdrawal.
-- **One cross-network direction:** only one top-level Ethereum-to-Rollup0 state-changing call is
-  selected.
-- **Unfinished blob format:** the required blob contents are known, but their byte-exact encoding is
-  not yet defined.
-- **Unfinished catch-up limits:** historical catch-up anchors are defined, but the DA limits,
-  minimum recovery rate, lag thresholds, and backpressure policy are not.
+- **One cross-network direction:** V1 supports top-level state-changing actions from Ethereum to
+  Rollup0 only. A candidate may contain an ordered sequence of these actions, with exactly one
+  top-level Rollup0 action in each trigger. Top-level Rollup0-to-Ethereum actions are not supported.
+- **No L2 blob transactions:** Rollup0 uses Ethereum blobs for L1 data availability but does not
+  provide a beacon sidecar network for blob transactions inside Rollup0 blocks.
+- **Historical data availability:** standard P2P block and state synchronization does not require
+  blob archives, but ordinary pruning can make old bodies, receipts, and historical states
+  unavailable. Historical RPC requires normal Rollup0 archive nodes.
+- **Scheduled catch-up timestamps:** a catch-up block's timestamp identifies its scheduled
+  Rollup0 position, not when the block was first produced or gossiped. Ethereum settlement
+  determines when the position becomes safe and finalized.
+- **No candidate-cost reimbursement:** ordinary priority fees are the only protocol-level producer
+  revenue currently defined. Rollup0 does not guarantee reimbursement for construction,
+  validation, proving, DA, settlement, retries, or losing siblings.
+- **Unanchorable unsafe branches:** an unsafe range that cannot fit a valid blob-backed candidate
+  never becomes safe. A composer can rebuild a smaller sibling from the settled cursor, but nodes
+  following the oversized branch experience an unsafe reorganization.
 - **Unsafe siblings:** local unsafe state can be replaced when another valid sibling settles first.
-- **Builder dependency:** composers request one of several ordered prefixes through
-  `eth_sendBundle`. The API does not prevent a builder from repackaging the signed transactions.
-  The builder trust assumption or a contract-enforced alternative is still under discussion.
 - **Private trigger trust:** validators, relayers, and builders receive signed Ethereum trigger
-  transactions before inclusion. Initial Rollup0 trusts them not to leak or submit those
-  transactions outside an approved bundle.
-- **Duplicate call identity:** the rule for identical top-level cross-chain call hashes is not yet
-  selected.
+  transactions before inclusion. They are trusted not to leak them. Ordered-call identity keeps a
+  substituted matching call consistent with Rollup0, but it cannot prevent a leaked transaction
+  from being included on Ethereum and producing ordinary L1 effects.
+- **No blob triggers:** an Ethereum trigger cannot be an EIP-4844 blob transaction or otherwise
+  require a blob sidecar. `submitCandidate` is the candidate's blob transaction.
 - **Trusted manager:** the Rollup0 manager selects the proof policy and retains the EEZ
-  `setStateRoot` escape power assigned by the generic protocol.
-- **Permissioned recovery:** exceptional recovery requires an authority that is not yet defined.
-- **No secure in-block randomness:** anchor-derived `prevRandao` is predictable after the anchor
-  seed is known. Deriving a different value for each block adds no entropy; copying the seed
-  unchanged, as the OP Stack does within an L1-origin epoch, makes the same limitation explicit.
+  `setStateRoot` escape power assigned by the generic protocol. Despite its legacy name, this
+  function sets Rollup0's block-hash commitment. An out-of-protocol use changes Ethereum-side EEZ
+  state but is not automatically accepted by Rollup0 followers.
+- **Community hardfork recovery:** ordinary non-finalized reorganizations return to the latest
+  finalized Ethereum checkpoint and have no separate Rollup0 depth limit. A conflict with
+  finalized Rollup0 history has no privileged in-protocol recovery authority; followers halt until
+  a community-coordinated hardfork defines a new authenticated checkpoint.
+- **No secure in-block randomness:** the containing Ethereum block's `prevRandao` can be known
+  before the live anchor is included. Rollup0 then copies that seed unchanged until the next live
+  anchor, making the limitation explicit.
 - **Simulation parity:** a composer and every validator/prover must simulate the exact selected EVM
   fork and protocol-transaction semantics. A mismatch makes an apparently valid candidate fail on
   Ethereum or derive a different Rollup0 block.
-- **Unsigned EEZ dispatch counts:** the fixed EEZ proof digest does not bind the transient
-  execution-entry or lookup counts. Rollup0 requires exact values, but a relayer can change them
-  without invalidating validator signatures. The mitigation is not yet selected.
+- **Settlement-wrapper dependency:** the fixed EEZ proof digest does not bind the transient-prefix
+  lengths, and EEZ does not revert when the leading anchor entry is skipped. Rollup0 therefore
+  requires its manager-gated settlement wrapper. Direct EEZ submission is invalid.
+- **Legacy EEZ terminology:** the current contracts call Rollup0's opaque block-hash commitment a
+  state root. The encoding is unambiguous and does not block production, but a later EEZ revision
+  should use commitment-oriented names.
 
-## 12.2 Undefined Production Choices
+## 12.2 Production Blockers and Launch Parameters
 
-The following need exact definitions before production:
+The following are not accepted V1 limitations. They need exact definitions or implementations
+before production:
 
-- Rollup0 chain ID, EEZ rollup ID, native asset, genesis, and initial RANDAO seed;
-- whether `prevRandao` uses the current per-block derivation or copies the live-anchor seed
-  unchanged;
+- Rollup0 chain ID, EEZ rollup ID, genesis, and finalized Ethereum RANDAO reference block;
+- the unsafe-block announcement P2P mapping and conformance vectors;
 - the selected EEZ version;
+- the initial validator/prover membership, proof-system keys, and manager configuration;
 - production contract addresses, predeploy bytecode, and upgrade rules;
-- the genesis base fee;
-- the post-Fusaka EVM fork-activation schedule;
-- validator/prover membership, proof systems, keys, threshold, and rotation;
-- proof context and domain separation;
-- the protocol-transaction type, byte-exact payload, source identifier, transaction-hash vectors,
-  receipt encoding, and RPC fields;
-- protocol-transaction fee handling, including `GASPRICE` and receipt `effectiveGasPrice`;
+- comprehensive conformance vectors for the normative byte-exact blob payload format;
+- protocol-transaction, receipt, execution, RPC, and invalid-input conformance vectors;
 - deterministic failed-lookup construction and validation for caught Rollup0 failures;
-- whether to keep one protocol transaction per successful Ethereum trigger;
-- whether every protocol-level transaction failure invalidates the complete candidate;
-- whether `EEZL2` keeps the selected per-transaction balance-neutrality rule;
-- deterministic lowering from EEZ entries and Ethereum origin data to the protocol transaction;
-- the Ethereum builder and strict prefix-bundle submission mechanism;
-- whether a later version permits actions after a caught failure by trusting exact builder ordering
-  or by adding a unified on-chain action cursor;
-- enforcement that the leading anchor-root transition either applies or reverts;
-- enforcement of the fixed Rollup0 transient dispatch counts without changing EEZ;
-- the duplicate top-level cross-chain call rule;
-- enforcement of one EEZ batch that contains Rollup0 per Ethereum block, or equivalent queue
-  integrity;
-- maximum payload size, transaction count, and gas;
-- catch-up range limits, recovery-rate requirements, lag thresholds, and transaction-intake
-  backpressure;
-- the later dedicated-vault design, including liquidity, yield, losses, and withdrawals;
-- fee recipients, DA charging, and composer reimbursement;
-- deployment start block and historical upgrade boundaries; and
-- reorganization history bounds and emergency authority.
+- deterministic lowering from the settlement context, action manifest, and EEZ entries to the
+  protocol transaction;
+- the asynchronous ETH withdrawal authorization, confirmation, payout, and replay rules;
+- the Ethereum builder API and operational prefix-bundle submission policy;
+- the transaction-scoped L1 EEZ guard and its conformance vectors;
+- catch-up recovery-rate and intake-backpressure reporting;
+- deployment start block and historical upgrade boundaries.
 
-These are unresolved protocol inputs. A client MUST NOT select production values by convention.
+Consensus and wire-format values require normative specification and conformance vectors.
+Deployment-specific addresses, builder integrations, and operational policies require published
+network configuration. A client MUST NOT invent missing consensus values by convention.
 
 ## 12.3 Possible Rollup0.x L2 Contract Changes
 
@@ -85,6 +91,10 @@ A later Rollup0.x hardfork may consider:
 
 - enabling synchronous actions originating on Rollup0, routing them from sequencers to composers,
   and then extending the profile to full nested composability in both directions;
+- adding an Ethereum-initiated synchronous withdrawal claim against ETH previously locked in a
+  Rollup0 withdrawal escrow;
+- activating a new settlement wrapper and candidate-domain tag whose transient execution prefix
+  includes the anchor followed by all leading top-level outbound entries;
 - clearing an inbound execution table immediately after its action completes, which removes
   inactive table data but adds storage writes;
 - moving action-scoped execution data to EIP-1153 transient storage, which gives it a natural
