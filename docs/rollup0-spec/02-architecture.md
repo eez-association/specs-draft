@@ -90,8 +90,13 @@ Rollup0 additionally requires an L2 EEZ predeploy and a deterministic protocol-t
 mechanism for inbound execution. Their Rollup0-specific placement and unresolved production
 parameters are defined in [Chapter 3](03-evm-proxy-systemtx.md).
 
-Execution clients expose the standard Engine API needed to build, validate, execute, and import
-Rollup0 blocks.
+Execution clients use the standard Engine API to validate, execute, and import Rollup0 payloads.
+Payload construction additionally has to insert the deterministic type-`0x45` transaction after
+the Sync block's pure-L2 prefix. The standard Engine API has no general method for an external
+composer to inject that non-pool transaction into payload construction. An implementation MUST
+therefore construct the payload in process or expose a versioned Rollup0-specific construction
+extension. The selected construction interface is an interoperability and deployment choice, not
+a new consensus input: every resulting payload remains subject to the same block-validation rules.
 
 ---
 

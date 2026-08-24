@@ -69,8 +69,9 @@ the number of successful actions in the complete candidate. Because an optional 
 terminal, `s` is either `n` or `n - 1`. The published data defines terminal variants `B[0]` through
 `B[s]`. Every variant has block number `toNumber`, the same timestamp, the same pure-L2 prefix, and
 exactly its first `k` successful protocol transactions. Candidate validation checks every variant
-against the current Ethereum-confirmed Rollup0 head. A failed action must be the final action in the
-manifest and does not create another block variant.
+by replaying it from the candidate's same settled parent, which must be the current
+Ethereum-confirmed Rollup0 safe head when the candidate settles. A failed action must be the final
+action in the manifest and does not create another block variant.
 
 `H[k]` is the block hash of `B[k]`. It is the Rollup0 commitment used in EEZ state deltas.
 `R[k]` is the EVM state root in that block's header, and `R[0]` is also called `R0`.
@@ -261,17 +262,39 @@ that a leaked valid Ethereum transaction can cause on L1.
     successful queue entry, and no action follows a terminal failed lookup. Candidate relay remains
     permissionless.
 
-!!! danger "PRODUCTION BLOCKER: transaction-scoped trigger guard"
-    Validator simulation of a proposed trigger cannot constrain a different transaction carrying
-    the same ordered call. The production L1 EEZ path must therefore enforce the transaction-carrier
-    rules itself. It must reject a second successful Rollup0 consumption in one outer transaction
-    and reject a consumption when `BLOBHASH(0)` is nonzero.
+!!! danger "PRODUCTION BLOCKER: required L1 EEZ trigger-consumption guard"
+    **This requires a change to the L1 EEZ contract.** A manager or settlement-wrapper change alone
+    is insufficient because later trigger transactions call the EEZ consumption path directly.
 
-    A transaction-scoped transient latch in EEZ can enforce the successful-consumption limit and
-    naturally resets at the end of the outer transaction; the exact contract change and conformance
-    tests are not yet defined. A failed lookup creates no Rollup0 transition and may remain reusable
-    under the terminal-failure rule. Synchronous production cannot rely on ordered-call substitution
-    until this guard is deployed.
+    The production EEZ contract MUST store a per-rollup carrier-policy flag. Only the registered
+    manager for that rollup may change its flag. The Rollup0 manager MUST enable the flag before V1
+    activation and MUST keep it enabled while candidate protocol V1 is active. This scopes the
+    restriction to Rollup0 without limiting unrelated EEZ rollups.
+
+    In `EEZ.executeCrossChainCall`, after resolving `targetRollupId` and matching its next prepared
+    queue entry, but before advancing the cursor, emitting `ExecutionConsumed`, or applying the
+    entry, EEZ MUST perform the following checks when that rollup's carrier-policy flag is enabled:
+
+    1. `BLOBHASH(0)` MUST equal zero. Otherwise the consumption MUST revert, so an EIP-4844 blob
+       transaction cannot act as a trigger.
+    2. A transaction-scoped transient successful-consumption latch, keyed by `targetRollupId`, MUST
+       be unset. EEZ MUST set it before advancing the cursor. A later successful consumption for
+       the same Rollup0 ID in the same outer transaction MUST revert.
+
+    The latch MUST use EIP-1153 transient storage, or equivalent transaction-scoped state with the
+    same semantics. For one `targetRollupId`, it is shared by all call frames in the outer
+    transaction, remains set after the first successful consumption returns, rolls back with the
+    EEZ call or surrounding transaction if execution reverts, and is empty in the next outer
+    transaction. A missing or mismatched entry and the separate prepared-failure lookup path MUST
+    NOT set the latch because none creates a successful Rollup0 transition. Existing call-hash,
+    cursor, and state-transition checks continue to run; this guard does not replace them.
+
+    Conformance tests MUST cover a non-blob first success, a rejected second success in the same
+    outer transaction, a successful consumption in the following transaction, blob-carrier
+    rejection, per-rollup scoping, latch rollback on revert, and failed-lookup reuse without a
+    retained latch.
+    Synchronous production cannot rely on ordered-call substitution until this EEZ change and its
+    tests are deployed.
 
 !!! note "DEPLOYMENT POLICY: bundle delivery"
     The initial operator SHOULD submit `n + 1` overlapping strict-prefix bundles when its builder
@@ -309,6 +332,13 @@ routed through the same source contract, can produce the same hash; at the expec
 intentionally equivalent for Rollup0. This rule preserves the current proxy and wallet call path
 while making clear that Rollup0 does not authenticate the outer transaction's nonce, fee payer, or
 unrelated L1 effects.
+
+Consequently, consuming one position can change what a previously proposed trigger does when it is
+included later. It can revert if no matching position remains, or it can consume the next position
+when that position has the same call hash. The latter position may have a different prepared result
+because it was evaluated against a later Rollup0 state. Canonical Ethereum ordering determines
+these L1 consequences; the successful-entry cursor still determines the unambiguous Rollup0
+prefix.
 
 ## 7.6 Canonical Evidence
 

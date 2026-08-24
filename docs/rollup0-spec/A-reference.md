@@ -60,7 +60,7 @@ This appendix summarizes values defined in the main chapters. The chapter text t
 | Rollup0.x settlement update | atomically activate a new wrapper address and candidate-domain tag |
 | Anchor acceptance | observed ordered previous-settled-block (`Hparent`) to `H[0]` EEZ commitment transition; `BatchPosted` alone is insufficient |
 | Successful-action evidence | retained EEZ `ExecutionConsumed(callHash, rollupId, cursor)` followed by the entry's `L2ExecutionPerformed(rollupId, H[k])` |
-| Late synchronization | finalized EEZ commitment as the authenticated checkpoint; standard Rollup0 `eth` and `snap` protocols for block and state data |
+| Late synchronization | finalized EEZ commitment as the authenticated checkpoint; standard execution-layer `eth` and `snap` protocols on Rollup0 for block and state data |
 | Candidate production | open |
 | Candidate relay | permissionless |
 | Candidate selection | first applicable candidate in canonical Ethereum transaction order |

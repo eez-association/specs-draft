@@ -143,6 +143,14 @@ calls.
     from including a valid signed transaction or undo its ordinary L1 effects. Users must treat
     leakage as a private-order-flow risk, even though it must not compromise Rollup0 validity.
 
+    A different carrier can consume the prepared result first only if it produces the same
+    effective source address and next ordered call, for example through the same source router or
+    another valid transaction from the same EOA. The originally proposed trigger can then revert
+    and spend nonce and gas, or—if the manifest's next position has the same call hash—consume that
+    later position and receive its potentially different prepared result. This is an L1
+    substitution consequence; the retained Rollup0 endpoint still follows the authenticated
+    ordered prefix.
+
     Encrypted transaction delivery, threshold release, and intent-based execution are possible
     Rollup0.x designs. They are not part of the initial protocol.
 

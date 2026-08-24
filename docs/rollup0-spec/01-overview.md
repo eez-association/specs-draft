@@ -261,6 +261,9 @@ Status labels have these meanings:
 - **Trust assumption:** accepted behavior that is not enforced cryptographically; and
 - **Future design:** work for a later Rollup0 version that does not block initial Rollup0.
 
+Other admonition titles, such as **Deployment policy**, **Finality failure**, or **Legacy
+terminology**, are explanatory topic headings. They do not introduce additional status categories.
+
 ---
 
 *Next: [Chapter 2, Architecture](02-architecture.md).*

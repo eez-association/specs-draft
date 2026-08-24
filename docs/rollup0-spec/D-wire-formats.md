@@ -90,7 +90,10 @@ the value derived above.
 
 !!! success "DECISION: use the Rollup0 manager domain and settlement gate"
     This design uses EEZ's existing `getCustomData` hook. It requires a production Rollup0 manager
-    and settlement wrapper, but it does not require an EEZ contract change.
+    and settlement wrapper, but that domain-and-gate mechanism does not itself require an EEZ
+    contract change. This statement is limited to candidate-domain authentication and settlement
+    activation. Chapter 7 separately requires a production change to the L1 EEZ trigger-consumption
+    path; the manager and wrapper cannot implement that guard on their own.
 
 ### D.2.1 Initial Settlement Wrapper
 
@@ -290,9 +293,10 @@ the same valid block sequence across different anchor candidates does not change
 validity. Validator admission limits are operational policy, not additional V0 wire validity.
 
 The decoded span MUST begin immediately after the settled Sync-block parent and end at another
-Sync position under the active chain configuration. Consequently, production `block_count` is a
-positive multiple of `6`; Chiado development `block_count` is a positive multiple of `5`. This
-schedule check is candidate validity, even though the integer codec can represent other values.
+Sync position under the active chain configuration, using the complete-interval rule and worked
+timeline in Chapter 4. Consequently, production `block_count` is a positive multiple of `6`;
+Chiado development `block_count` is a positive multiple of `5`. This schedule check is candidate
+validity, even though the integer codec can represent other values.
 
 The action manifest is not a separate Rollup0 byte structure. It is the sequence of top-level EEZ
 cross-chain transaction brackets in decoded message order. Candidate protocol V1 requires each
@@ -322,8 +326,10 @@ are non-normative test tooling.
 ### D.4.2 Initial V0 Codec Vectors
 
 These initial vectors test the Rollup0-owned `operations` codec. They assume a parent context in
-which the next six scheduled positions form one complete interval. Full action-manifest and
-execution-derivation vectors remain part of the production conformance work.
+which the next six scheduled positions form one complete interval. A vector that includes a signed
+transaction states its synthetic transaction-validation context separately; that context tests
+codec and execution integration and does not select a production Rollup0 chain ID. Full
+action-manifest and execution-derivation vectors remain part of the production conformance work.
 
 #### Vector 1: six empty blocks
 
@@ -347,7 +353,35 @@ The 31 bytes decode as:
 The codec result is valid. Candidate validation separately checks the supplied parent and schedule
 context.
 
-#### Vector 2: empty payload
+#### Vector 2: one transaction and multiple metadata runs
+
+```text
+operations =
+0x00060100000000000211111111111111111111111111111111111111110422222222222222222222222222222222222222220101aa0202bbcc03006f02f86c820539808405f5e100843b9aca0082520894000000000000000000000000000000000000dead8080c001a04849ec4d7eed2e9eb1da330cdb0a22cdb4c1e32d682556dcc2b491ea5d747dfda05e38e68ce47b2ae70e6b36de8f1e1413df4dbc73a30610675f0a8e8c1505e7a7
+```
+
+The 171 bytes decode as:
+
+| Field | Value |
+|---|---|
+| payload version | `0` |
+| `block_count` | `6` |
+| `pure_transaction_counts` | `[1, 0, 0, 0, 0, 0]` |
+| beneficiary runs | length `2` with `0x1111111111111111111111111111111111111111`, then length `4` with `0x2222222222222222222222222222222222222222` |
+| `extraData` runs | length `1` with `0xaa`, length `2` with `0xbbcc`, then length `3` with `0x` |
+| transaction lengths | `[111]` |
+| transaction type | EIP-1559 type `0x02` |
+| transaction hash | `0xfdf9c966ac23a592fda032328421cabc27414887b3496d1c6faec3b10e1f9b59` |
+
+The transaction uses chain ID `1337`, nonce `0`, gas limit `21000`, maximum fee `1 gwei`, maximum
+priority fee `0.1 gwei`, recipient `0x000000000000000000000000000000000000dead`, zero value,
+empty calldata, and an empty access list. It recovers sender
+`0x7e5f4552091a69125d5dfcb7b8c2659029395bdf`. Under a synthetic block context with chain ID
+`1337`, base fee no greater than `1 gwei`, sender nonce `0`, and sufficient sender balance, the
+transaction and codec result are valid. The first block contains the transaction; the following
+five are empty.
+
+#### Vector 3: empty payload
 
 ```text
 operations = 0x
@@ -355,7 +389,7 @@ operations = 0x
 
 Result: reject because the payload-version byte is absent.
 
-#### Vector 3: unknown payload version
+#### Vector 4: unknown payload version
 
 ```text
 operations = 0x01
@@ -363,7 +397,7 @@ operations = 0x01
 
 Result: reject because V0 does not fall back from an unknown version.
 
-#### Vector 4: non-shortest block count
+#### Vector 5: non-shortest block count
 
 ```text
 operations = 0x008600
@@ -371,7 +405,7 @@ operations = 0x008600
 
 Result: reject because `0x86 0x00` is a non-shortest encoding of `6`.
 
-#### Vector 5: impossible block count
+#### Vector 6: impossible block count
 
 ```text
 operations = 0x0006
@@ -379,7 +413,7 @@ operations = 0x0006
 
 Result: reject before allocation because six transaction-count bytes are required and none remain.
 
-#### Vector 6: trailing byte
+#### Vector 7: trailing byte
 
 ```text
 operations =

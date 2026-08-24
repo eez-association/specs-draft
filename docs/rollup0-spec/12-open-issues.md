@@ -73,6 +73,7 @@ before production:
   protocol transaction;
 - the asynchronous ETH withdrawal authorization, confirmation, payout, and replay rules;
 - the Ethereum builder API and operational prefix-bundle submission policy;
+- the composer-to-execution-client construction interface when composition is not in process;
 - the transaction-scoped L1 EEZ guard and its conformance vectors;
 - catch-up recovery-rate and intake-backpressure reporting;
 - deployment start block and historical upgrade boundaries.

@@ -24,6 +24,23 @@ n mod 6 = 0  -> Sync
 otherwise    -> Live
 ```
 
+For example, let production genesis have number `0` and timestamp `T`, where `T` is an Ethereum
+slot timestamp. The first complete interval after genesis is `(T, T + 12]`:
+
+| Rollup0 block | Timestamp | Position |
+|---:|---:|---|
+| `0` | `T` | preceding Sync / genesis |
+| `1` | `T + 2` | Live |
+| `2` | `T + 4` | Live |
+| `3` | `T + 6` | Live |
+| `4` | `T + 8` | Live |
+| `5` | `T + 10` | Live |
+| `6` | `T + 12` | Sync for the next Ethereum slot |
+
+Thus “five Live positions followed by one Sync position” describes the six new positions after a
+settled Sync parent; it does not classify genesis as Live. Chiado uses the analogous interval
+`(T, T + 5]`, with four one-second Live positions followed by the Sync position at `T + 5`.
+
 A Live block contains ordinary Rollup0 transactions. The final position is the Sync position. Its
 block can contain ordinary pure-L2 transactions. When an inbound action succeeds, the block also
 carries the protocol-derived transaction described in

@@ -20,6 +20,13 @@ M >= 1
 N = floor(2M / 3) + 1
 ```
 
+This is an authorization threshold: it is the smallest integer strictly greater than two thirds
+of `M`. It does not by itself promise BFT availability or fault tolerance. In particular, the
+formula requires unanimity for `M = 1`, `M = 2`, and `M = 3`; it first permits one unavailable
+member at `M = 4`, where `N = 3`. Operational availability therefore depends on the selected set
+size and on its members being independently operated. Rollup0 defines no protocol-wide minimum
+above `M >= 1`; the initial `M` is a launch parameter.
+
 The threshold proof or signature set covers one complete candidate. The authenticated candidate
 data commits the ordered action manifest and all deterministic terminal variants `B[0]` through
 `B[s]`, where `s` is the candidate's successful-action count. Rollup0 does not require a separate

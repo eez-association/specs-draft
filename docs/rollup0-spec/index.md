@@ -21,7 +21,7 @@ from putting significant value on it.
 | Inbound execution | Unsigned protocol-derived EIP-2718 transactions |
 | EEZ state commitment | Terminal Rollup0 block hash |
 | Data availability | Ethereum blobs; normative raw, uncompressed, columnar V0 payload |
-| Late synchronization | Standard Rollup0 `eth` block sync and `snap` state sync |
+| Late synchronization | Standard execution-layer `eth` block sync and `snap` state sync on Rollup0 |
 
 Composers build the continuous L2 chain. Sequencers sync and distribute those blocks. Blocks do not
 have to be posted every Ethereum slot. An anchor contains the complete contiguous range from the

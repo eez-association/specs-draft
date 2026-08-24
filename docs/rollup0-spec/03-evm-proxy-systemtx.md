@@ -5,9 +5,9 @@
 Rollup0 executes an Ethereum-equivalent EVM. It adds no custom opcode or precompile. Cross-network
 behavior is provided by contracts and protocol-derived transactions.
 
-Rollup0 starts with the execution-layer rules of the Ethereum Fusaka hardfork, whose execution
-fork is Osaka. Every Ethereum execution fork through Osaka is active at genesis. Rollup0 adopts
-each later Ethereum execution fork at that fork's Ethereum mainnet activation timestamp.
+Rollup0 starts with the Osaka execution-layer rules of Ethereum's Fusaka network upgrade. Every
+Ethereum execution fork through Osaka is active at genesis. Rollup0 adopts each later Ethereum
+execution fork at that fork's Ethereum mainnet activation timestamp.
 
 Rollup0 has no beacon chain. It keeps the post-Cancun header shape but does not execute the
 EIP-4788 beacon-roots contract update. Chapter 4 fixes `parentBeaconBlockRoot` to zero.
@@ -370,6 +370,11 @@ the protocol's value supply and cannot fund an EEZ action.
 For an inbound call with value `v`, Rollup0 opens a state checkpoint before crediting the system
 caller. It then credits exactly `v` and calls `EEZL2` with `value = v`. The credit is not a fee or
 block reward.
+
+Any balance already held by `SYSTEM_ADDRESS` is ignored when funding the action. The protocol
+credits exactly `v` regardless of that balance, and the ordinary value transfer debits exactly
+`v`. Rollup0 imposes no pre-call or post-call zero-balance invariant on `SYSTEM_ADDRESS`: value can
+be sent there through ordinary EVM behavior, but that residual value cannot fund a later action.
 
 If the application call succeeds, the value moves through `EEZL2` according to the verified EEZ
 action. The resulting increase in Rollup0 native value must be backed by the corresponding value
