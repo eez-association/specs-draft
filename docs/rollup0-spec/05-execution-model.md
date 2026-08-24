@@ -64,8 +64,8 @@ For Rollup0, a catch-up anchor has only this leading state transition. It has `n
 synchronous execution entry, no failed lookup, and an empty Ethereum trigger manifest. Its `R0`
 is the state root of its historical terminal Sync block.
 
-The proof or validator signatures bind the bytes of the leading entry and the selected blob
-hashes. Validators reconstruct the published blocks from `A`, verify that they form the claimed
+The prover signatures bind the bytes of the leading entry and the selected blob
+hashes. Provers reconstruct the published blocks from `A`, verify that they form the claimed
 chain, and accept the entry only when replay produces `R0`. The fixed EEZ proof digest does not,
 however, bind the dispatch count that makes this entry immediate.
 
@@ -79,7 +79,7 @@ no user transaction.
     The second keeps synchronous failed lookups available to their later Ethereum triggers.
 
     The fixed EEZ public-input hash excludes both fields. A relayer or builder can therefore
-    change them without invalidating the proof or validator signatures. This can defer the anchor
+    change them without invalidating the prover signatures. This can defer the anchor
     entry, change which later entries are published, or change lookup availability.
 
     Followers can detect the changed calldata and resulting state transition, but detection does
@@ -114,7 +114,7 @@ no user transaction.
     correctly ordered `L2ExecutionPerformed` event. They must not infer settlement from
     `BatchPosted`.
 
-For each candidate, the composer and every validator/prover independently:
+For each candidate, the composer and every prover independently:
 
 1. execute every nonterminal block after the named Rollup0 parent;
 2. execute the terminal block's pure-L2 transaction prefix and record `R0`;
@@ -134,7 +134,7 @@ The corresponding L1 EEZ batch contains:
 - zero or one failed lookup pinned to `R[n - 1]`, with no state delta, when the final synchronous
   action `n` fails.
 
-The proof or signatures authenticate every intermediate block and root inside a multi-block
+The prover signatures authenticate every intermediate block and root inside a multi-block
 pure-L2 range. Those intermediate roots do not need separate EEZ state deltas.
 
 For a successful action, the L1 EEZ entry and the L2 `EEZL2` entry are different objects. The L1
@@ -163,9 +163,9 @@ That version must define how every additional object is reached and consumed. Un
 remains invalid in every version.
 
 For a failed Ethereum-to-Rollup0 action, there is no Rollup0 protocol transaction or L2 execution
-table. The composer and every validator/prover execute the call temporarily from `R[i - 1]`, verify
+table. The composer and every prover execute the call temporarily from `R[i - 1]`, verify
 the exact failure and revert data, and discard the complete result. The L1 EEZ batch contains one
-failed lookup pinned to `R[i - 1]`. The trigger manifest and proof or signatures bind that lookup
+failed lookup pinned to `R[i - 1]`. The trigger manifest and prover signatures bind that lookup
 to the exact Ethereum transaction and action position.
 
 Under the initial one-way, non-nested profile, that L1 lookup has:
@@ -190,7 +190,7 @@ A successful action always has an execution entry, including when the complete R
 does not change. In that case, the entry's current and new state roots are equal and its
 `etherDelta` is zero. The protocol transaction has no sender nonce or L2 fee state change. It still
 consumes block gas and remains in the transaction and receipt roots. It can return data and emit
-logs, and its Ethereum trigger can change Ethereum state. Validators must verify the exact entry,
+logs, and its Ethereum trigger can change Ethereum state. Provers must verify the exact entry,
 transaction position, receipt, and block hash because an equal state root alone cannot distinguish
 this success from a failed action.
 
@@ -201,15 +201,15 @@ receipts do not contain return data.
 
 The DA payload does not need to repeat execution-derived header fields. It supplies the exact
 transaction bytes and order, block boundaries, parent, and every header input that cannot be
-derived from the protocol rules. Validators and followers then derive the transaction root,
+derived from the protocol rules. Provers and followers then derive the transaction root,
 receipts, receipt root, logs bloom, gas used, state root, and block hash. A block hash carried in
 the payload is only a claimed value and must equal the hash produced by replay.
 
-The proof or signatures cover the EEZ public-input hash, including commitments to the execution
+The prover signatures cover the EEZ public-input hash, including commitments to the execution
 entries, lookups, and Rollup0 DA payload. A supplied root or return value is not trusted without
 re-execution. Every value that can change candidate validity or a resulting Rollup0 block must
 either be derived uniquely from prior canonical state and this specification, or be authenticated
-by the EEZ public-input hash. Validator-only side data must not affect the accepted result.
+by the EEZ public-input hash. Prover-only side data must not affect the accepted result.
 
 !!! note "TO BE DEFINED: candidate domain and blob encoding"
     The blob-format specification must define the exact encoding and placement of every
@@ -263,7 +263,7 @@ builder trust assumption and the unresolved enforcement design.
     Two alternatives remain open for a later Rollup0 version:
 
     1. **Trust the Ethereum builder to preserve the exact submitted trigger prefix.** This permits
-       later actions without changing EEZ, but a proof or signature cannot stop the builder from
+       later actions without changing EEZ, but prover signatures cannot stop the builder from
        omitting the failed trigger and including a later transaction.
     2. **Add one ordered cursor for successful entries and failed lookups, plus a compatible way to
        acknowledge caught failures.** The cursor would allow only prefixes. If action `i` were

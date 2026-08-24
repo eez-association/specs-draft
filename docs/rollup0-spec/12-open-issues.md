@@ -3,7 +3,7 @@
 ## 12.1 Protocol Limitations
 
 - **Permissioned validity:** candidate production and relay are open, but settlement depends on a
-  permissioned validator/prover set.
+  permissioned prover set.
 - **No force inclusion:** the protocol does not guarantee that a valid candidate reaches or is
   included by Ethereum.
 - **No trustless exit:** a follower can detect invalid history but cannot reverse Ethereum
@@ -18,7 +18,7 @@
 - **Builder dependency:** composers request one of several ordered prefixes through
   `eth_sendBundle`. The API does not prevent a builder from repackaging the signed transactions.
   The builder trust assumption or a contract-enforced alternative is still under discussion.
-- **Private trigger trust:** validators, relayers, and builders receive signed Ethereum trigger
+- **Private trigger trust:** provers, relayers, and builders receive signed Ethereum trigger
   transactions before inclusion. Initial Rollup0 trusts them not to leak or submit those
   transactions outside an approved bundle.
 - **Duplicate call identity:** the rule for identical top-level cross-chain call hashes is not yet
@@ -29,12 +29,12 @@
 - **No secure in-block randomness:** anchor-derived `prevRandao` is predictable after the anchor
   seed is known. Deriving a different value for each block adds no entropy; copying the seed
   unchanged, as the OP Stack does within an L1-origin epoch, makes the same limitation explicit.
-- **Simulation parity:** a composer and every validator/prover must simulate the exact selected EVM
+- **Simulation parity:** a composer and every prover must simulate the exact selected EVM
   fork and protocol-transaction semantics. A mismatch makes an apparently valid candidate fail on
   Ethereum or derive a different Rollup0 block.
 - **Unsigned EEZ dispatch counts:** the fixed EEZ proof digest does not bind the transient
   execution-entry or lookup counts. Rollup0 requires exact values, but a relayer can change them
-  without invalidating validator signatures. The mitigation is not yet selected.
+  without invalidating prover signatures. The mitigation is not yet selected.
 
 ## 12.2 Undefined Production Choices
 
@@ -47,7 +47,7 @@ The following need exact definitions before production:
 - production contract addresses, predeploy bytecode, and upgrade rules;
 - the genesis base fee;
 - the post-Fusaka EVM fork-activation schedule;
-- validator/prover membership, proof systems, keys, threshold, and rotation;
+- prover membership, proof systems, keys, threshold, and rotation;
 - proof context and domain separation;
 - the protocol-transaction type, byte-exact payload, source identifier, transaction-hash vectors,
   receipt encoding, and RPC fields;

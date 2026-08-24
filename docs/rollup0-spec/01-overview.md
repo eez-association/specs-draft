@@ -13,8 +13,8 @@ Rollup0 selects:
 - six L2 block positions for every Ethereum slot, including a missed slot;
 - open block production and composition with no composer allowlist;
 - open block syncing, distribution, and RPC service with no sequencer allowlist;
-- a permissioned validator set that operates on a best-effort basis;
-- signing of valid sibling candidates without slashing or an equivocation penalty;
+- a permissioned prover set that operates on a best-effort basis;
+- prover signatures attest to candidate validity, not uniqueness or canonicality;
 - canonical Ethereum transaction order as the candidate-selection rule;
 - unsigned protocol-derived transactions for successful inbound actions;
 - blob data availability; and
@@ -75,7 +75,7 @@ caller catches does not add a Rollup0 transaction, so `B[i]` can equal `B[i - 1]
 outcome selects one of these variants as the candidate's exact endpoint. A candidate can contain
 at most one failed action, and that action must be its final trigger.
 
-Validators and followers check the parent block hash and number from the published block data. The
+Provers and followers check the parent block hash and number from the published block data. The
 proof system must enforce the same rule before accepting the candidate. The EEZ contract checks the
 starting state root separately; it does not store or check the Rollup0 parent block hash or number.
 
@@ -92,7 +92,7 @@ A candidate is applicable when it:
 
 1. extends the current Ethereum-confirmed Rollup0 safe head;
 2. follows the EEZ and Rollup0 rules;
-3. has the required validator signatures; and
+3. has the required prover signatures; and
 4. can establish `R0` and defines every possible synchronous prefix correctly.
 
 The first applicable candidate in canonical Ethereum transaction order advances Rollup0. Ethereum
@@ -100,26 +100,27 @@ block builders therefore control the ordering between valid candidates. This is 
 Sibling candidates for the old parent then become stale.
 
 !!! note "TO BE DEFINED"
-    The protocol used to share candidates with validators is not yet selected.
+    The protocol used to share candidates with provers is not yet selected.
 
 ## 1.3 Validation
 
-Validators provide a best-effort service. They can reject malformed or oversized messages before
+Provers provide a best-effort service. They can reject malformed or oversized messages before
 full validation. They can rate limit or ban parties that waste resources.
 
-After fully checking a candidate, a validator signs it when it is valid. A validator can sign
-several valid siblings and can finish signing a candidate after another sibling arrives. This is
-not equivocation and carries no slashing risk.
+After fully checking a candidate, a prover signs it only when it is valid. A prover can sign several
+valid siblings and can finish processing a candidate after another sibling arrives. Signing one
+candidate does not exclude other valid candidates with the same parent.
 
-Each signature is for one intended Ethereum settlement context: the target child-slot timestamp and
-the known parent Ethereum block hash. The future child block hash is not known when validators sign.
+For the initial ECDSA proof system, each signature is for one intended Ethereum settlement context:
+the target child-slot timestamp and the known parent Ethereum block hash. The future child block
+hash is not known when provers sign.
 The first applicable candidate that lands in that context wins. This context always names the
 current Ethereum slot; it is separate from the Rollup0 endpoint timestamp of a catch-up anchor. A
 missed target or changed parent requires a new candidate and new signatures. Signatures for
 candidates that still name an old Rollup0 parent can no longer advance Rollup0.
 
 Rollup0 has no force-inclusion path. A valid empty candidate can win while excluding pending
-transactions. Force inclusion and TEE-backed validators are possible features for Rollup0.x, not
+transactions. Force inclusion and TEE-backed provers are possible features for Rollup0.x, not
 this version.
 
 ## 1.4 Cross-Network Scope

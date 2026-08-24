@@ -25,11 +25,17 @@ execution belongs to Rollup0.x.
 
 Sequencing is open. Rollup0 has no sequencer allowlist.
 
-### Validator/Prover
+### Prover
 
-A validator/prover provides candidate checking and signing as a best-effort service. It tries to
-check each candidate that it accepts for processing, but gives no availability or response-time
-guarantee. It can reject work before full validation, rate limit senders, and ban abusive senders.
+A Rollup0 prover independently validates a candidate and signs the EEZ public-input hash with its
+configured ECDSA key. Each prover has a separate deployed `ECDSAProofSystem` instance configured
+with that prover as its sole `authorizedSigner`. The prover's 65-byte signature occupies the
+parallel `proofs[k]` slot for that proof-system instance. Rollup0 does not use a zero-knowledge
+proof system in this profile.
+
+A prover provides this service on a best-effort basis. It tries to check each candidate that it
+accepts for processing, but gives no availability or response-time guarantee. It can reject work
+before full validation, rate limit senders, and ban abusive senders.
 
 When it completes validation, it signs a candidate only if the candidate satisfies the selected
 EEZ rules and every Rollup0 rule in this specification. It does not treat any of these facts as a
@@ -40,18 +46,18 @@ validity failure:
 - the candidate is a sibling of another valid candidate; or
 - another valid candidate arrived first.
 
-Initial Rollup0 also trusts every validator/prover that receives a signed Ethereum trigger to keep
+Initial Rollup0 also trusts every prover that receives a signed Ethereum trigger to keep
 it private and not submit it outside an approved candidate bundle. Chapter 6 describes this
 confidentiality assumption.
 
 !!! note "TO BE DEFINED"
-    The production validator/prover membership, threshold, keys, and key-rotation rules are not yet
+    The production prover membership, threshold, keys, and key-rotation rules are not yet
     selected. Chapter 8 defines the ECDSA attestation mechanism.
 
 ### Relayer
 
 Any account or contract MAY relay a completed candidate. A relayer cannot change the candidate
-bytes covered by its proof or signatures. A relayer that receives private signed trigger
+bytes covered by its prover signatures. A relayer that receives private signed trigger
 transactions is trusted not to disclose or submit them outside an approved candidate bundle.
 
 ### Follower

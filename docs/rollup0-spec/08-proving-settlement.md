@@ -2,28 +2,30 @@
 
 ## 8.1 Proof Policy
 
-Rollup0 uses a permissioned set of `M` validators/provers over openly produced candidates. A
-candidate needs attestations from at least `N` members.
+Rollup0 uses a permissioned set of `M` ECDSA provers over openly produced candidates. A candidate
+needs signatures from at least `N` members.
 
-Each member is represented by an independent single-signer ECDSA proof system in the EEZ batch.
-Each signs the EEZ public-input hash for that proof-system slot. The Rollup0 manager selects the
-accepted proof systems, verification keys, and threshold. The
+Each prover is represented by a separate deployed `ECDSAProofSystem` instance configured with that
+prover as its sole `authorizedSigner`. For proof-system slot `k`, the prover signs
+`publicInputsHash[k]`, and its 65-byte signature occupies the parallel `proofs[k]` slot. The Rollup0
+manager selects the accepted proof-system instances, verification keys, and threshold. The
 [EEZ proving specification](../eez-protocol-spec/04-proving-and-settlement.md) defines the proof
 interface and digest. [EEZ Wire Formats](../eez-protocol-spec/05-wire-formats.md) defines the
 encoding and proof-system fold.
 
-The threshold proof or signature set covers one complete candidate. The authenticated candidate
+The threshold set of prover signatures covers one complete candidate. The authenticated candidate
 data commits the ordered trigger manifest and all deterministic terminal variants `B[0]` through
-`B[n]`. Rollup0 does not require a separate proof or signature set for each possible prefix.
+`B[n]`. Rollup0 does not require a separate set of prover signatures for each possible prefix.
 
 !!! note "TO BE DEFINED"
     The production values of `M`, `N`, the member keys, and the rotation procedure are not yet
     selected.
 
-Rollup0 realizes `N`-of-`M` as `N` distinct accepted single-signer proof systems, not as one proof
-system containing `N` signatures. The Rollup0 manager rejects a submitted subset with fewer than
-`N` accepted proof systems. The proof-system list and each Rollup0 proof-system index list are
-strictly increasing, so one verifier cannot count twice.
+Rollup0 realizes `N`-of-`M` using `M` independently configured instances of the single-signer
+`ECDSAProofSystem`, one per prover. A candidate supplies signatures for at least `N` accepted
+instances. The Rollup0 manager rejects a submitted subset with fewer than `N` accepted instances.
+The proof-system list and each Rollup0 proof-system index list are strictly increasing, so one
+instance cannot count twice.
 
 For each ECDSA proof system:
 
@@ -41,13 +43,13 @@ other.
 
 ## 8.2 Producer-Neutral Validation
 
-When a validator/prover accepts a candidate for full validation, it:
+When a prover accepts a candidate for full validation, it:
 
 1. authenticates the complete candidate and its referenced Ethereum and Rollup0 data;
 2. independently executes it;
 3. checks the EEZ batch, Rollup0 blocks, DA payload, pure-L2 prefix, every terminal variant
    `B[0]` through `B[n]`, and the intended prefix bundles;
-4. signs or proves it if and only if it is valid; and
+4. signs it if and only if it is valid; and
 5. remains free to check other candidates for the same parent.
 
 This is a best-effort service. The list above defines the checks performed before signing; it does
@@ -58,11 +60,11 @@ state that the candidate is canonical.
 
 ## 8.3 Permissionless Submission
 
-Any relayer MAY submit a candidate that carries the required proof or signatures. The settlement
-contract MUST NOT require the relayer to be the composer or a validator/prover.
+Any relayer MAY submit a candidate that carries the required prover signatures. The settlement
+contract MUST NOT require the relayer to be the composer or a prover.
 
-Changing any candidate field covered by the EEZ public-input hash invalidates the proof or
-signatures. Appendix C tracks the domain binding of fields outside that hash.
+Changing any candidate field covered by the EEZ public-input hash invalidates the prover signatures.
+Appendix C tracks the domain binding of fields outside that hash.
 
 ## 8.4 Settlement Rule
 
@@ -73,7 +75,7 @@ A candidate is applicable only when:
 - its exact named Rollup0 parent is the current settled cursor;
 - its target timestamp and parent Ethereum block hash match the current settlement context;
 - its terminal Sync timestamp follows the live or catch-up rule in Chapter 4;
-- its proof or signatures satisfy the Rollup0 proof policy;
+- its prover signatures satisfy the Rollup0 proof policy;
 - its EEZ batch is valid;
 - its Rollup0 DA and range are valid; and
 - its Ethereum execution produces the required settlement evidence.
@@ -94,7 +96,7 @@ position or prevent a later candidate from winning.
 
     A first valid anchor changes the Rollup0 state root, including when it has no user
     transaction. A later sibling therefore cannot apply its stale leading state transition. A
-    chained second candidate is also invalid because validators may sign only from the
+    chained second candidate is also invalid because provers may sign only from the
     Ethereum-confirmed cursor, not from the result of an earlier transaction in the same
     unconfirmed Ethereum block.
 
@@ -120,7 +122,7 @@ order, replays the trigger transactions, and verifies the processed action seque
 
 ## 8.5 Safety Boundary
 
-The permissioned validator/prover policy is the validity trust assumption. Independent derivation
+The permissioned prover policy is the validity trust assumption. Independent derivation
 detects a candidate that does not reproduce the published Rollup0 chain, but it cannot reverse
 canonical Ethereum state.
 

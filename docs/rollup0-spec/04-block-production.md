@@ -244,7 +244,7 @@ timestamp, `n = 0`, and the complete range contains no inbound protocol transact
 lookup. Consecutive catch-up anchors can advance through old ranges over several Ethereum blocks.
 
 !!! note "TO BE DEFINED"
-    One proof or signature set covers all synchronous prefixes. The published data must be enough
+    One set of prover signatures covers all synchronous prefixes. The published data must be enough
     to reconstruct every terminal variant, but the blob format still needs to choose between
     carrying an explicit ordered vector of terminal block hashes and deriving that vector entirely
     from the authenticated block inputs. Any carried hash is checked against replay.
