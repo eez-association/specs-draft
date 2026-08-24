@@ -26,10 +26,10 @@ the Ethereum transactions.
 The current payload contains per-block transaction counts, raw user transactions, and L2 execution
 entries. It does not carry the production non-derived header inputs or exact production protocol
 transaction envelopes. The current follower instead rebuilds blocks with development constants for
-the beneficiary, `extraData`, `prevRandao`, and gas limit. Production validators and followers must
+the beneficiary, `extraData`, `prevRandao`, and gas limit. Production provers and followers must
 derive every root and the exact block hash from the blob inputs and the Rollup0 header rules.
 
-The current remote-validator path receives full block data and execution witnesses separately from
+The current remote proving path receives full block data and execution witnesses separately from
 the batch payload. It re-executes those blocks, but it does not yet derive the complete window from
 the published payload or byte-compare every reconstructed block against it. Production validation
 must close this gap before signing: the blocks being replayed must be the unique blocks derived from
@@ -92,7 +92,7 @@ branches on the revert data can then execute a different path. This is a product
 blocker, not only a missing receipt feature.
 
 Production Rollup0 must publish one failed L1 lookup pinned to the correct Rollup0 pre-state, bind
-it to the trigger manifest, and have every validator/prover reproduce its exact failure data. It
+it to the trigger manifest, and have every prover reproduce its exact failure data. It
 must not create an L2 protocol transaction for that action, and the failed action must end the
 candidate manifest. The current `EEZL2` contract can encode a failed inner call inside a normally
 returning system transaction, but that path can retain table, proxy, or value effects and is not
@@ -123,10 +123,10 @@ for each possible trigger prefix, and the contracts do not implement a persisten
 mechanism. It expects every included outer trigger transaction to succeed, as the target design
 does, but it does not offer shorter successful prefixes when a longer choice fails.
 
-The current remote-validator path receives one realized Rollup0 block window. It does not receive
+The current remote proving path receives one realized Rollup0 block window. It does not receive
 and validate the complete ordered trigger manifest, every terminal variant `B[0]` through `B[n]`,
-or every proposed Ethereum prefix bundle. Production validators must check that complete candidate
-before providing its single proof or signature set.
+or every proposed Ethereum prefix bundle. Production provers must check that complete candidate
+before signing it.
 
 The current client does not enforce the rule that a failed action ends the candidate manifest.
 The current EEZ contract also has no unified cursor across successful execution entries and failed
@@ -154,7 +154,7 @@ the actual ordered root update and must not treat `BatchPosted` as anchor accept
 
 The fixed EEZ public-input hash does not include `transientExecutionEntryCount` or
 `transientLookupCallCount`. This is EEZ behavior, not an EL implementation bug. Rollup0 requires
-the values `1` and `0`, respectively, but the current proof or signatures cannot prevent a
+the values `1` and `0`, respectively, but the current prover signatures cannot prevent a
 submitter from changing them. A Rollup0-specific mitigation remains a production blocker.
 
 The current contracts and client accept duplicate cross-chain call hashes in one candidate.
@@ -165,7 +165,7 @@ batch posting.
 
 The current client can collect more than one Ethereum-to-Rollup0 action from one Ethereum
 transaction. Production Rollup0 permits exactly one such top-level action in the transaction's
-complete execution trace. Validators and composers must inspect the full trace, including calls
+complete execution trace. Provers and composers must inspect the full trace, including calls
 made through intermediate Ethereum contracts, and reject a candidate containing a second action.
 
 The current EEZ contract can verify more than one batch that contains Rollup0 in one Ethereum
@@ -182,7 +182,7 @@ required order and are not valid production settlement paths.
 
 The development scheduler reserves some ordinary positions as `Future` positions and builds them
 before their timestamps. This leaves enough time to generate a ZK proof before the target settlement
-slot. `Future` is local scheduling metadata, not a Rollup0 block type. The ECDSA validator path does
+slot. `Future` is local scheduling metadata, not a Rollup0 block type. The ECDSA prover path does
 not require a reserved proof window. A composer can still pre-build blocks or close transaction
 intake early as an implementation choice.
 
@@ -190,15 +190,15 @@ A conforming chain always classifies the five non-Sync positions as Live positio
 catch-up scheduler can also label an intermediate scheduled Sync position as Live. Followers instead
 derive Sync positions from the genesis-aligned timestamp and block-number grid.
 
-The current client uses an EEZ batch without Ethereum settlement context. Its validator signatures
-therefore do not commit the target timestamp and parent Ethereum block hash. Builder-side target
+The current client uses an EEZ batch without Ethereum settlement context. Its prover signatures
+therefore does not commit the target timestamp and parent Ethereum block hash. Builder-side target
 parameters do not provide this contract-level binding. Rollup0 batches use the EEZ current-settlement
 context described in Chapter 4 by setting `blockNumber = 2^64 - 1`.
 
-The current remote-validator path does not prove that the first supplied Rollup0 block extends the
+The current remote proving path does not prove that the first supplied Rollup0 block extends the
 current Ethereum-confirmed Rollup0 cursor. It checks a supplied block window, but does not bind the
 window's first parent block number and hash to canonical Ethereum settlement evidence. Production
-validators may pre-validate speculative work, but must perform this binding before signing.
+provers may pre-validate speculative work, but must perform this binding before signing.
 
 The current client puts zero in `prevRandao` for every Rollup0 block. Production Rollup0 derives a
 different value for every block from the seed established by the latest successful canonical live

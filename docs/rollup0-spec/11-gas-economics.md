@@ -80,7 +80,7 @@ still depends on the final batch shape, proof threshold, trigger, and Ethereum b
 ## 11.5 Inbound Transaction Gas and Value
 
 Chapter 3 defines the common gas pool and the protocol credit used for inbound value. Every
-composer, validator or prover, and follower must reproduce the same gas use and value movement.
+composer, prover, and follower must reproduce the same gas use and value movement.
 
 !!! note "TO BE DEFINED"
     Rollup0 must select one of the protocol-transaction fee approaches discussed in Chapter 3. The

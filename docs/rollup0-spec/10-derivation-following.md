@@ -73,7 +73,7 @@ calls to exact Ethereum transactions.
 - **Safe:** reconstructed and verified from canonical Ethereum settlement.
 - **Finalized:** safe and included in finalized Ethereum history.
 
-A proof, validator signature, candidate announcement, or local execution result cannot make a
+Prover signatures, a candidate announcement, or a local execution result cannot make a
 Rollup0 block safe by itself.
 
 ## 10.5 Ethereum Reorganizations

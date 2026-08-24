@@ -119,7 +119,7 @@ between settlement chains, EEZ deployments, Rollup0 instances, or protocol versi
     the same candidate to be retried after non-inclusion.
 
     Adding an intended Ethereum settlement slot or parent can restrict replay further, but a retry
-    for a later slot would require new transaction bytes and new validator signatures. The team must
+    for a later slot would require new transaction bytes and new prover signatures. The team must
     select the exact retry and domain-binding rule together.
 
 ## F.4 Value and Failure
@@ -134,8 +134,8 @@ execution. Reusing the OP wire format would not make that behavior suitable for 
 
 A failed action creates no Rollup0 protocol transaction, receipt, gas use, or temporary value
 credit. The L1 EEZ failed lookup contains its exact revert data and is pinned to the Rollup0
-pre-state. The trigger manifest and proof or validator signatures bind the lookup to its Ethereum
-transaction and action position. Validators and followers re-execute the call temporarily and
+pre-state. The trigger manifest and prover signatures bind the lookup to its Ethereum
+transaction and action position. Provers and followers re-execute the call temporarily and
 discard its result after checking the failure.
 
 If the Ethereum caller catches the verified proxy revert, the Ethereum transaction can settle and

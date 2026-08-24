@@ -74,7 +74,7 @@ The protocol transaction:
   by the accepted EEZ action;
 - provides exactly the value delivered by that action under the selected value-source rule;
 - has a normal transaction hash, transaction index, typed receipt, and trace position; and
-- is reconstructed identically by composers, validators/provers, and followers.
+- is reconstructed identically by composers, provers, and followers.
 
 A protocol transaction is valid only in its derived Sync-block position and only when every field
 matches the accepted Ethereum trigger and EEZ action. A node MUST reject this transaction type
@@ -182,7 +182,7 @@ or the block does not have enough gas for the required intrinsic and calldata-fl
 Intrinsic and EVM execution gas contribute to the transaction receipt and block `gasUsed`, and
 leave less gas for later transactions.
 
-The proof or validator policy must execute the exact candidate and check this gas accounting before
+Each prover must execute the exact candidate and check this gas accounting before
 the candidate can settle on Ethereum. A candidate is invalid if its cumulative gas use exceeds the
 block gas limit or an outer `EEZL2` call has a protocol failure. Ethereum does not perform this
 Rollup0 gas check itself.
@@ -242,8 +242,8 @@ When the target application succeeds, the `EEZL2` call returns normally after it
 execution entry. The protocol transaction has receipt status `1`.
 
 When the simulated Rollup0 application returns `success = false`, the L1 EEZ batch contains one
-failed lookup with the exact action hash, pre-state root, and revert data. The proof or validator
-signatures bind that lookup and the trigger manifest. No Rollup0 protocol transaction is created,
+failed lookup with the exact action hash, pre-state root, and revert data. The prover signatures
+binds that lookup and the trigger manifest. No Rollup0 protocol transaction is created,
 no `EEZL2` table is loaded, and no L2 gas, nonce, receipt, log, value credit, or state change is
 recorded. This includes `REVERT` and exceptional EVM failures such as an out-of-gas in the target
 call.
@@ -303,7 +303,7 @@ offset that increase.
 If the simulated application call fails, Rollup0 does not open the checkpoint, credit the system
 caller, or create a protocol transaction. The failed proxy call on Ethereum rolls back its value
 transfer. Rollup0 balances and native supply remain unchanged. A composer cannot choose `v`: it is
-bound to the failed lookup and checked by the proof or validator policy.
+bound to the failed lookup and checked by every prover.
 
 !!! note "TO BE DISCUSSED: protocol-transaction value source"
     Rollup0 currently selects option 1. Clients must use this option unless a later specification

@@ -12,7 +12,7 @@ from putting significant value on it.
 | Anchoring | For a synchronous transaction, or after a maximum interval that is **to be defined** |
 | Block production and composition | Open; no composer allowlist |
 | Block syncing, P2P, and RPC | Open; no sequencer allowlist |
-| Candidate validation | Permissioned validators provide a best-effort validation service |
+| Candidate validation | Permissioned provers provide a best-effort validation service |
 | Candidate selection | The first applicable candidate in canonical Ethereum order wins |
 | Inbound execution | Unsigned protocol-derived EIP-2718 transactions |
 | Data availability | Ethereum blobs; the exact format is **to be defined** |

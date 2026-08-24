@@ -80,7 +80,7 @@ Settlement cost grows with:
 
 - encoded EEZ batch size;
 - number of execution entries and lookups;
-- validator/prover threshold and proof-system verification cost;
+- prover threshold and proof-system verification cost;
 - state reads and writes;
 - trigger execution; and
 - bundle inclusion overhead.

@@ -20,7 +20,7 @@ Execution-derived fields do not need separate encodings. A follower derives each
 receipt, receipt root, logs bloom, gas-used value, state root, header, and block hash from the
 published inputs. Any redundant claimed value must equal the replayed value.
 
-The manifest binds each trigger by its Ethereum transaction hash and position. Validators receive
+The manifest binds each trigger by its Ethereum transaction hash and position. Provers receive
 the complete signed transactions and verify that they reproduce the manifest and the proposed
 `eth_sendBundle` payload. A transaction-hash commitment in the manifest does not make that hash
 available to the EEZ contract during execution.
@@ -132,7 +132,7 @@ Every Rollup0 batch also requires:
 - proof context bound to the intended Ethereum settlement domain;
 - Rollup0 state deltas derived from `R0` and every successful synchronous action;
 - enough L2 entries and origin data to reconstruct every protocol transaction; and
-- the proof or signatures required by Chapter 8.
+- the prover signatures required by Chapter 8.
 
 Rollup0 does not redefine the EEZ batch tuple or public-input hash.
 
@@ -168,7 +168,7 @@ occurred and returned the committed revert data. A successful Ethereum receipt a
 `eth_sendBundle` is a builder API, not an Ethereum consensus rule. A public-mempool submission is
 not a valid replacement for the required same-block ordering.
 
-The exact signed trigger transactions remain private before inclusion. Validators, relayers, and
+The exact signed trigger transactions remain private before inclusion. Provers, relayers, and
 builders that receive them are trusted not to leak or submit them separately. Chapter 6 states the
 consequences and scope of this trust assumption.
 
@@ -239,7 +239,7 @@ an earlier rolled-back entry.
     2. **Reject duplicate top-level call hashes in one candidate.** The uniqueness check covers
        both successful execution entries and failed lookups; zero-hash immediate entries are not
        call identities. This works with standard Ethereum transactions and the current proxy
-       interface. Rollup0 validators and proofs can reject such a candidate while leaving EEZ
+       interface. Rollup0 provers can reject such a candidate while leaving EEZ
        flexible for other networks. Alternatively, EEZ can reject duplicates while posting the
        batch, which gives an on-chain check but adds gas and applies the restriction to every
        affected EEZ network unless it is configurable. Identical calls remain valid in different

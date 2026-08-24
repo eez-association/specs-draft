@@ -79,12 +79,12 @@ The restored draft uses these development defaults. Production must either confi
 
 | Item | Development default |
 |---|---|
-| Maximum validator/prover set size | `M <= 20` |
+| Maximum prover set size | `M <= 20` |
 | Example threshold | `ceil(2M / 3) + 1` |
 
 !!! note "TO BE DEFINED"
     The Rollup0 chain ID, genesis base fee, genesis RANDAO seed, fee-vault addresses,
-    validator/prover keys, and actual threshold are not fixed.
+    prover keys, and actual threshold are not fixed.
 
 ## A.5 DA Format
 
@@ -94,11 +94,12 @@ The restored draft uses these development defaults. Production must either confi
 
 ## A.6 Terms
 
-- **Candidate:** one proposed Rollup0 range, EEZ batch, DA payload, proof context, proof or
-  signatures, and set of intended Ethereum prefix bundles.
+- **Candidate:** one proposed Rollup0 range, EEZ batch, DA payload, proof context, prover signatures,
+  and set of intended Ethereum prefix bundles.
 - **Composer:** any party that constructs a candidate.
-- **Validator/prover:** a member of the permissioned validity set that independently checks and
-  signs or proves candidates.
+- **Prover:** a member of the permissioned validity set that independently validates candidates
+  and signs its assigned EEZ public-input hash. Each prover has a separate `ECDSAProofSystem`
+  instance configured with that prover as its sole `authorizedSigner`.
 - **Relayer:** any party that submits a completed candidate to Ethereum.
 - **Follower:** a client that derives Rollup0 from canonical Ethereum.
 - **Live block:** an ordinary Rollup0 block in a nominal interval.

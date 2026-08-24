@@ -6,8 +6,9 @@ envelope, inbound protocol transaction, and ECDSA proof policy.
 
 ## D.1 ECDSA Attestation
 
-Rollup0 realizes an `N`-of-`M` attestation with one independent single-signer ECDSA proof system
-per validator/prover.
+Rollup0 realizes an `N`-of-`M` attestation with `M` independently configured instances of the
+single-signer `ECDSAProofSystem`, one per prover. A candidate supplies signatures for at least `N`
+accepted instances.
 
 For proof system `k`:
 
