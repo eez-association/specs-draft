@@ -236,8 +236,9 @@ sharedPublicInput = keccak256(abi.encodePacked(
     crossProofSystemInteractions))
 ```
 
-`abi.encode(bytes32[])` is the full dynamic encoding: one length word followed by the elements.
-The three encodings are concatenated with the two trailing `bytes32` values.
+`abi.encode(bytes32[])` includes a leading offset word (`0x20`), then the array length word and
+elements. Even an empty array occupies 64 bytes. The three complete encodings are concatenated
+with the two trailing `bytes32` values.
 
 For proof system `k`, fold rollups in strictly increasing rollup-ID order:
 
@@ -296,6 +297,9 @@ The single argument is one `ProofSystemBatchPerVerificationEntries` tuple. Its f
 tuples are `ExecutionEntry[]` and `LookupCall[]`.
 
 ## 5.8 Conformance vectors
+
+Run `python3 companion-docs/check-wire-vectors.py` from the repository root to check the entry and
+public-input byte vectors with Foundry's `cast`.
 
 ### Vector 1: cross-chain call hash
 
@@ -398,6 +402,8 @@ abi.encode(entry) =
   0000000000000000000000000000000000000000000000000000000000000000
   0000000000000000000000000000000000000000000000000000000000000004
   deadbeef00000000000000000000000000000000000000000000000000000000
+  0000000000000000000000000000000000000000000000000000000000000000
+  0000000000000000000000000000000000000000000000000000000000000000
 
 entryHash =
 0xf55a0b2f661170eb3d02881188f6fc27ce192d6653a2c45c3d6b9bc8e368ce39
