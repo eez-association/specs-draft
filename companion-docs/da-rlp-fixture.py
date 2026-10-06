@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """
-DA tag-0x00 payload RLP round-trip fixture for Appendix D of the Rollup0 spec.
+Historical DA tag-0x00 RLP round-trip fixture for the retired Rollup0 draft.
+
+This does not test the current Appendix D columnar V0 codec. Both formats use
+tag 0x00, so these bytes MUST NOT be used as current candidate data.
 
 CODEC-AUTHORED (not contract-authored): the DA payload codec is an off-chain /
 execution-layer artifact. The `sync-rollups-protocol` contracts at commit fe7bf66

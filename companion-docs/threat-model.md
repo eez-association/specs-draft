@@ -1,5 +1,13 @@
 # 14. Security & Threat Model
 
+> [!WARNING]
+> **Superseded as of 2026-08-25.** This document analyzes an earlier design that settled on Gnosis
+> Chain, used signed `SYSTEM_ADDRESS` transactions and calldata DA, and assigned different operator
+> roles. It is not a security statement for the current
+> [Rollup0 specification](../docs/rollup0-spec/index.md). Historical findings may be useful when
+> auditing the development implementation, but every protocol claim and link below must be
+> revalidated before use.
+
 ## 14.1 Trust assumptions and the adversary model
 
 Rollup0 is a centralized system with a permissioned committee. Its claim is *not* "trust no

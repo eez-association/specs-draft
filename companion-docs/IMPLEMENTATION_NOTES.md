@@ -1,5 +1,11 @@
 # Appendix A. Implementation Deviations
 
+> [!WARNING]
+> **Superseded as of 2026-08-25.** These notes compare code with a retired Rollup0 draft and use its
+> former chapter numbering. They do not identify conformance with the
+> [current Rollup0 specification](../docs/rollup0-spec/index.md). Treat the file only as historical
+> implementation-audit material until it is rewritten against a pinned current code revision.
+
 > **How to read this appendix.** Chapters 1–16 (the **body**) are 100% normative — the
 > intended-correct Rollup0 design. **This appendix is not normative.** It ranks every place
 > the *current code, at the pinned commit,* does **not** meet that target — for auditors (what

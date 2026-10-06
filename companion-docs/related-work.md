@@ -1,5 +1,11 @@
 # 15. Related Work
 
+> [!WARNING]
+> **Superseded as of 2026-08-25.** This comparison describes an earlier Gnosis-settled, centralized
+> Rollup0 design with different DA, transaction, fee, and role choices. It is not current project
+> documentation and many internal links target retired chapters. Use the
+> [current Rollup0 specification](../docs/rollup0-spec/index.md) for protocol claims.
+
 This chapter situates Rollup0 — and its successor Rollup1 ([§16](16-rollup1-roadmap.md)) —
 within the contemporary rollup landscape. It states plainly where Rollup0 is *ahead* of deployed
 systems (its synchronous, single-L1-block atomic composability is more ambitious than any
@@ -194,7 +200,7 @@ domain-separates a distinct value for every L2 block instead of copying the seed
 | **EIP-1559** | Elasticity `6`, denominator `250` (Holocene: operator-configurable via `eip1559Params` in `extraData`). | Adopt OP's `6`/`250` as fixed constants ([§B.7](B1-reference.md)); `extraData` stays empty for deterministic re-derivation ([§5.1](05-block-production.md)). |
 | **Gas limit** | Set via `SystemConfig`. | `BUILDER_GAS_LIMIT = 30_000_000`, a shared compile-time constant ([§5.1](05-block-production.md)). |
 | **Sequencer architecture** | **op-node** (derivation + Engine API) + **op-geth** (execution) + **op-batcher** (posts DA batches to L1) + **op-proposer** (posts output roots). | A **single composer** drives stock reth via the Engine API; the **submitter** is the op-batcher analog ([§8.5](08-da-and-bundles.md)); there is **no separate proposer** — the state root advances inside `postAndVerifyBatch`, not via a periodic output-root tx ([§9.4](09-proving-settlement.md)). |
-| **DA framing** | Channels / frames / **span batches**; **version-0 blob encoding** (4096 field elements, high byte dropped). | RLP payload (tag `0x00`) today; **adopt OP's version-0 blob encoding** for the blob path ([§B.7](B1-reference.md), [§8.4](08-da-and-bundles.md)). |
+| **DA framing** | Channels / frames / **span batches**; **version-0 blob encoding** (4096 field elements, high byte dropped). | Guest of the **EEZ Core blob message stream** (`eez-core-protocol/docs/blobs/BLOB_FORMAT_SPEC.md`, 31 data bytes per field element): one opaque `ChainOperation.operations` carrying the Rollup0 columnar V0 span, then EEZ action brackets ([Appendix D](../docs/rollup0-spec/D-wire-formats.md), [Appendix G](../docs/rollup0-spec/G-blob-payload-design.md)). OP's own version-0 blob encoding is not adopted. |
 | **Fees** | `BaseFeeVault` / `SequencerFeeVault` / `L1FeeVault` predeploys + an L1-data-fee oracle (`GasPriceOracle`). | Fees burn to `0x0` today; **adopt OP-style fee vaults** ([§B.7](B1-reference.md)); no L1-data-fee oracle yet ([App A](A1-implementation-deviations.md)). |
 | **Settlement** | **Fraud proofs** (Cannon fault-proof; permissionless via the dispute game). | **Permissioned ECDSA *N*-of-*M* attestation** ([§9](09-proving-settlement.md)); Rollup1 → ZK validity proof ([§16](16-rollup1-roadmap.md)). |
 | **Cross-chain composability** | **Asynchronous** two-tx interop (§15.4). | **Synchronous, single-L1-block atomic** ([§1.1](01-introduction.md)) — the differentiator. |
