@@ -4,6 +4,21 @@
 hashes, events, proof inputs, and proxy bytecode. This appendix defines the Rollup0 DA envelope,
 inbound protocol transaction, validator ECDSA proof policy, and unsafe-block announcement.
 
+Rollup0 uses independent version namespaces. The human-readable `V1` domain tags identify the
+first candidate and announcement protocols; their zero-based binary envelopes start at `0`:
+
+| Namespace | Current value |
+|---|---|
+| candidate protocol domain | `EEZ_ROLLUP0_CANDIDATE_V1` |
+| Rollup0 blob payload | `0x00` |
+| type-`0x45` inbound envelope | integer `0` |
+| unsafe-block protocol domain | `EEZ_ROLLUP0_UNSAFE_BLOCK_V1` |
+| unsafe-block announcement envelope | integer `0` |
+
+A change in one namespace does not silently change another. Each decoder validates its own value.
+The unsafe-block announcement includes its numeric version directly in the signed preimage; a
+candidate attestation covers the blob-payload version through the authenticated blob contents.
+
 !!! danger "PRODUCTION BLOCKER: pin the complete EEZ Core wire and digest version"
     The EEZ chapters currently bundled in this repository still define the older
     `getTimestampAndBlockHash` public-input fold and do not contain the physical EEZ logical-message
@@ -629,6 +644,7 @@ unsafeBlockDomainTag = keccak256(bytes("EEZ_ROLLUP0_UNSAFE_BLOCK_V1"))
 
 message = keccak256(abi.encode(
     bytes32(unsafeBlockDomainTag),
+    uint256(version),
     uint256(chainId),
     bytes32(blockHash)
 ))
