@@ -60,17 +60,19 @@ current Ethereum timestamp.
 
 ## 1.2 Sequencers, Composers, and L2 Views
 
-The current working distinction is:
+The role distinction is:
 
-- a **composer** creates pure L2 and Sync blocks and prepares anchor candidates;
-- a **sequencer** syncs blocks, makes them available over peer-to-peer protocols, and provides RPC
-  services; and
-- one party can perform both roles.
+- a **sequencer** builds, signs, and announces unsafe Rollup0 blocks;
+- a **composer** constructs anchor candidates from blocks it builds or adopts; and
+- a peer may sync, relay, or serve blocks over RPC without being their sequencer or composer.
 
-Neither role has an allowlist. A composer can extend pure L2 blocks received from another composer
-or sequencer. Different composers can build different valid L2 views, and sequencers can serve
-different views. A user can follow any sequencer, knowing that its view might never become
-canonical.
+One party can perform several roles. A sequencer can also compose and submit candidates, and a
+composer can also sequence the blocks it proposes.
+
+Neither role has an allowlist. A composer can adopt pure-L2 blocks received from any sequencer or
+build them while also performing the sequencer role. Different sequencers can build different
+valid L2 views, and peers can serve different views. A user can follow any peer's unsafe view,
+knowing that it might never become canonical.
 
 An anchor candidate extends the Rollup0 safe head whose block hash is currently stored by EEZ. The
 candidate's first block must name that safe head as its parent and use the next block number. The

@@ -153,9 +153,11 @@ protocol maximum for `M`; Ethereum settlement gas limits provide the practical b
   prefix followed by exactly the first `k` protocol transactions selected by successful actions.
 - **`H[k]`:** the Rollup0 block hash of `B[k]`. EEZ stores this value as Rollup0's commitment.
 - **`R[k]`:** the EVM state root in the header of `B[k]`; `R[0]` is also called `R0`.
-- **Composer:** any party that constructs a candidate.
-- **Sequencer:** a producer that signs blocks for announcement to the pre-settlement unsafe view.
-  Rollup0 permits any signing key, and the signature grants no settlement priority.
+- **Composer:** any party that constructs an anchor candidate from blocks it builds or adopts.
+- **Sequencer (block producer):** the party that builds and signs an exact block for announcement
+  to the pre-settlement unsafe view. Rollup0 permits any signing key, and the signature grants no
+  settlement priority. A peer that merely syncs, relays, or serves the signed block is not its
+  sequencer.
 - **Validator/prover:** a member of the permissioned validity set that independently checks and
   signs or proves candidates.
 - **Relayer:** any party that submits a completed candidate to Ethereum.

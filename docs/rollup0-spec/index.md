@@ -23,10 +23,12 @@ from putting significant value on it.
 | Data availability | Ethereum blobs; normative raw, uncompressed, columnar V0 payload |
 | Late synchronization | Standard execution-layer `eth` block sync and `snap` state sync on Rollup0 |
 
-Composers build the continuous L2 chain. Sequencers sync and distribute those blocks. Blocks do not
-have to be posted every Ethereum slot. An anchor contains the complete contiguous range from the
-block after the previous settled endpoint through its new endpoint. Historical catch-up anchors
-can publish a backlog over several Ethereum blocks.
+Sequencers build, sign, and announce unsafe L2 blocks. Composers build or adopt those blocks when
+constructing anchor candidates; one party may perform both roles. Other peers may sync, relay, and
+serve the same blocks over RPC without becoming their sequencer. Blocks do not have to be posted
+every Ethereum slot. An anchor contains the complete contiguous range from the block after the
+previous settled endpoint through its new endpoint. Historical catch-up anchors can publish a
+backlog over several Ethereum blocks.
 
 This specification uses the [EEZ specification](../eez-protocol-spec/index.md) for the shared
 contracts, cross-chain execution, proofs, settlement, proxies, and wire formats. This document
