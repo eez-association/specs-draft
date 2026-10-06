@@ -38,8 +38,8 @@ slot timestamp. The first complete interval after genesis is `(T, T + 12]`:
 | `6` | `T + 12` | Sync for the next Ethereum slot |
 
 Thus “five Live positions followed by one Sync position” describes the six new positions after a
-settled Sync parent; it does not classify genesis as Live. Chiado uses the analogous interval
-`(T, T + 5]`, with four one-second Live positions followed by the Sync position at `T + 5`.
+settled Sync parent; it does not classify genesis as Live. Development-network cadence is kept
+separate in [Appendix A.2](A-reference.md#a2-development-cadence).
 
 A Live block contains ordinary Rollup0 transactions. The final position is the Sync position. Its
 block can contain ordinary pure-L2 transactions. When an inbound action succeeds, the block also
@@ -82,11 +82,6 @@ synchronous variants or triggers. For an expired catch-up candidate, the same hi
 also be proposed again. In both cases, the candidate needs a new settlement context and new
 validator signatures. Any encoded bytes that commit the expired context must be rebuilt. Only a
 canonical anchor makes the retained range safe.
-
-Chiado is a development settlement network only. Its nominal 5-second interval contains five
-1-second Rollup0 positions: four Live positions followed by one Sync position. Chiado values are
-not production values. Chiado genesis is also a Sync position, and block `n` is Sync when
-`n mod 5 = 0`.
 
 The block interval is a whole number of seconds, and the nominal settlement interval is an integer
 multiple of it.

@@ -379,9 +379,9 @@ validity. Validator admission limits are operational policy, not additional V0 w
 
 The decoded span MUST begin immediately after the settled Sync-block parent and end at another
 Sync position under the active chain configuration, using the complete-interval rule and worked
-timeline in Chapter 4. Consequently, production `block_count` is a positive multiple of `6`;
-Chiado development `block_count` is a positive multiple of `5`. This schedule check is candidate
-validity, even though the integer codec can represent other values.
+timeline in Chapter 4. Consequently, production `block_count` is a positive multiple of `6`. This
+schedule check is candidate validity, even though the integer codec can represent other values.
+Development-network schedule overrides are defined separately in Appendix A.2.
 
 The action manifest is not a separate Rollup0 byte structure. It is the sequence of EEZ
 cross-chain transaction brackets that follow the `ChainOperation` in decoded message order, each

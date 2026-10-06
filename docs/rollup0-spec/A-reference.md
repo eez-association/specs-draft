@@ -84,7 +84,9 @@ This appendix summarizes values defined in the main chapters. The chapter text t
 
 ## A.2 Development Cadence
 
-Chiado development uses:
+Chiado is a development settlement network only. Its values are not production values. Chiado
+genesis is a Sync position, and its nominal five-second interval contains four one-second Live
+positions followed by one Sync position. Chiado development uses:
 
 ```text
 nominal interval       = 5 seconds
