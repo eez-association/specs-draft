@@ -91,6 +91,21 @@ DA_fee = b * blob_gas_per_blob * blob_base_fee
 Settlement-transaction execution fees and private inclusion payments are additional publication
 costs; they are not part of `DA_fee`.
 
+Let `b_max(fork)` be the active Ethereum fork's maximum blobs per transaction and let
+`payload_bytes_per_blob(eez_version)` be the selected EEZ stream's usable bytes per blob before its
+own framing overhead. The candidate's physical payload ceiling is bounded by:
+
+```text
+candidate_payload_bytes <
+    b_max(fork) * payload_bytes_per_blob(eez_version)
+```
+
+The inequality is strict for the Rollup0 `operations` slice because the surrounding EEZ messages
+and framing consume part of the transport. Under Fusaka and the current 31-of-32-byte EEZ packing,
+`b_max = 6`, `payload_bytes_per_blob = 126,976`, and the pre-overhead product is `761,856` bytes.
+These are settlement-fork and EEZ-version parameters, not frozen Rollup0 values; a later Ethereum
+hardfork or EEZ stream revision can change them.
+
 ## B.4 Settlement and Bundle Scaling
 
 The settlement transaction's gas use grows with:

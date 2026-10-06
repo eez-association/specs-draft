@@ -85,6 +85,27 @@ resource limits, a catch-up composer SHOULD use the largest blob allotment it ca
 included and fill it with the longest complete valid historical prefix. Maximality is not a
 validity rule, and a smaller candidate remains valid.
 
+!!! note "CURRENT ETHEREUM DA CAPACITY, NOT A ROLLUP0 CONSTANT"
+    Under Ethereum's Fusaka rules, [EIP-7594](https://eips.ethereum.org/EIPS/eip-7594) permits at
+    most six blobs in one blob transaction. With the EEZ transport's 31 payload bytes per 32-byte
+    field element, one blob carries at most
+    `4,096 * 31 = 126,976` payload bytes and six carry at most `761,856` bytes before EEZ framing
+    and message overhead. The usable Rollup0 V0 `operations` slice is therefore smaller.
+
+    If a composer waits the complete 15-minute operational target, the unsettled range contains
+    `900 / 2 = 450` scheduled Rollup0 blocks. One six-blob candidate then provides an absolute
+    pre-overhead average of about `1,693` bytes per block. A busy composer must anchor earlier. If
+    it publishes one maximum-size candidate every Ethereum slot, the corresponding absolute
+    pre-overhead average is `761,856 / 6 = 126,976` bytes per newly scheduled Rollup0 block.
+
+    These figures describe the current settlement fork, not Rollup0 consensus constants. A future
+    Ethereum hardfork may change the per-transaction blob allowance or physical transport
+    capacity, and Rollup0 V0 automatically uses the capacity admitted by that active fork and the
+    selected EEZ stream version. Implementations MUST calculate limits from the active settlement
+    rules rather than freeze the six-blob figure. Rollup0 still deliberately imposes no DA-derived
+    per-block validity limit: an oversized unsafe block simply cannot become canonical through a
+    valid anchor.
+
 !!! note "PHYSICAL DA AND OPERATIONAL PROVING LIMITS"
     A validator or prover may reject or defer a request that exceeds its local capacity, but this
     does not make the candidate invalid. A future proof system that cannot cover all valid V0
