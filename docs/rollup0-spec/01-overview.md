@@ -151,8 +151,9 @@ this version.
 
 Each proposed trigger transaction makes exactly one top-level cross-chain call into Rollup0. A
 candidate can contain several proposed triggers. Under ordered-call identity, a different carrier
-transaction may replace one of them, but the production L1 EEZ guard permits that transaction to
-consume at most one successful Rollup0 action.
+transaction may replace one of them. Candidate protocol V1 requires the production L1 EEZ guard to
+permit that transaction to consume at most one successful Rollup0 action. This is a production
+blocker until the EEZ change defined in Chapter 7 is deployed and tested.
 
 For synchronous transactions, the composer submits this ordered Ethereum bundle through
 `eth_sendBundle`:

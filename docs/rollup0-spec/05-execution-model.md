@@ -23,10 +23,12 @@ need to occur at EVM call depth zero. In this chapter, *top-level* means that th
 parent EEZ action. A second Ethereum-to-Rollup0 action anywhere in a proposed trigger makes that
 delivery proposal invalid, including when the caller catches its revert.
 
-An equivalent carrier transaction is not pre-authenticated by the candidate. The production L1 EEZ
-path therefore enforces the state-relevant rule directly: one outer transaction can successfully
-consume at most one ordered Rollup0 action. Additional mismatched or failed calls that create no
-Rollup0 transition are L1-only behavior and do not affect Rollup0 derivation.
+An equivalent carrier transaction is not pre-authenticated by the candidate. Candidate protocol
+V1 therefore requires the production L1 EEZ path to enforce the state-relevant rule directly: one
+outer transaction can successfully consume at most one ordered Rollup0 action. Additional
+mismatched or failed calls that create no Rollup0 transition are L1-only behavior and do not affect
+Rollup0 derivation. This remains a production blocker until the Chapter 7 EEZ guard is deployed and
+tested.
 
 A trigger MUST NOT be an EIP-4844 blob transaction or otherwise require a blob sidecar. This
 restriction applies to the proposed delivery transaction and any equivalent transaction that
