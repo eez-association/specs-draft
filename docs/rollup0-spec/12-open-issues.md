@@ -52,6 +52,11 @@
 - **Settlement-wrapper dependency:** the fixed EEZ proof digest does not bind the transient-prefix
   lengths, and EEZ does not revert when the leading anchor entry is skipped. Rollup0 therefore
   requires its manager-gated settlement wrapper. Direct EEZ submission is invalid.
+- **Pooled EEZ custody:** permissionless sibling-rollup registration shares the EEZ contract's
+  physical ETH balance. Safety relies on Rollup0's proof authorization and manager-gated batch
+  scope, together with EEZ's per-entry ether conservation and per-rollup balance-underflow checks.
+  The arithmetic checks alone do not prevent a transfer of backing between rollup ledgers.
+  A dedicated vault could provide clearer physical isolation but is not part of V1.
 - **Legacy EEZ terminology:** the current contracts call Rollup0's opaque block-hash commitment a
   state root. The encoding is unambiguous and does not block production, but a later EEZ revision
   should use commitment-oriented names.

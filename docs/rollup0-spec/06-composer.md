@@ -118,6 +118,8 @@ A validator/prover checks at least:
   root;
 - every failed action has one correctly pinned L1 EEZ failed lookup, exact revert data, and no
   Rollup0 transaction;
+- every successful action carrying value `v` has an L1 Rollup0 state delta with
+  `etherDelta = +v`, while a zero-value success has `etherDelta = 0`;
 - a failed action, when present, is the candidate's final manifest action;
 - every `H[k]` and `R[k]`, including `H[0]` and `R0`, matches independent execution; and
 - when the request proposes a nonzero synchronous prefix, it supplies the corresponding signed

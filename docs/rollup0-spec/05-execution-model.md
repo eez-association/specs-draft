@@ -237,6 +237,12 @@ entry contains exactly one non-static inbound call, has no expected outgoing cal
 and sets `callCount = 1`. Its action hash, source and destination, value, calldata, return data, and
 rolling hash must match replay.
 
+For each successful action `k` carrying value `v`, its deferred L1 EEZ execution entry contains
+the Rollup0 state delta from `H[k - 1]` to `H[k]` with `etherDelta = +v`. Under the V1 one-way,
+non-nested profile, the trigger delivers `etherIn = v` to EEZ and the entry sends no Ethereum-side
+`etherOut`, so EEZ's per-entry conservation rule requires that exact delta. For `v = 0`, the delta
+is zero. A different delta is invalid even if the validator threshold signed it.
+
 Rollup0.x can permit additional entries, lookups, and nested-call data without changing the ABI.
 That version must define how every additional object is reached and consumed. Unused table data
 remains invalid in every version.
@@ -267,10 +273,11 @@ from `R[k - 1]` to `R[k]`. A failed action adds no transaction or receipt and cr
 `B`, `H`, or `R` variant. It consumes no Rollup0 block gas and causes no L2 nonce, value, fee, log,
 or state change.
 
-A successful action always has an execution entry, including when the complete Rollup0 world state
-does not change. In that case, `R[k]` can equal `R[k - 1]`, but `H[k]` differs because the protocol
-transaction and its receipt are present in `B[k]`. The entry's `etherDelta` is zero. The protocol
-transaction has no sender nonce or L2 fee state change. It still consumes block gas, remains in the
+A successful zero-value action always has an execution entry, including when the complete Rollup0
+world state does not change. In that case, `R[k]` can equal `R[k - 1]`, but `H[k]` differs because
+the protocol transaction and its receipt are present in `B[k]`. Its `etherDelta` is zero because
+`v = 0`. The protocol transaction has no sender nonce or L2 fee state change. It still consumes
+block gas, remains in the
 transaction and receipt roots, and can return data or emit logs. The block-hash commitment therefore
 distinguishes this success from a failed action without pretending that the EVM state root changed.
 
@@ -388,6 +395,14 @@ The ETH balance of the L1 EEZ contract must be at least the sum of its per-rollu
 `etherBalance` values. ETH forced into the contract without a valid EEZ action is surplus and does
 not credit Rollup0. Rollup0's ledger backs the native value issued through EEZ. L2 fee burning or
 otherwise inaccessible value can make the backing greater than the remaining redeemable value.
+
+Permissionless registration of another EEZ rollup does not authorize it to spend Rollup0's ledger.
+Every batch touching Rollup0 must satisfy Rollup0's proof policy and manager-gated settlement path;
+V1 also rejects mixed-rollup batches. EEZ separately enforces per-entry ether conservation and
+per-rollup balance-underflow checks. Those arithmetic checks alone do not isolate ledgers: debiting
+Rollup0 by `v` and crediting a sibling by `v` could satisfy both. Rollup0's authorization and batch
+scope prevent that reassignment. Pooled custody therefore relies on these checks together with
+the validator and manager trust assumptions in Chapter 8. A dedicated vault is not part of V1.
 
 Rollup0 genesis gives no ordinary account a native balance. Any faucet or operational balance must
 enter through a collateralized EEZ deposit. Genesis can still install contract code and storage,
