@@ -76,6 +76,12 @@ For each ECDSA proof system:
   domain; and
 - the recovered address MUST equal that proof system's configured signer.
 
+Each configured signer MUST use a key dedicated to Rollup0 validator attestations. It MUST NOT use
+that key for Ethereum transactions, personal-sign messages, EIP-712 applications, another proof
+system, or another protocol's bare-hash signatures. The candidate domain prevents accidental
+cross-network replay inside Rollup0, while key separation prevents an external signing interface
+from being asked to sign an already-computed Rollup0 `publicInputsHash` under another pretext.
+
 The opaque EEZ verification key returned by the Rollup0 manager is separate from the signer
 address configured in the ECDSA proof-system contract. Clients MUST NOT substitute one for the
 other.

@@ -16,7 +16,7 @@ from putting significant value on it.
 | Unsafe block attribution | Producer-signed; no Rollup0 signer allowlist |
 | Block syncing, relay, and RPC | Open; peers may relay producer-signed blocks |
 | Candidate validation | Permissioned validators provide a best-effort validation service |
-| Validator threshold | Dynamic set; `floor(2M / 3) + 1` active members |
+| Validator threshold | `M` active members; `N = floor(2M / 3) + 1` signatures required |
 | Candidate selection | The first applicable candidate in canonical Ethereum order wins |
 | Inbound execution | Unsigned protocol-derived EIP-2718 transactions |
 | EEZ state commitment | Terminal Rollup0 block hash |

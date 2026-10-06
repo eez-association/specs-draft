@@ -110,11 +110,22 @@ The production genesis must bind exact bytecode and exact protocol-transaction b
 | Active set size | Dynamic `M >= 1` |
 | Required threshold | `N = floor(2M / 3) + 1` |
 | Membership authority | EEZ team Safe |
+| Signer-key use | dedicated to Rollup0 validator attestations |
 | Change activation | Canonical Ethereum transaction order |
 | Membership and threshold update | Atomic when `M` changes |
 
 Validator addresses and keys are active manager configuration, not genesis constants. There is no
 protocol maximum for `M`; Ethereum settlement gas limits provide the practical bound.
+
+| `M` | Required `N` | Unavailable members tolerated while signing |
+|---:|---:|---:|
+| `1` | `1` | `0` |
+| `2` | `2` | `0` |
+| `3` | `3` | `0` |
+| `4` | `3` | `1` |
+
+This is an authorization threshold, not an availability guarantee. Larger values continue to use
+the same strict-two-thirds formula.
 
 !!! note "GENESIS PARAMETERS"
     The Rollup0 chain ID and finalized Ethereum reference block are not yet fixed. The initial

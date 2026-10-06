@@ -9,6 +9,10 @@
   unjustified Ethereum-side EEZ results, corrupt dependent applications, and drain assets they
   control. Threshold compromise is catastrophic and follower detection cannot reverse those L1
   effects.
+- **Validator liveness authority:** no candidate can settle without `N` timely attestations. The
+  service is best effort and has no force-inclusion or fallback proof path. In particular,
+  `M <= 3` requires unanimity, so one unavailable member halts anchoring, synchronous execution,
+  safe-head progress, and any withdrawal path that depends on new finalized anchors.
 - **No force inclusion:** the protocol does not guarantee that a valid candidate reaches or is
   included by Ethereum.
 - **One cross-network direction:** V1 supports top-level state-changing actions from Ethereum to

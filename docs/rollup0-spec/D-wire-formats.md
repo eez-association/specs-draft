@@ -44,6 +44,10 @@ candidate domain from Section D.2 into that hash. The signer MUST NOT add an EIP
 `Ethereum Signed Message` prefix or another EIP-712 domain. Verification succeeds only when the
 recovered address equals the signer configured for that proof system.
 
+Because this is a bare-hash signature, the configured private key MUST be dedicated to Rollup0
+validator attestations and MUST NOT sign transactions, messages, typed data, or hashes for another
+role or protocol.
+
 `proofSystems` is strictly increasing by address and contains one proof per element. Rollup0's
 proof-system index list is strictly increasing. For active set size `M`, the Rollup0 manager accepts
 only configured proof systems and rejects a submitted subset with fewer than
