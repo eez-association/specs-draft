@@ -90,13 +90,29 @@ Rollup0 additionally requires an L2 EEZ predeploy and a deterministic protocol-t
 mechanism for inbound execution. Their Rollup0-specific placement and unresolved production
 parameters are defined in [Chapter 3](03-evm-proxy-systemtx.md).
 
-Execution clients use the standard Engine API to validate, execute, and import Rollup0 payloads.
-Payload construction additionally has to insert the deterministic type-`0x45` transaction after
-the Sync block's pure-L2 prefix. The standard Engine API has no general method for an external
-composer to inject that non-pool transaction into payload construction. An implementation MUST
-therefore construct the payload in process or expose a versioned Rollup0-specific construction
-extension. The selected construction interface is an interoperability and deployment choice, not
-a new consensus input: every resulting payload remains subject to the same block-validation rules.
+## 2.3 Engine API Profile
+
+Execution clients use the Engine API to validate, execute, and import Rollup0 payloads. Under the
+[Osaka Engine API](https://github.com/ethereum/execution-apis/blob/main/src/engine/osaka.md), the
+standard method profile is:
+
+| Operation | Method and Rollup0 values |
+|---|---|
+| update fork choice / start a standard build | `engine_forkchoiceUpdatedV3`; exact Rollup0 timestamp and `prevRandao`, composer-selected `suggestedFeeRecipient`, empty withdrawals, and zero `parentBeaconBlockRoot` |
+| obtain an Osaka payload | `engine_getPayloadV5`; empty blob bundle and empty `executionRequests` for a valid Rollup0 block |
+| validate or import a payload | `engine_newPayloadV4`; empty `expectedBlobVersionedHashes`, zero `parentBeaconBlockRoot`, and empty `executionRequests` |
+
+Rollup0 adopts the corresponding standard method profile when it activates a later Ethereum
+execution fork. A client MUST NOT infer nonempty consensus-layer withdrawals, blobs, beacon roots,
+or execution requests merely because the standard method schema contains those fields.
+
+Standard payload attributes carry the selected `beneficiary` as `suggestedFeeRecipient` and the
+Rollup0 seed as `prevRandao`, but they do not carry composer-selected `extraData` or provide a
+general method for an external composer to inject a deterministic non-pool type-`0x45`
+transaction after the Sync block's pure-L2 prefix. Construction MUST therefore happen in process
+or through a versioned Rollup0-specific extension that supplies those values. That extension is an
+interoperability and deployment interface, not a new consensus input: every constructed payload
+remains subject to the same block-validation rules and can be imported through the profile above.
 
 ---
 

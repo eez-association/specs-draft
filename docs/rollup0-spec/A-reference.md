@@ -22,6 +22,7 @@ This appendix summarizes values defined in the main chapters. The chapter text t
 | Genesis base fee | `1,000,000,000` wei (`1 gwei`) |
 | Initial EVM fork | Fusaka, using the Osaka execution-layer rules |
 | Later EVM forks | Ethereum execution forks at their Ethereum mainnet activation timestamps |
+| Osaka Engine API | `engine_forkchoiceUpdatedV3`, `engine_getPayloadV5`, `engine_newPayloadV4`; zero beacon root, empty blob hashes and execution requests |
 | Inbound transaction type | unsigned EIP-2718 type `0x45` |
 | Inbound transaction encoding | `0x45 || rlp([version, chainId, sourceHash, gasLimit, to, value, input])` |
 | Inbound `sourceHash` version | `0`; settlement-context, manifest-index, and call-hash formula in Appendix F |
