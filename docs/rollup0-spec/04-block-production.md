@@ -135,9 +135,9 @@ base fee from its parent with the `2/50` rule above.
     All terminal Sync-block variants for one block position use the same `beneficiary`; only their
     transaction-derived header values differ.
 
-    `COINBASE` returns this address. Ordinary signed transactions use Ethereum's fee routing: the
-    base fee is burned and the priority fee is credited to `beneficiary`. Type-`0x45` protocol
-    transactions consume gas but pay no fee and do not credit `beneficiary`.
+    `COINBASE` returns this address. Ordinary signed transactions credit their priority fee to
+    `beneficiary`. Their base fee is credited to `FEE_COLLECTOR` rather than burned (Chapter 11).
+    Type-`0x45` protocol transactions consume gas but pay no fee and credit neither account.
 
 Rollup0 has no beacon chain. It retains the post-Cancun header field without changing the header
 encoding, but fixes `parentBeaconBlockRoot` to 32 zero bytes in every block. Protocol transactions

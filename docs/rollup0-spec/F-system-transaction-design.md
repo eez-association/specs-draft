@@ -360,8 +360,8 @@ part of the accepted prefix. A later Rollup0.x version can add an L2 failure rec
 decides that mirrored failure history is worth a new execution rule.
 
 !!! success "DECISION: V1 has no protocol-transaction fee"
-    Type-`0x45` consumes and reports gas but has no payer, deduction, refund, burn, or beneficiary
-    credit. Clients bypass ordinary EIP-1559 fee-cap and signed-payer balance checks for this type.
+    Type-`0x45` consumes and reports gas but has no payer, deduction, refund, burn, fee-collector
+    credit, or beneficiary credit. Clients bypass ordinary EIP-1559 fee-cap and signed-payer balance checks for this type.
     `GASPRICE`, JSON-RPC `gasPrice`, and receipt `effectiveGasPrice` are zero. A failed inbound
     action creates no Rollup0 transaction or fee, and Rollup0 does not reimburse its simulation or
     validation.

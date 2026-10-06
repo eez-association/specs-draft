@@ -317,8 +317,8 @@ gas purchase.
     Type-`0x45` consumes the common block gas pool and contributes its exact intrinsic, calldata-
     floor, and execution gas to the receipt and block `gasUsed`. It pays no L2 fee. Clients MUST
     skip the ordinary fee-cap, signed-payer upfront-balance, fee-deduction, and refund checks for
-    this type. They MUST NOT burn a fee, credit the block beneficiary, or deduct from the action's
-    `msg.value`.
+    this type. They MUST NOT burn a fee, credit `FEE_COLLECTOR` or the block beneficiary, or
+    deduct from the action's `msg.value`.
 
     The EVM transaction gas price is zero, so `GASPRICE` returns `0`. JSON-RPC reports
     `gasPrice = 0` for the transaction and `effectiveGasPrice = 0` for its receipt. Gas consumption

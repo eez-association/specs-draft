@@ -317,6 +317,11 @@ denominator `8`. Rollup0 uses elasticity `2` and denominator `50`. The productio
 Rollup0 chain specification that applies `2/50` in both payload construction and header
 validation.
 
+The current client also uses reth's standard Ethereum fee routing, which burns the base fee.
+Production Rollup0 credits the base fee and any blob fee of every ordinary signed transaction to
+`FEE_COLLECTOR` (Chapter 11). Execution, payload construction, and validation must all apply that
+credit, or their state roots will diverge from production.
+
 ---
 
 *Next: [Appendix F, Inbound Transaction Design](F-system-transaction-design.md).*

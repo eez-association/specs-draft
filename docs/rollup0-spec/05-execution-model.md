@@ -393,8 +393,10 @@ withdrawal changes neither side.
 
 The ETH balance of the L1 EEZ contract must be at least the sum of its per-rollup
 `etherBalance` values. ETH forced into the contract without a valid EEZ action is surplus and does
-not credit Rollup0. Rollup0's ledger backs the native value issued through EEZ. L2 fee burning or
-otherwise inaccessible value can make the backing greater than the remaining redeemable value.
+not credit Rollup0. Rollup0's ledger backs the native value issued through EEZ. Rollup0 does not
+burn L2 fees: base fees and blob fees are credited to `FEE_COLLECTOR` (Chapter 11), so paying fees
+does not reduce the native supply that the ledger backs. Value sent to an account nobody controls
+can still make the backing greater than the value that can be redeemed in practice.
 
 Permissionless registration of another EEZ rollup does not authorize it to spend Rollup0's ledger.
 Every batch touching Rollup0 must satisfy Rollup0's proof policy and manager-gated settlement path;

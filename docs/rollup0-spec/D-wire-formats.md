@@ -558,7 +558,8 @@ remaining before it starts and `16,777,216`. That numeric cap is fixed for envel
 it does not increase automatically if a later Ethereum fork raises the ordinary-transaction cap.
 
 Type-`0x45` pays no L2 fee. Its EVM gas price is zero, clients bypass ordinary fee-cap and
-signed-payer balance checks, and no fee is burned or credited to the block beneficiary. The
+signed-payer balance checks, and no fee is burned or credited to `FEE_COLLECTOR` or the block
+beneficiary. The
 transaction and receipt JSON-RPC objects report `gasPrice = 0` and `effectiveGasPrice = 0`,
 respectively. Gas consumption still contributes to the receipt and block `gasUsed`.
 

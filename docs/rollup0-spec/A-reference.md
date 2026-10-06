@@ -47,7 +47,7 @@ This appendix summarizes values defined in the main chapters. The chapter text t
 | `prevRandao` mapping | direct copy of `P(T).prevRandao` throughout the interval |
 | Initial RANDAO seed | direct copy from the finalized Ethereum reference block named by genesis |
 | Block `beneficiary` | composer-selected and authenticated per block |
-| Ordinary transaction fees | base fee burned; priority fee paid to `beneficiary` |
+| Ordinary transaction fees | base fee and blob fee credited to `FEE_COLLECTOR`, never burned; priority fee paid to `beneficiary` |
 | `extraData` | zero to 32 composer-selected bytes |
 | DA channel | Ethereum blobs |
 | Ethereum trigger transaction type | non-blob only; type `0x04` permitted, type `0x03` and any sidecar-dependent trigger prohibited |
@@ -105,6 +105,7 @@ These are not production values.
 |---|---|
 | `EEZL2` predeploy | `0xee50000000000000000000000000000000000000` |
 | `EEZL2` implementation | Exact `eez-core-protocol` version and bytecode selected and pinned for genesis; not yet fixed |
+| `FEE_COLLECTOR` | Genesis chain parameter; ordinary account with no reserved code; not yet fixed |
 
 The production genesis must bind exact bytecode and exact protocol-transaction behavior.
 
@@ -133,10 +134,10 @@ This is an authorization threshold, not an availability guarantee. Larger values
 the same strict-two-thirds formula.
 
 !!! note "GENESIS PARAMETERS"
-    The Rollup0 chain ID and finalized Ethereum reference block are not yet fixed. The initial
-    RANDAO seed is copied from that reference block into the genesis header and first interval.
-    Deployment-specific beneficiary policy and recipients are operational configuration, not
-    genesis consensus fields.
+    The Rollup0 chain ID, `FEE_COLLECTOR` address, and finalized Ethereum reference block are not
+    yet fixed. The initial RANDAO seed is copied from that reference block into the genesis header
+    and first interval. `FEE_COLLECTOR` is a consensus parameter. Deployment-specific beneficiary
+    policy and recipients are operational configuration, not genesis consensus fields.
 
 ## A.5 DA Format
 

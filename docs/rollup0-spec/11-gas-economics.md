@@ -29,15 +29,51 @@ Rollup0 does not admit L2 blob transactions and therefore charges no L2 blob gas
 block has zero `blobGasUsed`. Ethereum blob gas paid by a settlement transaction is an L1 data
 availability cost and is not part of Rollup0 block execution.
 
-Ordinary signed transactions use Ethereum's fee rules. The base fee is burned and the priority fee
-is credited to the composer-selected block `beneficiary`. The Rollup0 genesis base fee is
-`1,000,000,000` wei (`1 gwei`), matching Ethereum's standard initial base fee.
+Ordinary signed transactions use Ethereum's fee rules with one change: Rollup0 does not burn the
+base fee. Every amount that Ethereum would burn is instead credited to the chain's fee-collector
+account, `FEE_COLLECTOR`. When an ordinary signed transaction completes, after its gas refund,
+Rollup0:
+
+1. credits the composer-selected block `beneficiary` with the priority fee, exactly as Ethereum
+   does;
+2. credits `FEE_COLLECTOR` with `baseFeePerGas * gasUsed`, where `gasUsed` is the transaction's
+   final gas use after refunds; and
+3. for a blob-carrying transaction, also credits `FEE_COLLECTOR` with the blob fee
+   `blobGasUsed * blobBaseFee` that Ethereum would burn.
+
+The credits are plain balance increases. They do not call or execute code at `FEE_COLLECTOR`, and
+they do not change its nonce. They take effect at the end of each transaction, so a later
+transaction in the same block observes the increased balance. If `FEE_COLLECTOR` equals the block
+`beneficiary`, that account receives both amounts. The sender's deduction, the upfront-balance and
+fee-cap checks, `BASEFEE`, `GASPRICE`, and JSON-RPC `effectiveGasPrice` are unchanged from
+Ethereum. Only the destination of the base-fee and blob-fee amounts changes.
+
+Rollup0 does not admit L2 blob transactions, so step 3 always credits zero under the current rules.
+The rule is defined anyway so that Rollup0's fee routing matches Gnosis Chain's and remains complete
+if a later version admits blob transactions.
+
+`FEE_COLLECTOR` is a genesis chain parameter. It is an ordinary account with no reserved code or
+privileges. Changing it after genesis changes block state transitions and therefore requires a
+Rollup0 hardfork. The Rollup0 value is not yet fixed (Appendix A.3).
+
+The Rollup0 genesis base fee is `1,000,000,000` wei (`1 gwei`), matching Ethereum's standard
+initial base fee.
+
+!!! success "DECISION: collect base fees instead of burning them"
+    Rollup0 credits base fees and blob fees to `FEE_COLLECTOR` instead of burning them. This is the
+    fee-collector rule that Gnosis Chain has applied since the merge, where burning the
+    stablecoin-backed native currency would serve no monetary purpose.
+
+    The same reasoning applies to Rollup0. Its native ETH is not issued by Rollup0's own consensus;
+    it is a claim backed by Rollup0's `etherBalance` ledger in the L1 EEZ contract (Chapter 5).
+    Burning L2 fees would permanently strand the matching L1 backing. Collecting them keeps the L2
+    native supply equal to the value that entered through EEZ.
 
 !!! success "DECISION: type-`0x45` pays no L2 fee"
     Type-`0x45` inbound transactions have no fee fields or payer. They consume and report gas but
     skip ordinary fee-cap, upfront-balance, deduction, and refund processing. `GASPRICE`, JSON-RPC
-    `gasPrice`, and receipt `effectiveGasPrice` are all zero. No base fee is burned and no priority
-    fee is credited for their gas.
+    `gasPrice`, and receipt `effectiveGasPrice` are all zero. Their gas credits nothing to
+    `FEE_COLLECTOR` or the block `beneficiary`.
 
 [Appendix B](B-gas-cost-analysis.md) explains why Rollup0 uses `2/50` rather than Ethereum's
 `2/8` or the earlier `6/250` proposal.
@@ -53,7 +89,8 @@ Candidate production can create costs for several participants:
 - relayers, builders, or other parties may bear or receive private inclusion payments.
 
 Ordinary signed Rollup0 transactions use the only protocol-level fee mechanism currently defined:
-their base fee is burned and their priority fee is paid to the block `beneficiary`. Rollup0 defines
+their base fee is credited to `FEE_COLLECTOR` and their priority fee is paid to the block
+`beneficiary`. Fee-collector balances are not a reimbursement mechanism either. Rollup0 defines
 no protocol-level reimbursement for candidate construction, validation, proving, DA, settlement,
 failed candidates, or losing siblings. Participants may use private funding and payment
 arrangements, but open composition does not imply that candidate production is profitable.

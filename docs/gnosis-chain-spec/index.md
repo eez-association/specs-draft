@@ -30,7 +30,18 @@ Chiado is a development settlement network only. In that environment, each
 At launch, Gnosis funds the authorized sequencer/composer as an operational service. That operator
 sets the block `beneficiary` to the Gnosis-designated fee recipient, so ordinary Gnosis Chain
 transaction priority fees accrue to Gnosis and can offset sequencing, composition, validation, DA,
-and settlement costs. Base fees remain burned under the inherited Rollup0 fee rules.
+and settlement costs.
+
+Gnosis Chain inherits Rollup0's fee-collector rule. Base fees and blob fees are not burned; they
+are credited to `FEE_COLLECTOR`, which for Gnosis Chain is:
+
+```text
+FEE_COLLECTOR = 0x6BBe78ee9e474842Dbd4AB4987b3CeFE88426A92
+```
+
+This is the fee collector Gnosis Chain has used since the merge. Its fee routing therefore does not
+change at the EEZ fork. Not burning xDAI also keeps the native supply equal to the DAI that backs
+it.
 
 This funding and cost-recovery arrangement is deployment policy, not a protocol reimbursement or
 profitability guarantee. Gnosis Chain does not mint an additional protocol fee for the operator and

@@ -70,7 +70,8 @@
 The following are not accepted V1 limitations. They need exact definitions or implementations
 before production:
 
-- Rollup0 chain ID, EEZ rollup ID, genesis, and finalized Ethereum RANDAO reference block;
+- Rollup0 chain ID, EEZ rollup ID, `FEE_COLLECTOR` address, genesis, and finalized Ethereum
+  RANDAO reference block;
 - the unsafe-block announcement P2P mapping and conformance vectors;
 - the selected and pinned EEZ Core version, including the exact `getCustomData` public-input fold
   and complete physical blob-message stream;
