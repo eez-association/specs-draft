@@ -393,6 +393,13 @@ credits exactly `v` regardless of that balance, and the ordinary value transfer 
 `v`. Rollup0 imposes no pre-call or post-call zero-balance invariant on `SYSTEM_ADDRESS`: value can
 be sent there through ordinary EVM behavior, but that residual value cannot fund a later action.
 
+The active fork's ordinary EIP-161 empty-account clearing applies after the protocol transaction.
+If `SYSTEM_ADDRESS` began empty and returns to zero balance, zero nonce, and empty code, it leaves
+no persistent empty account in the state trie. A pre-existing nonzero balance remains and prevents
+empty-account deletion. The EIP-2935 system operation earlier in the block uses the same reserved
+caller, but transfers no value, does not increment its nonce, and neither prefunds nor otherwise
+changes these protocol-transaction rules. Rollup0 does not execute the EIP-4788 system operation.
+
 If the application call succeeds, the value moves through `EEZL2` according to the verified EEZ
 action. The resulting increase in Rollup0 native value must be backed by the corresponding value
 held on Ethereum. Any verified value movement out of Rollup0 is accounted for separately and can
