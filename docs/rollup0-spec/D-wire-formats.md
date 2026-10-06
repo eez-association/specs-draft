@@ -535,7 +535,8 @@ canonical RLP encoding.
 The transaction is derived rather than signed. Its sender is `SYSTEM_ADDRESS`, its recipient is
 `EEZL2`, and its calldata follows the selected `EEZL2` inbound delivery ABI. Its access list,
 blob-hash list, and authorization list are empty. Its gas limit is the lower of the block gas
-remaining before it starts and the Fusaka per-transaction cap of `16,777,216`.
+remaining before it starts and `16,777,216`. That numeric cap is fixed for envelope version `0`;
+it does not increase automatically if a later Ethereum fork raises the ordinary-transaction cap.
 
 Type-`0x45` pays no L2 fee. Its EVM gas price is zero, clients bypass ordinary fee-cap and
 signed-payer balance checks, and no fee is burned or credited to the block beneficiary. The

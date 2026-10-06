@@ -247,9 +247,15 @@ maximum gas limit of `16,777,216` (`2^24`). Each inbound protocol transaction th
 gasLimit = min(gas remaining in the block, 16,777,216)
 ```
 
+The numeric `16,777,216` cap is frozen for inbound envelope version `0`, even if a later Ethereum
+fork changes its ordinary-transaction cap. Changing this derivation changes the typed transaction
+bytes, transaction root, receipt context, and `H[k]`; it therefore requires a new inbound envelope
+version and Rollup0 hardfork. Ordinary signed transactions follow the cap of the active Ethereum
+execution fork.
+
 Before EVM execution, Rollup0 charges the standard intrinsic gas for a non-creation transaction
 under the active Ethereum fork. The calculation uses the complete calldata passed to `EEZL2`.
-With the selected empty access list, define:
+With the selected empty access list, the Osaka values are:
 
 ```text
 calldataTokens = zeroCalldataBytes + 4 * nonZeroCalldataBytes
@@ -267,9 +273,15 @@ gasUsed = 21,000 + max(
 )
 ```
 
+Unlike the envelope's numeric gas-limit cap, intrinsic-gas and calldata-floor semantics follow the
+active Ethereum execution fork. Chapter 3.1 requires Rollup0 to specify any new consensus-layer
+dependency before adopting a later fork; a client MUST NOT keep the displayed Osaka formula if
+that active fork changes it.
+
 This gas remains used when the successful action catches an internal application revert. A
-candidate is invalid if the transaction exceeds the EIP-7825 cap, its outer `EEZL2` call reverts,
-or the block does not have enough gas for the required intrinsic and calldata-floor charges.
+candidate is invalid if an envelope-version-`0` transaction exceeds its fixed `16,777,216` cap,
+its outer `EEZL2` call reverts, or the block does not have enough gas for the required intrinsic
+and calldata-floor charges.
 Intrinsic and EVM execution gas contribute to the transaction receipt and block `gasUsed`, and
 leave less gas for later transactions.
 

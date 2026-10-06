@@ -200,8 +200,11 @@ blob-only `blobGasUsed` and `blobGasPrice` fields are omitted.
     transaction type unchanged. A Rollup0 hardfork must resolve the conflict. Moving the inbound
     type also requires incrementing the envelope version so that `sourceDomain` changes.
 
-The `gasLimit` field must not exceed the Fusaka EIP-7825 limit of `16,777,216`. Derivation sets it to
-the lower of that limit and the gas remaining in the block before the protocol transaction starts.
+The `gasLimit` field must not exceed `16,777,216`. Derivation sets it to the lower of that value
+and the gas remaining in the block before the protocol transaction starts. Although this value was
+selected from Fusaka EIP-7825, it is an envelope-version-`0` constant. A later Ethereum fork that
+changes the ordinary transaction cap does not change these bytes; changing the inbound cap needs a
+new envelope version and Rollup0 hardfork.
 
 The source identifier must distinguish otherwise identical actions without relying on a system
 account nonce. It also needs enough domain information so that the same origin produces a different

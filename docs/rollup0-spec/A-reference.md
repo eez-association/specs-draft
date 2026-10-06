@@ -25,9 +25,9 @@ This appendix summarizes values defined in the main chapters. The chapter text t
 | Inbound transaction type | unsigned EIP-2718 type `0x45` |
 | Inbound transaction encoding | `0x45 || rlp([version, chainId, sourceHash, gasLimit, to, value, input])` |
 | Inbound `sourceHash` version | `0`; settlement-context, manifest-index, and call-hash formula in Appendix F |
-| Maximum transaction gas limit | `16,777,216` (`2^24`) |
+| Maximum inbound transaction gas limit | `16,777,216` (`2^24`), frozen for envelope version `0` |
 | Inbound transaction gas limit | `min(remaining block gas, 16,777,216)` |
-| Inbound transaction gas accounting | ordinary EVM execution gas plus standard non-creation intrinsic gas and the EIP-7623 calldata floor |
+| Inbound transaction gas accounting | active fork's ordinary EVM execution gas plus standard non-creation intrinsic gas and calldata floor; displayed formulas are Osaka values |
 | Inbound transaction fee | none; `GASPRICE`, RPC `gasPrice`, and receipt `effectiveGasPrice` are `0` |
 | System caller | `0xfffffffffffffffffffffffffffffffffffffffe` |
 | Inbound transaction access list | empty |
