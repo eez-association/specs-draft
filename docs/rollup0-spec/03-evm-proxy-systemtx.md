@@ -39,6 +39,11 @@ Rollup0 does not support ordinary EIP-4844 blob transactions. A node must reject
 `0x03` from its transaction pool and `eth_sendRawTransaction`. A Rollup0 block that contains a blob
 transaction or a transaction with a non-empty blob-versioned-hash list is invalid.
 
+Ordinary transaction type `0x04` and EIP-7702 delegation are valid under the active Osaka rules.
+This permission applies both to pure-L2 transactions and to non-blob Ethereum trigger transactions.
+Delegation does not change Rollup0 action identity: source-address derivation and the complete-trace
+one-action check follow the code that actually executes, including delegated code.
+
 Rollup0 retains the post-Cancun execution header fields. The genesis values of `blobGasUsed` and
 `excessBlobGas` are zero. Every later block has `blobGasUsed = 0` and derives `excessBlobGas` from
 its parent under the active Ethereum execution fork. It therefore remains zero. `BLOBBASEFEE`

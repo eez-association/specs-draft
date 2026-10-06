@@ -31,6 +31,16 @@ Rollup0 transition are L1-only behavior and do not affect Rollup0 derivation.
 A trigger MUST NOT be an EIP-4844 blob transaction or otherwise require a blob sidecar. This
 restriction applies to the proposed delivery transaction and any equivalent transaction that
 performs an ordered action. The separate `submitCandidate` settlement transaction is blob-carrying.
+This separation reserves sidecar transport for candidate DA, avoids transporting and simulating
+additional private trigger sidecars, and lets the L1 EEZ path distinguish current blob-bearing
+transaction types with `BLOBHASH(0)`. If a future Ethereum transaction type requires a sidecar but
+does not expose a nonzero `BLOBHASH(0)`, Rollup0 MUST extend the EEZ carrier-policy check before
+permitting that type on Ethereum; the current opcode check alone would not enforce the general rule.
+
+An EIP-7702 type-`0x04` transaction MAY be a trigger because it has no blob sidecar. Proposed-trigger
+validators apply the complete-trace one-action rule to delegated code as well. The L1 EEZ guard
+enforces at most one successful consumption per outer transaction, including equivalent carriers;
+it does not count failed or mismatched calls.
 
 Ordinary nested calls that remain on one network are allowed. An Ethereum transaction with no
 Rollup0 action is not a trigger transaction and is not part of the candidate's action manifest.
