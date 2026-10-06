@@ -229,8 +229,15 @@ across more than one L2 and supports both L1-to-L2 and L2-to-L1 flows.
 
 `EEZL2` uses the same structs and rolling hash, with these differences: it has no proofs, registry,
 or `StateDelta` application; a trusted `SYSTEM_ADDRESS` loads and drives entries; inbound delivery
-mints exactly `value` and enforces `msg.value == value`; and a proxy-routed call originating on L2
-forces its own `ROLLUP_ID` as the source and burns any `msg.value` to `SYSTEM_ADDRESS`.
+requires `msg.value == value` and forwards that supplied value through ordinary EVM calls; and a
+proxy-routed call originating on L2 forces its own `ROLLUP_ID` as the source and burns any
+`msg.value` to `SYSTEM_ADDRESS`.
+
+`EEZL2` does not perform a second mint or balance credit. The execution network defines how newly
+issued or unlocked inbound value reaches `SYSTEM_ADDRESS` before it calls `EEZL2`. For Rollup0,
+the protocol-derived transaction temporarily credits exactly `value` to `SYSTEM_ADDRESS` and the
+payable `EEZL2` call transfers that same value. Other EEZ networks may select a different
+network-level value-supply rule while preserving `msg.value == value` at this interface.
 
 ## 3.12 Access control
 
