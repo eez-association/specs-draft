@@ -2,8 +2,9 @@
 
 While its blobs remain available, each Rollup0 anchor publishes enough data on Ethereum for a
 follower to reconstruct the selected range without trusting a composer. EEZ also retains the exact
-settled Rollup0 block hash. A follower reads the RANDAO seed selected from each accepted live
-anchor's containing Ethereum execution block.
+settled Rollup0 block hash. A follower derives each interval's RANDAO value from the canonical
+Ethereum execution block immediately preceding that interval's starting Sync timestamp; anchor
+inclusion does not select the value.
 
 ## 10.1 Canonical Input
 
@@ -50,8 +51,8 @@ For each applicable candidate, the follower:
    `B[k]`, `H[k]`, and `R[k]`;
 11. recomputes every state, transaction, receipt, header, and block-hash commitment required for the
    selected endpoint;
-12. checks whether the terminal timestamp makes the candidate a live or catch-up anchor and applies
-   the corresponding action and RANDAO rules;
+12. checks whether the terminal timestamp makes the candidate a live or catch-up anchor, applies
+   the corresponding action rules, and independently applies Chapter 4's interval RANDAO rule;
 13. compares the executed endpoint with canonical settlement evidence; and
 14. commits the accepted range and advances its cursor.
 
@@ -67,10 +68,12 @@ state. It MUST still independently execute the selected Rollup0 data and halt if
 blocks or commitments disagree with canonical EEZ evidence. An auditing implementation MAY replay
 the relevant Ethereum execution and independently reverify the historical proof or signatures.
 
-After accepting a live anchor, the follower reads `prevRandao` from the authenticated header of the
-canonical Ethereum execution block that contains it. It activates that value as `currentSeed` at
-the first Rollup0 block after the anchored endpoint. A catch-up anchor and a scheduled Sync position
-without an accepted anchor do not change the seed.
+For every reconstructed interval after Sync timestamp `T`, the follower authenticates the canonical
+Ethereum header `P(T)` with the greatest timestamp strictly less than `T` and copies
+`P(T).prevRandao` into all six Rollup0 headers in the interval. It performs this derivation whether
+or not `T` has an Ethereum block and whether or not an anchor was accepted. A candidate spanning
+several intervals can therefore contain different interval seeds, all derived from canonical
+Ethereum history rather than from candidate inclusion.
 
 ## 10.3 Standard Block and State Synchronization
 
@@ -145,8 +148,8 @@ On an Ethereum reorganization, a follower:
 3. removes candidate evidence from orphaned, non-finalized Ethereum blocks;
 4. retreats the safe Rollup0 view to the last surviving endpoint while leaving the finalized view
    unchanged;
-5. restores the RANDAO seed established by the last surviving live anchor;
-6. removes or revalidates unsafe descendants against that cursor and seed; and
+5. recomputes each affected interval's RANDAO value from its preceding canonical Ethereum block;
+6. removes or revalidates unsafe descendants against that cursor and the recomputed values; and
 7. derives the replacement Ethereum branch in order.
 
 A follower may retain removed branches as noncanonical data. A block containing a protocol

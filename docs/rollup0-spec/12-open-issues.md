@@ -43,9 +43,9 @@
   finalized Ethereum checkpoint and have no separate Rollup0 depth limit. A conflict with
   finalized Rollup0 history has no privileged in-protocol recovery authority; followers halt until
   a community-coordinated hardfork defines a new authenticated checkpoint.
-- **No secure in-block randomness:** the containing Ethereum block's `prevRandao` can be known
-  before the live anchor is included. Rollup0 then copies that seed unchanged until the next live
-  anchor, making the limitation explicit.
+- **No secure in-block randomness:** each interval copies `prevRandao` from an earlier Ethereum
+  block whose value is already known before the interval starts. All six positions repeat it, so
+  applications must not treat it as fresh or unpredictable entropy.
 - **Simulation parity:** a composer and every validator/prover must simulate the exact selected EVM
   fork and protocol-transaction semantics. A mismatch makes an apparently valid candidate fail on
   Ethereum or derive a different Rollup0 block.

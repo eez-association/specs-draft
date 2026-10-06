@@ -40,10 +40,10 @@ This appendix summarizes values defined in the main chapters. The chapter text t
 | EIP-4788 beacon-roots update | disabled |
 | `requestsHash` | `sha256("")` |
 | EIP-6110, EIP-7002, and EIP-7251 requests | disabled |
-| `prevRandao` refresh | after each successful canonical live anchor |
-| Refreshed RANDAO source | `prevRandao` in the containing Ethereum execution block header |
-| Refreshed seed activation | first Rollup0 block after the anchored endpoint |
-| `prevRandao` mapping | direct copy of the current live-anchor seed |
+| `prevRandao` interval | six positions after each Sync timestamp `T` |
+| RANDAO source | `prevRandao` of canonical Ethereum block `P(T)` with greatest timestamp `< T` |
+| Seed activation | first Rollup0 block after `T`, independent of anchor inclusion |
+| `prevRandao` mapping | direct copy of `P(T).prevRandao` throughout the interval |
 | Initial RANDAO seed | direct copy from the finalized Ethereum reference block named by genesis |
 | Block `beneficiary` | composer-selected and authenticated per block |
 | Ordinary transaction fees | base fee burned; priority fee paid to `beneficiary` |
@@ -70,7 +70,7 @@ This appendix summarizes values defined in the main chapters. The chapter text t
 | EEZ batch `blockNumber` | `2^64 - 1` (current settlement context) |
 | Live-anchor endpoint | Sync timestamp equal to containing Ethereum block timestamp |
 | Catch-up-anchor endpoint | older Sync timestamp; no synchronous action |
-| Catch-up RANDAO behavior | retain the seed from the latest live anchor |
+| Catch-up RANDAO behavior | no special case; use the interval value derived from `P(T)` |
 | EEZ batch scope | Rollup0-only MUST for candidate protocol V1 |
 | Failed application call | must be the terminal manifest action; L1 EEZ failed lookup; no Rollup0 transaction, receipt, commitment transition, or new block variant |
 | `EEZL2` genesis balance | `0` |
@@ -115,8 +115,9 @@ protocol maximum for `M`; Ethereum settlement gas limits provide the practical b
 
 !!! note "GENESIS PARAMETERS"
     The Rollup0 chain ID and finalized Ethereum reference block are not yet fixed. The initial
-    RANDAO seed is derived from that reference block. Deployment-specific beneficiary policy and
-    recipients are operational configuration, not genesis consensus fields.
+    RANDAO seed is copied from that reference block into the genesis header and first interval.
+    Deployment-specific beneficiary policy and recipients are operational configuration, not
+    genesis consensus fields.
 
 ## A.5 DA Format
 
@@ -164,10 +165,9 @@ protocol maximum for `M`; Ethereum settlement gas limits provide the practical b
   contains a pure-L2 transaction prefix followed by zero or more protocol transactions derived
   from successful synchronous actions.
 - **Live anchor:** an anchor whose terminal Sync timestamp equals the containing Ethereum block
-  timestamp. It can contain synchronous actions and refreshes the RANDAO seed after inclusion.
+  timestamp. It can contain synchronous actions; its inclusion does not select the RANDAO seed.
 - **Catch-up anchor:** an anchor whose terminal Sync timestamp is older than the containing
-  Ethereum block timestamp. It contains only pure-L2 execution and does not refresh the RANDAO
-  seed.
+  Ethereum block timestamp. It contains only pure-L2 execution and has no special RANDAO behavior.
 - **Protocol transaction:** an unsigned EIP-2718 transaction derived from a successful
   Ethereum-to-Rollup0 action and included after the Sync block's pure-L2 prefix.
 - **Rollup0 state commitment:** the exact terminal Rollup0 block hash stored in EEZ fields that use

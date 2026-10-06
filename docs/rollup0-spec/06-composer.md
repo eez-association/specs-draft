@@ -48,6 +48,12 @@ confirmed. A candidate submitted for final validation must nevertheless contain 
 from the current Ethereum-confirmed cursor. A validator/prover must not sign a candidate whose
 named parent is only an unsafe or proposed Rollup0 block.
 
+The first descendant after Sync timestamp `T` uses the `prevRandao` of the latest canonical
+Ethereum block strictly before `T`. That block is known before the target slot. The header therefore
+does not branch based on whether the slot is missed or whether a live or catch-up candidate lands.
+An Ethereum reorganization that changes the selected preceding block still requires the normal
+revalidation described in Chapter 10.
+
 A composer may include, exclude, and order valid pure-L2 transactions and synchronous intents. It
 does not have to use arrival order, fee order, or any other fairness rule. Different valid
 candidates may select and order the same pending transactions differently.

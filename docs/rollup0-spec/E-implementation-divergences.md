@@ -24,8 +24,9 @@ The current client now implements bounded historical settlement catch-up. When i
 backlog is too large, it searches old empty on-grid boundaries from newest to oldest and can settle
 effect-free, anchor-only ranges over successive Ethereum heads. This resembles Rollup0's range
 catch-up, but it still publishes calldata, commits EVM state roots, uses the development
-one-in-flight and gas-cap policy, and neither retains nor restores the production RANDAO seed.
-Production ranges must obey the settlement and seed rules in the normative chapters.
+one-in-flight and gas-cap policy, and does not derive production interval RANDAO values from
+canonical Ethereum headers. Production ranges must obey the settlement and seed rules in the
+normative chapters.
 
 The current client publishes its Rollup0 payload in Ethereum calldata. Rollup0 will publish chain
 data in Ethereum blobs. The current payload is not the Rollup0 blob format and does not bind an
@@ -303,12 +304,11 @@ window's first parent block number and hash to canonical Ethereum settlement evi
 validators may pre-validate speculative work, but must perform this binding before signing.
 
 The current client puts zero in `prevRandao` for every Rollup0 block. Production Rollup0 copies the
-seed established by the latest successful canonical live anchor into every block until the next
-refresh. The client does not yet read `prevRandao` from the authenticated header of the Ethereum
-execution block containing that anchor, activate it after the live anchored endpoint, preserve it
-across catch-up anchors, or restore the preceding seed during a live-anchor reorganization. It must
-also initialize the genesis seed from the finalized Ethereum reference block named by the genesis
-configuration.
+`prevRandao` of the latest canonical Ethereum execution block strictly before an interval's starting
+Sync timestamp into all six blocks in that interval. The client does not yet derive that value from
+authenticated Ethereum headers, apply it independently of anchor inclusion, or recompute affected
+intervals during an Ethereum reorganization. It must also initialize the genesis header and first
+interval from the finalized Ethereum reference block named by the genesis configuration.
 
 ## E.6 Fee Market
 

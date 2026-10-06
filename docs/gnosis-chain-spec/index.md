@@ -47,10 +47,10 @@ number and hash and defines the first block governed by this specification.
 Gnosis Chain keeps xDAI as its native currency. The fork preserves the existing account state,
 including all native xDAI balances. Rollup0's empty native-balance genesis rule does not apply.
 
-The initial `currentSeed` is copied directly from the `prevRandao` in the designated finalized
-Gnosis Chain fork block. After the transition, Gnosis Chain follows Rollup0's live-anchor RANDAO
-refresh rule and obtains later seeds from the Ethereum blocks that contain successful canonical
-live anchors.
+The initial RANDAO value is copied directly from the `prevRandao` in the designated finalized
+Gnosis Chain fork block. After the transition, Gnosis Chain follows Rollup0's interval rule: every
+interval copies `prevRandao` from the latest canonical Ethereum execution block strictly before
+the interval's starting Sync timestamp, independently of anchor inclusion.
 
 Gnosis Chain does not reset its base fee at the fork. The first EEZ-era block derives
 `baseFeePerGas` from the designated Gnosis Chain parent using Rollup0's elasticity `2` and

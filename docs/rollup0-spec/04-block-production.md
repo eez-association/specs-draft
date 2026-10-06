@@ -115,7 +115,7 @@ The fixed header choices are:
 | `difficulty` | zero |
 | `nonce` | eight zero bytes |
 | `beneficiary` | composer-selected address carried in the authenticated blob payload |
-| `prevRandao` | anchor-scoped derivation defined below |
+| `prevRandao` | previous-Ethereum-block derivation defined below |
 | `baseFeePerGas` | EIP-1559 value derived from the parent with elasticity `2` and denominator `50` |
 | `withdrawals` | present and empty when required by the selected EVM fork |
 | `parentBeaconBlockRoot` | 32 zero bytes |
@@ -172,71 +172,61 @@ executes before the block's transactions.
 The composer-selected `beneficiary` and `extraData` are part of the block hash and must be available
 in the published block data so followers reconstruct the same header.
 
-### Live-Anchor-Scoped `prevRandao`
+### Previous-Ethereum-Block `prevRandao`
 
-Rollup0 refreshes its RANDAO seed only after a successful canonical live anchor. A catch-up anchor
-and a scheduled Sync position that is not anchored do not refresh the seed. An Ethereum
-reorganization that leaves the latest Rollup0 live anchor in the canonical chain does not require
-block rebuilding solely because of a RANDAO seed change. Normal anchor selection can still change
-safe Rollup0 history.
-
-For every Rollup0 block `b` before the next seed refresh:
+Rollup0 selects `prevRandao` from the Ethereum block before each interval, independently of anchor
+inclusion. Let `T` be a Sync timestamp and let `P(T)` be the canonical Ethereum execution block
+with the greatest timestamp strictly less than `T`. For every Rollup0 block `b` in the next
+interval:
 
 ```text
-prevRandao(b) = currentSeed
+T < timestamp(b) <= T + 12
+prevRandao(b) = P(T).prevRandao
 ```
 
-`currentSeed` is 32 bytes. Its initial value is the `prevRandao` in the header of the finalized
-Ethereum reference block selected by the Rollup0 genesis configuration.
+All six Rollup0 positions in that interval therefore copy the same 32-byte value. Rollup0 does not
+hash the seed with the block number and does not repeatedly hash the preceding Rollup0 block's
+`prevRandao`.
 
-When a live anchor becomes canonical on Ethereum, its next seed is the `prevRandao` field in the
-authenticated header of the Ethereum execution block that contains the accepted anchor. That value
-becomes `currentSeed` for the first Rollup0 block after the anchored endpoint. The anchored terminal
-block itself uses the previous Rollup0 seed; the refresh applies only after Ethereum selects the
-anchor. The containing Ethereum block's `prevRandao` may be known before inclusion, so this rule
-does not claim fresh or unpredictable entropy from the anchor block's later beacon-chain reveal.
+The strict inequality is intentional. A Rollup0 block after Sync position `T` never depends on the
+Ethereum block at `T`, even if one is produced and contains a live anchor. `P(T)` is already known
+before slot `T`; whether slot `T` is missed, whether a candidate lands there, and whether that
+candidate is live or catch-up do not create alternate Rollup0 headers. Anchor inclusion changes
+the safe cursor, not the interval's RANDAO value.
 
-A catch-up anchor retains `currentSeed` for the first block after its endpoint. Existing unsafe
-descendants can therefore remain valid while several historical ranges become safe. When a later
-live anchor catches up to the current Ethereum timestamp, that live anchor refreshes the seed for
-its descendants.
+For example, suppose canonical Ethereum has block `P` at timestamp `T - 12` and block `E` at
+timestamp `T`. The Rollup0 positions from `T + 2` through `T + 12` use `P.prevRandao`, regardless
+of whether `E` contains an anchor. If `E` remains the latest Ethereum block before `T + 12`, then
+`E.prevRandao` first applies to the Rollup0 positions from `T + 14` through `T + 24`.
 
-Every Live and Sync block copies the same value until the seed refreshes. Rollup0 does not hash the
-seed with the block number and does not repeatedly hash the preceding block's `prevRandao`.
+If one or more Ethereum slots before `T` were missed, `P(T)` is simply the latest earlier canonical
+execution block. The rule remains total; it does not require an Ethereum block at every scheduled
+Sync timestamp. A reorganization that changes `P(T)` changes the RANDAO input for the interval and
+requires affected unsafe descendants to be rebuilt. A reorganization that changes anchor inclusion
+but leaves `P(T)` unchanged creates no additional RANDAO-driven rebuild.
 
-If an Ethereum reorganization removes the latest live anchor, Rollup0 restores the seed from the
-last surviving live anchor and rebuilds the affected descendants. Removing a catch-up anchor
-retreats the settled cursor but does not change the seed. Neither case adds a new reorganization
-condition: removing an anchor already requires Rollup0 to retreat to the preceding settled cursor.
+The Rollup0 genesis configuration names a finalized Ethereum reference block strictly before the
+genesis Sync timestamp. That block is `P(Tgenesis)` and supplies the seed for the first interval
+after genesis. The Rollup0 genesis header also copies this value.
 
-Applications MUST NOT use `prevRandao` as secure same-block randomness. Once `currentSeed` is
-known, every block exposes that same value until the next live anchor. Secure application randomness
-requires a delayed commitment to a future live-anchor seed.
+Applications MUST NOT use `prevRandao` as secure same-block randomness. The selected value is known
+before the interval begins and is repeated for all six positions. Secure application randomness
+requires a delayed commitment to a future Ethereum-derived value.
 
-!!! success "DECISION: direct-copy `prevRandao` mapping"
-    Rollup0 copies `currentSeed` directly into every block until the next successful canonical live
-    anchor refreshes it. Exact repetition makes the absence of fresh entropy visible and does not
-    offer a menu of different derived values within one seed interval.
+!!! success "DECISION: use the preceding Ethereum block"
+    Rollup0 uses `P(T).prevRandao`, not the `prevRandao` of a block produced at `T`. This one-slot
+    lag lets sequencers, composers, and validators determine the next interval's headers without
+    waiting to learn whether a target-slot anchor landed.
 
-    Hashing the seed with the chain ID and block number would give each block a distinct value but no
-    additional entropy. Rollup0 does not use that mapping. Applications that need a unique per-block
-    salt can combine `prevRandao` with `block.number`, `block.chainid`, and application-specific
-    context. That still does not turn a known seed into secure randomness.
-
-!!! warning "Review before production: RANDAO refresh cadence"
-    Live-anchor-only refreshes are the selected Rollup0 rule and are not a production blocker. They
-    avoid rebuilding L2 history for Ethereum reorganizations that do not remove a Rollup0 anchor,
-    but the seed can remain known and unchanged for the complete period between live anchors,
-    including a long catch-up period.
-
-    The team may revisit more frequent Ethereum-derived refreshes or a separate delayed-randomness
-    mechanism before genesis. If it does not, the live-anchor-only rule remains in force. Changing
-    the rule after genesis requires a Rollup0 hardfork.
+    Hashing the value with the chain ID and block number would give each block a distinct value but
+    no additional entropy. Applications that need a unique per-block salt can combine
+    `prevRandao` with `block.number`, `block.chainid`, and application-specific context. That still
+    does not turn a known seed into secure randomness.
 
 !!! success "DECISION: copy the genesis reference block's RANDAO"
     Rollup0 copies the `prevRandao` of its designated finalized Ethereum reference block directly
-    into the genesis `currentSeed`. This avoids an arbitrary constant and uses the same direct-copy
-    rule as later live-anchor refreshes.
+    into the genesis header and first post-genesis interval. This avoids an arbitrary constant and
+    uses the same direct-copy rule as later intervals.
 
     The reference block number and hash are genesis parameters. The final Rollup0 genesis block
     cannot be calculated until that Ethereum block is finalized.
