@@ -34,9 +34,9 @@ an unsigned transaction derived from its Ethereum trigger. A failed action is re
 Ethereum by an EEZ failed lookup and adds no Rollup0 transaction.
 
 Every anchor contains every L2 block after the previous settled endpoint through its new endpoint,
-including empty blocks. A composer must anchor when a synchronous transaction occurs. A composer
-should also propose an anchor when 15 minutes have elapsed since the Ethereum inclusion of the
-latest anchor.
+including empty blocks. A synchronous action can settle only as part of a live anchor; Rollup0
+cannot compel a composer or Ethereum builder to provide that service. Composers SHOULD also
+propose an anchor when 15 minutes have elapsed since the Ethereum inclusion of the latest anchor.
 
 Rollup0 has two anchor forms:
 

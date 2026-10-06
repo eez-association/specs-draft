@@ -160,12 +160,22 @@ Every Rollup0 batch also requires:
 - `blockNumber = 2^64 - 1` to select the authenticated current Ethereum settlement context;
 - submission through the active Rollup0 settlement wrapper;
 - no other EEZ batch that contains Rollup0 in the same Ethereum block;
-- the selected blobs to be referenced by the batch;
-- no duplicate or unrelated blob index;
+- `callData` equal to the empty byte string;
+- a nonempty `blobIndices` array of length `m` equal to `[0, 1, ..., m - 1]`;
+- `blobhash(i) != bytes32(0)` for every `0 <= i < m`, and `blobhash(m) = bytes32(0)` to prove that
+  the outer transaction carries exactly `m` blobs;
 - the exact Rollup0 manager domain defined in Appendix D;
 - Rollup0 state deltas derived from `H[0]` and every successful synchronous action;
 - enough L2 entries and ordered-action data to reconstruct every protocol transaction; and
 - the proof or signatures required by Chapter 8.
+
+The batch therefore selects every blob carried by `submitCandidate`, once and in transaction
+order; the transaction cannot carry an unrelated or unreferenced sidecar. EEZ hashes that exact
+ordered versioned-hash list into every `publicInputsHash`. A validator MUST derive the list from
+the exact transaction and sidecars it validates. With canonical indices, a relayer that changes a
+blob, its position, or the blob count changes the signed list; a relayer that changes
+`blobIndices` violates the wrapper profile. The nonzero and contiguous checks additionally reject
+an out-of-range `BLOBHASH` result rather than authenticating a zero placeholder.
 
 Rollup0 does not redefine the EEZ batch tuple or public-input hash.
 

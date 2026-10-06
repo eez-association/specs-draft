@@ -63,7 +63,9 @@ before production:
 
 - Rollup0 chain ID, EEZ rollup ID, genesis, and finalized Ethereum RANDAO reference block;
 - the unsafe-block announcement P2P mapping and conformance vectors;
-- the selected EEZ version;
+- the selected and pinned EEZ Core version, including the exact `getCustomData` public-input fold
+  and complete physical blob-message stream;
+- an end-to-end `publicInputsHash` vector and full-blob vectors for that EEZ version;
 - the initial validator/prover membership, proof-system keys, and manager configuration;
 - production contract addresses, predeploy bytecode, and upgrade rules;
 - comprehensive conformance vectors for the normative byte-exact blob payload format;

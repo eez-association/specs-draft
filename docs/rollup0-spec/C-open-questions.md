@@ -6,6 +6,9 @@ It is not left to incompatible client convention.
 
 ## C.1 Conformance and Contract Work
 
+- Select and pin the EEZ Core revision, import its exact `getCustomData` public-input fold and
+  physical blob-message stream into the normative EEZ chapters, and add an end-to-end
+  `publicInputsHash` vector.
 - Add transaction, receipt, execution, JSON-RPC, and invalid-input conformance vectors for the
   fixed type-`0x45` envelope and RPC schema.
 - Add comprehensive canonical and invalid-input vectors for Appendix D's normative V0 payload.

@@ -50,6 +50,9 @@ This appendix summarizes values defined in the main chapters. The chapter text t
 | `extraData` | zero to 32 composer-selected bytes |
 | DA channel | Ethereum blobs |
 | Ethereum trigger transaction type | non-blob only; type `0x03` and any sidecar-dependent trigger prohibited |
+| Candidate `blobIndices` | nonempty canonical `[0, 1, ..., m - 1]`, covering every outer transaction blob |
+| Candidate batch `callData` | empty byte string |
+| Candidate EEZ message stream | EEZ Core stream version `0x00`; one `ChainOperation(chain_id = rollup0EezRollupId)` first, then zero or more action brackets, then `CloseBlobStream` |
 | EEZ state commitment | terminal Rollup0 block hash `H[k]` after `k` successful actions |
 | Registered initial commitment | Rollup0 genesis block hash |
 | Candidate domain tag | `keccak256(bytes("EEZ_ROLLUP0_CANDIDATE_V1"))` |

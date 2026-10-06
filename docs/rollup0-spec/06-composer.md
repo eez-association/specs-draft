@@ -109,7 +109,9 @@ A validator/prover checks at least:
 - the transaction root, receipts, receipt root, logs bloom, gas used, state root, and all header
   fields match replay;
 - the EEZ batch is the exact result of that execution;
-- the DA payload reconstructs the complete range;
+- the DA payload reconstructs the complete range, `blobIndices` canonically selects every blob of
+  the exact settlement transaction in order, every selected versioned hash is nonzero and matches
+  its verified sidecar, and batch `callData` is empty;
 - every protocol transaction has the required position and is byte-identical to the deterministic
   Rollup0 construction;
 - every protocol transaction and typed receipt is included in the correct transaction and receipt

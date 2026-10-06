@@ -4,6 +4,20 @@
 hashes, events, proof inputs, and proxy bytecode. This appendix defines the Rollup0 DA envelope,
 inbound protocol transaction, validator ECDSA proof policy, and unsafe-block announcement.
 
+!!! danger "PRODUCTION BLOCKER: pin the complete EEZ Core wire and digest version"
+    The EEZ chapters currently bundled in this repository still define the older
+    `getTimestampAndBlockHash` public-input fold and do not contain the physical EEZ logical-message
+    stream, field-element packing, framing, or multi-blob continuation referenced below. The
+    standalone EEZ Core repository defines that layer in `docs/blobs/BLOB_FORMAT_SPEC.md` (stream
+    version byte `0x00`); Section D.4 profiles Rollup0 against that document. The bundled chapters
+    alone are not sufficient to implement the Rollup0 candidate digest or enclosing blob stream.
+
+    Production MUST select and pin one EEZ Core revision, import its exact `getCustomData` fold and
+    physical stream rules into the normative documentation, and publish end-to-end
+    `publicInputsHash` and full-blob vectors. Implementations MUST NOT infer those rules from the
+    superseded companion blob placeholder. The Rollup0-local codecs in this appendix do not fill
+    that missing shared layer.
+
 ## D.1 ECDSA Attestation
 
 Rollup0 realizes an `N`-of-`M` attestation with one independent single-signer ECDSA proof system
@@ -101,16 +115,24 @@ Any account or contract can call the active wrapper. For candidate protocol V1, 
 
 1. verifies that the batch includes Rollup0;
 2. requires `transientExecutionEntryCount = 1` and `transientLookupCallCount = 0`;
-3. verifies that entry zero is a call-free Rollup0 anchor: it has destination Rollup0, a zero
+3. requires `callData` to be empty;
+4. lets `m = blobIndices.length`, requires `m >= 1` and `blobIndices[i] = i` for every
+   `0 <= i < m`, requires `BLOBHASH(i)` to be nonzero for those indices, and requires
+   `BLOBHASH(m)` to be zero;
+5. verifies that entry zero is a call-free Rollup0 anchor: it has destination Rollup0, a zero
    `proxyEntryHash`, exactly one Rollup0 state delta, no ether delta, empty call and nested-action
    arrays, empty return data, `callCount = 0`, and a zero rolling hash;
-4. reads the live EEZ commitment, requires it to equal the anchor's `currentState` (`Hparent`), and
+6. reads the live EEZ commitment, requires it to equal the anchor's `currentState` (`Hparent`), and
    requires the anchor's `newState` (`H[0]`) to differ from it;
-5. asks the manager to begin one transaction-scoped settlement session;
-6. calls `EEZ.postAndVerifyBatch` with the unchanged batch and blob transaction context;
-7. requires the live EEZ commitment to equal `H[0]` after the call;
-8. clears the manager's transaction-scoped authorization; and
-9. returns only after all checks succeed.
+7. asks the manager to begin one transaction-scoped settlement session;
+8. calls `EEZ.postAndVerifyBatch` with the unchanged batch and blob transaction context;
+9. requires the live EEZ commitment to equal `H[0]` after the call;
+10. clears the manager's transaction-scoped authorization; and
+11. returns only after all checks succeed.
+
+Because `BLOBHASH` returns zero when no blob exists at an index, the nonzero checks prove that all
+`m` selected positions exist and the final zero check proves that there is no uncommitted sidecar
+at position `m`. Requiring the indices to cover exactly `[0, m)` makes `blobIndices` canonical.
 
 The wrapper MUST prevent reentrancy. The manager MUST accept authorization only from its active
 wrapper and MUST reject a second active session. When it begins a session, the manager stores the
@@ -169,17 +191,76 @@ carry a second checkpoint table.
 
 ## D.4 Blob Format
 
-Rollup0 uses Ethereum blobs for anchored chain data. The first byte of the decoded
-`ChainOperation.operations` field is its Rollup0-local payload version:
+Rollup0 uses Ethereum blobs for anchored chain data. The physical layer is the EEZ Core blob
+message format, `docs/blobs/BLOB_FORMAT_SPEC.md` in `eez-core-protocol`, at stream version `0x00`.
+That format writes one stream-version byte followed by typed messages, packs the stream at 31 bytes
+per field element across the batch's blobs in order, ends the blob portion with `CloseBlobStream`,
+and continues the stream in the batch `callData`. Rollup0 is a guest of that format. It defines
+only the contents of the fields EEZ leaves opaque and a profile over which EEZ messages a
+candidate may contain.
+
+### D.4.1 EEZ Message Profile
+
+The decoded EEZ logical message stream of a candidate protocol V1 candidate MUST be exactly:
+
+```text
+ChainOperation(chain_id = rollup0EezRollupId, operations)
+bracket[0] ... bracket[n - 1]        // n >= 0 action brackets, shape below
+CloseBlobStream
+```
+
+Candidate protocol V1 sets the enclosing EEZ batch's `callData` field to the empty byte string, so
+the stream ends at `CloseBlobStream`. The complete EEZ logical message stream for a candidate is
+carried by its selected blobs; V1 does not append a separately available calldata tail. The empty
+value remains part of `publicInputsHash` through `keccak256(callData)`.
+
+`chain_id` is the `uint64` EEZ rollup ID that EEZ assigned when it registered the Rollup0 manager.
+It equals `rollup0EezRollupId` in the candidate domain and is not the Rollup0 execution chain ID.
+
+Candidate protocol V1 MUST contain exactly one Rollup0 `ChainOperation` for its anchored range,
+and that message's `operations` value MUST contain the complete span. It is the first message after
+the stream-version byte. A second `ChainOperation`, one whose `chain_id` is another network, or one
+positioned after an action bracket is invalid; two chain operations are not concatenated or
+interpreted as two spans. The V1 Rollup0-only batch rule independently prohibits a chain operation
+for another network.
+
+Each action bracket has exactly this shape:
+
+```text
+InitiateCrossChainTransaction(chain_id = 0, tx_data = 0x)
+Call(to_chain = rollup0EezRollupId, from_address, to_address, value, gas, data)
+ReturnSuccess(return_data) | ReturnFail(return_data)
+FinishCrossChainTransaction
+```
+
+`chain_id = 0` is the settlement L1's EEZ network ID, so the call's implicit source chain is `0`.
+`tx_data` MUST decode to the empty byte string under the unchanged EEZ encoding. `StaticCall`,
+`Snapshot`, `Revert`, a second or nested `Call`, and `ChainOperation` are invalid inside a bracket.
+No other message type appears at the top level. No bracket may follow a bracket whose return is
+`ReturnFail`.
+
+Any violation of the EEZ format's own validity rules, including its encoding layer, stream version
+and close marker, known types, truncation, bracket discipline, and placement conditions, makes the
+whole stream and therefore the candidate invalid. Validators MUST NOT attest such a candidate and
+followers MUST reject it. EEZ does not enforce shortest-form encodings of its own varint length
+prefixes, so raw stream bytes are not canonical. Rollup0 does not depend on that canonicality:
+action identity and every commitment are derived from decoded values and from the authenticated
+blob versioned hashes, never from raw stream bytes.
+
+EEZ's reference `ChainOpItem[]` layout for `operations` is explicitly not protocol, and Rollup0
+does not use it. Rollup0 also does not emit EEZ's reference pair of open-block and close-block
+chain operations around the cross-chain section. The single `ChainOperation` carries the complete
+span; its terminal Sync block is the block that the following brackets extend with protocol
+transactions, and that block closes when the stream ends.
+
+### D.4.2 Payload Version and Bounds
+
+The first byte of the decoded `ChainOperation.operations` field is its Rollup0-local payload
+version:
 
 ```text
 operations = 0x00 || native_block_span_v0
 ```
-
-Candidate protocol V1 MUST contain exactly one Rollup0 `ChainOperation` for its anchored range,
-and that message's `operations` value MUST contain the complete span. A second Rollup0
-`ChainOperation` is invalid; it is not concatenated with the first or interpreted as another span.
-The V1 Rollup0-only batch rule independently prohibits a chain operation for another network.
 
 The field MUST contain at least that byte. `0x00` selects the format described below. Every other
 first byte is invalid under the current rules and MUST NOT fall back to version `0`. This namespace
@@ -202,7 +283,7 @@ MUST reject a truncated continuation, an encoding longer than five bytes, a fift
 `0x0f`, or a multi-byte encoding whose final seven-bit group is zero. This canonicality rule applies
 inside the opaque Rollup0 `operations` value and does not modify EEZ's enclosing field decoder.
 
-### D.4.1 Linear V0 Grammar
+### D.4.3 Linear V0 Grammar
 
 The complete chain-operation payload is the following concatenation, where `||` denotes byte
 concatenation and all array elements appear in increasing index order:
@@ -298,15 +379,12 @@ timeline in Chapter 4. Consequently, production `block_count` is a positive mult
 Chiado development `block_count` is a positive multiple of `5`. This schedule check is candidate
 validity, even though the integer codec can represent other values.
 
-The action manifest is not a separate Rollup0 byte structure. It is the sequence of top-level EEZ
-cross-chain transaction brackets in decoded message order. Candidate protocol V1 requires each
-bracket to contain exactly one non-static call from EEZ network `0` to Rollup0, followed directly by
-one success or failure return and the transaction finish marker. The bracket ordinal is its
-manifest index, and the call hash is derived under the EEZ rules. The initiating `tx_data` field
-MUST decode to the empty byte string under the unchanged EEZ encoding. No bracket may follow the
-first failed return. The stream does not contain the complete signed bytes or hashes of proposed
-Ethereum triggers. A follower obtains the bytes of triggers that actually execute from canonical
-Ethereum; omitted proposed triggers have no Rollup0 effect to reconstruct.
+The action manifest is not a separate Rollup0 byte structure. It is the sequence of EEZ
+cross-chain transaction brackets that follow the `ChainOperation` in decoded message order, each
+with the shape fixed in Section D.4.1. The bracket ordinal is its manifest index, and the call hash
+is derived under the EEZ rules. The stream does not contain the complete signed bytes or hashes of
+proposed Ethereum triggers. A follower obtains the bytes of triggers that actually execute from
+canonical Ethereum; omitted proposed triggers have no Rollup0 effect to reconstruct.
 
 The terminal block timestamp and authenticated current Ethereum settlement context determine
 whether an anchor is live or catch-up. The format does not need a separate anchor-mode flag. A
@@ -323,7 +401,7 @@ The presentation of a vector in Markdown, JSON, or a program-specific fixture is
 choice. The byte strings and expected results printed here are normative; machine-readable mirrors
 are non-normative test tooling.
 
-### D.4.2 Initial V0 Codec Vectors
+### D.4.4 Initial V0 Codec Vectors
 
 These initial vectors test the Rollup0-owned `operations` codec. They assume a parent context in
 which the next six scheduled positions form one complete interval. A vector that includes a signed

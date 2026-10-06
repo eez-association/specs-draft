@@ -5,11 +5,16 @@ informative; Appendix D defines the normative, byte-exact raw, uncompressed, col
 format. If this rationale and Appendix D conflict, Appendix D controls.
 
 The shared EEZ blob format is not a Rollup0 design surface. EEZ defines the physical blob packing,
-the logical message stream, message framing, multi-blob continuation, and the `callData` tail.
-Rollup0 defines only how its chain-specific data uses fields that EEZ deliberately leaves opaque,
-principally `ChainOperation.operations`. Candidate protocol V1 also constrains the decoded value of
-`InitiateCrossChainTransaction.tx_data` to be empty; it does not redefine that field's EEZ wire
-encoding.
+the logical message stream, message framing, multi-blob continuation, and the `callData` tail in
+`docs/blobs/BLOB_FORMAT_SPEC.md` of `eez-core-protocol`. Rollup0 defines only how its
+chain-specific data uses fields that EEZ deliberately leaves opaque, principally
+`ChainOperation.operations`, plus the message profile in Appendix D Section D.4.1. Candidate
+protocol V1 also constrains the decoded value of `InitiateCrossChainTransaction.tx_data` to be
+empty; it does not redefine that field's EEZ wire encoding.
+
+Candidate protocol V1 additionally requires the enclosing batch `callData` tail itself to be
+empty. All candidate messages are therefore available from the selected blobs. A later protocol
+that uses the EEZ calldata tail needs a new candidate-domain rule for its meaning and availability.
 
 Changing the Rollup0 payload MUST NOT change the interpretation of an EEZ blob-stream version.
 The Rollup0 payload has its own format version inside the opaque chain-defined bytes.
@@ -17,6 +22,14 @@ The Rollup0 payload has its own format version inside the opaque chain-defined b
 !!! success "DECISION: keep the EEZ transport unchanged"
     Rollup0 uses the EEZ blob protocol as specified. It does not replace EEZ field-element packing,
     stream framing, message types, or blob-boundary behavior with OP Stack equivalents.
+
+    EEZ describes a reference `ChainOpItem[]` layout for `operations`, a `u32` item count followed
+    by transaction and new-block items, and marks it as not protocol. Rollup0 does not use that
+    layout; the payload version byte and columnar span below are the Rollup0 interpretation of the
+    opaque field. EEZ's reference slot flow also emits two chain operations per chain, one that
+    opens a cross-chain block before the brackets and one that closes it afterwards. Rollup0
+    emits one: the span's terminal Sync block is the open block that the following brackets extend
+    with protocol transactions, and it closes when the stream ends.
 
     The comparison with OP in this appendix is therefore about the organization of Rollup0 block
     data inside the EEZ stream, not about adopting OP's complete batch-submission protocol.
@@ -368,9 +381,10 @@ state delta. A failed action produces no type-`0x45` transaction and therefore n
 ## G.6 Action Manifest from EEZ Brackets
 
 Rollup0 does not encode a second action-manifest array inside `ChainOperation.operations`. The
-manifest is the semantic view of the top-level EEZ cross-chain transaction brackets that follow the
-native Rollup0 span in decoded message order. The transport-only `CloseBlobStream` marker, if it
-separates blob data from the `callData` tail, does not affect that order.
+manifest is the semantic view of the EEZ cross-chain transaction brackets that follow the native
+Rollup0 span in decoded message order. EEZ never nests transactions, so every bracket is top-level.
+The transport-only `CloseBlobStream` marker, if it separates blob data from the `callData` tail,
+does not affect that order.
 
 Candidate protocol V1 permits zero or more brackets with exactly this shape:
 
