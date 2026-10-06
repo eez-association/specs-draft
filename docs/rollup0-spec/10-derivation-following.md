@@ -23,6 +23,12 @@ block hash despite its legacy EEZ field name. The event identifies an individual
 but does not by itself prove the complete selected action prefix. The follower accepts both events
 only from the selected EEZ deployment and derives the endpoint by replay.
 
+The inline anchor entry is not consumed from the published per-rollup queue. It emits the anchor's
+`L2ExecutionPerformed(rollup0Id, H[0])` during `postAndVerifyBatch`, but no
+`ExecutionConsumed`. Deferred successful manifest actions are then published as a separate
+zero-based Rollup0 queue. Successful action number `k`, where action numbering starts at `1`, must
+therefore emit `ExecutionConsumed.cursor = k - 1`.
+
 ## 10.2 Derivation
 
 For each applicable candidate, the follower:
@@ -44,8 +50,8 @@ For each applicable candidate, the follower:
 8. executes the terminal block's pure-L2 prefix and verifies `H[0]` and `R0`;
 9. processes retained `ExecutionConsumed` and `L2ExecutionPerformed` logs after
    `submitCandidate`; for each successful action, it verifies the expected call hash, Rollup0 ID,
-   zero-based successful-entry queue position, and resulting `H[k]` in order, then derives the
-   successful-action count `k`;
+   exact zero-based successful-entry queue position `cursor = k - 1`, and resulting `H[k]` in
+   order, then derives the successful-action count `k`;
 10. reconstructs and executes the protocol transaction for each of those `k` successful actions
    from its authenticated settlement context, manifest index, call hash, and EEZ entry, deriving
    `B[k]`, `H[k]`, and `R[k]`;

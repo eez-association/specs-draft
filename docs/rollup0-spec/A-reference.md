@@ -63,7 +63,9 @@ This appendix summarizes values defined in the main chapters. The chapter text t
 | V1 transient lookup prefix | `0` entries |
 | Rollup0.x settlement update | atomically activate a new wrapper address and candidate-domain tag |
 | Anchor acceptance | observed ordered previous-settled-block (`Hparent`) to `H[0]` EEZ commitment transition; `BatchPosted` alone is insufficient |
+| Anchor events | inline anchor emits `L2ExecutionPerformed(rollup0Id, H[0])` and no `ExecutionConsumed` |
 | Successful-action evidence | retained EEZ `ExecutionConsumed(callHash, rollupId, cursor)` followed by the entry's `L2ExecutionPerformed(rollupId, H[k])` |
+| Successful-action cursor | for successful action number `k >= 1`, `cursor = k - 1` |
 | Late synchronization | finalized EEZ commitment as the authenticated checkpoint; standard execution-layer `eth` and `snap` protocols on Rollup0 for block and state data |
 | Candidate production | open |
 | Candidate relay | permissionless |
