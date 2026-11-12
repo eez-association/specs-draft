@@ -27,8 +27,10 @@ not a separately encoded array: it is derived from the top-level EEZ action brac
 message order. Bracket `i` has zero-based `manifestIndex = i`; its `Call` fields determine the EEZ
 cross-chain call hash, and its `ReturnSuccess` or `ReturnFail` determines the expected outcome. The
 corresponding authenticated EEZ execution entry or failed lookup must match that bracket. The
-candidate domain, manifest index, and call hash determine a successful action's Rollup0
-`sourceHash` as defined in Appendix F.
+native execution-group index equals the manifest index for each successful action in this
+inbound-only profile. Appendix F derives its `sourceHash` from that original group index, the L2
+chain ID and the intended L1 parent hash. The terminal failed lookup produces no native transaction
+or source index. The call hash and remaining candidate context are authorized separately.
 
 Every bracket's `InitiateCrossChainTransaction.tx_data` is empty. It does not carry a proposed
 Ethereum transaction or transaction hash. Appendix G explains why candidate protocol V1 identifies
@@ -328,6 +330,12 @@ The settlement context identifies the candidate's intended Ethereum slot and par
 index identifies the next action position, and the call hash identifies the call semantics. The
 outer Ethereum transaction hash, sender nonce, and unrelated L1 effects are not Rollup0 action
 identity.
+
+This action-authorization tuple is distinct from the native `sourceHash` in Appendix F. That hash
+names the original execution-group position using the L2 chain ID and intended L1 parent, without
+the call hash or timestamp. Equal source hashes across competing candidates do not make their
+actions interchangeable or authorize repeated execution; the full candidate and accepted
+commitment transitions remain authoritative.
 
 Two manifest positions MAY have the same call hash. They remain distinct ordered actions because
 the successful-entry cursor assigns the first matching call to the first position and advances

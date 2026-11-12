@@ -137,17 +137,16 @@ have different purposes:
 - the envelope's `chainId` is the Rollup0 EVM chain ID;
 - `sourceRollup` in the `EEZL2` calldata is the source network's EEZ rollup ID; the settlement L1
   uses the reserved value `0`; and
-- the transaction's source identifier binds the settlement chain ID and EEZ deployment. Candidate
-  validation uses these values to separate the L2 transaction identity between settlement domains,
-  even though they do not need separate EVM execution fields.
+- the transaction's source identifier binds the L2 chain ID, intended L1 parent hash and native
+  execution-group index. Settlement-chain and deployment authorization are checked separately
+  through the authenticated candidate domain.
 
 `sourceRollup` is an EEZ network identifier, not an EVM chain ID. For the initial Ethereum-to-
 Rollup0 path, the settlement chain ID is the Ethereum chain ID. A development deployment uses its
-configured settlement chain ID instead, such as Chiado's. This value is included in the
-source-identifier calculation. It SHOULD NOT also be encoded as a second top-level transaction
-field. Duplicating a fixed value would add a new mismatch case without changing execution. An RPC
-implementation MAY expose it as derived metadata. For a future L2 source, `sourceRollup` is the
-identity used by EEZ; its EVM chain ID does not replace that registry ID.
+configured settlement chain ID instead, such as Chiado's. This value is authenticated by the
+candidate domain; it is not an input to `sourceHash` and is not encoded as a second top-level
+transaction field. An RPC implementation MAY expose it as derived metadata. For a future L2
+source, `sourceRollup` is the identity used by EEZ; its EVM chain ID does not replace that registry ID.
 
 The inbound call has the following caller path:
 
@@ -212,10 +211,10 @@ other transaction-scoped state reset.
        reentrant calls.
 
 !!! success "DECISION: type `0x45` RLP envelope"
-    Envelope version `0` uses transaction type `0x45`, the ASCII byte for `E`, and the exact RLP
-    payload defined in Appendix F. Its transaction hash is the Keccak-256 hash of the complete typed
-    transaction bytes. The matching type-`0x45` receipt contains only the standard status,
-    cumulative gas used, log bloom, and logs fields.
+    The versionless six-field envelope uses transaction type `0x45`, the ASCII byte for `E`, and
+    the exact RLP payload defined in Appendix F. Its transaction hash is the Keccak-256 hash of the
+    complete typed transaction bytes. The matching type-`0x45` receipt contains only the standard
+    status, cumulative gas used, log bloom, and logs fields.
 
 !!! danger "PRODUCTION BLOCKER: transaction conformance"
     Rollup0 must still publish transaction, receipt, execution, RPC, and invalid-input conformance
@@ -224,15 +223,15 @@ other transaction-scoped state reset.
     reconstructed. It must not duplicate the derived envelope bytes.
 
 !!! success "DECISION: protocol transaction source identity"
-    The `sourceHash` calculation in Appendix F is fixed for envelope version `0`. It binds the
-    settlement chain ID, L1 EEZ address, EEZ Rollup0 ID, Rollup0 chain ID, envelope version,
-    intended settlement timestamp, known Ethereum parent hash, action-manifest index, and EEZ
-    cross-chain call hash. It cannot use the actual L1 child block hash, transaction index, or log
-    index because the builder selects those after candidate construction.
+    The `SOURCE_ENTRY_V1` calculation in Appendix F binds the Rollup0 EVM chain ID, intended
+    Ethereum parent hash and zero-based native execution-group index in the complete original Sync
+    candidate. A successful inbound action contributes one group; the terminal failed action
+    contributes none. Partial settlement must not renumber the original groups.
 
-    The calculation intentionally omits the outer Ethereum transaction hash and nonce. Rollup0
-    identifies the action by its ordered call, not by the exact transaction carrying it. Every
-    validator and follower must recompute `sourceHash` and reject a mismatch.
+    This identifier names an execution position. It does not hash the call, settlement timestamp
+    or deployment, and is not a replay guard. Every validator and follower must independently
+    reconstruct the source identity, authorized call and complete transaction bytes. A matching
+    `sourceHash` alone does not authorize execution.
 
     This source identifier does not replace the candidate domain folded into the EEZ
     `publicInputsHash`. Chapter 8 and Appendix D define that separate settlement-signature domain.
@@ -252,11 +251,10 @@ maximum gas limit of `16,777,216` (`2^24`). Each inbound protocol transaction th
 gasLimit = min(gas remaining in the block, 16,777,216)
 ```
 
-The numeric `16,777,216` cap is frozen for inbound envelope version `0`, even if a later Ethereum
+The numeric `16,777,216` cap is fixed for this native transaction format, even if a later Ethereum
 fork changes its ordinary-transaction cap. Changing this derivation changes the typed transaction
-bytes, transaction root, receipt context, and `H[k]`; it therefore requires a new inbound envelope
-version and Rollup0 hardfork. Ordinary signed transactions follow the cap of the active Ethereum
-execution fork.
+bytes, transaction root, receipt context, and `H[k]`; it therefore requires an explicitly specified
+Rollup0 hardfork. Ordinary signed transactions follow the cap of the active Ethereum execution fork.
 
 Before EVM execution, Rollup0 charges the standard intrinsic gas for a non-creation transaction
 under the active Ethereum fork. The calculation uses the complete calldata passed to `EEZL2`.
@@ -284,7 +282,7 @@ dependency before adopting a later fork; a client MUST NOT keep the displayed Os
 that active fork changes it.
 
 This gas remains used when the successful action catches an internal application revert. A
-candidate is invalid if an envelope-version-`0` transaction exceeds its fixed `16,777,216` cap,
+candidate is invalid if a type-`0x45` transaction exceeds its fixed `16,777,216` cap,
 its outer `EEZL2` call reverts, or the block does not have enough gas for the required intrinsic
 and calldata-floor charges.
 Intrinsic and EVM execution gas contribute to the transaction receipt and block `gasUsed`, and
@@ -326,7 +324,7 @@ gas purchase.
 
     A failed inbound action creates no protocol transaction and has no Rollup0 fee. Rollup0 also
     defines no reimbursement for its simulation or validation. Adding a payer, fee fields, or a
-    protocol-level debit requires a later envelope version and a Rollup0 hardfork.
+    protocol-level debit requires a separately specified encoding and a Rollup0 hardfork.
 
 The Sync block begins with an ordered pure-L2 transaction prefix. These transactions are fixed for
 the candidate and execute regardless of which later Ethereum trigger transactions succeed. The

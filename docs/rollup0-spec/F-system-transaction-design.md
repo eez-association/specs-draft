@@ -6,6 +6,11 @@ and `sourceHash` calculation referenced by Appendix D. The remaining sections ex
 and restate execution behavior selected in Chapters 3 through 5; those chapters take precedence
 if the explanatory text conflicts with them.
 
+The envelope and source formula match the shared native format in Rollup0 PR #235 and RollupX.
+This alignment does not select their deployment addresses, broader action profiles, or balance
+policies. The [Implementations comparison](../implementations/A-rollup0-differences.md#a61-native-format-alignment)
+records those remaining differences against pinned implementation revisions.
+
 The representation needed an explicit protocol decision because it affects:
 
 - which data the block header commits;
@@ -87,11 +92,10 @@ application execution rather than fixed block maintenance.
     type with different execution rules. Sharing the byte while changing its meaning would cause
     OP-aware software to decode or execute a Rollup0 transaction incorrectly.
 
-Envelope version `0` is:
+The canonical, versionless envelope is:
 
 ```text
 0x45 || rlp([
-    version,
     chainId,
     sourceHash,
     gasLimit,
@@ -101,11 +105,10 @@ Envelope version `0` is:
 ])
 ```
 
-The RLP payload is a list of exactly seven items with no trailing fields:
+The RLP payload is a list of exactly six items with no trailing fields:
 
 | Field | Encoding and rule |
 |---|---|
-| `version` | canonical non-negative RLP integer; exactly `0` |
 | `chainId` | canonical `uint256` RLP integer; equal to the Rollup0 chain ID |
 | `sourceHash` | exactly 32 bytes; calculated below |
 | `gasLimit` | canonical `uint64` RLP integer; at most `16,777,216` |
@@ -124,10 +127,11 @@ transactionHash = keccak256(0x45 || rlp(payload))
 complete ABI encoding of `executeIncomingCrossChainCall`, including `sourceAddress`, `sourceRollup`,
 the execution entry, and the lookup array. `value` must equal the inbound action value and the
 function's `value` argument. The sender is implicitly `SYSTEM_ADDRESS`; it is not encoded. There is
-no signature, nonce, access list, blob-hash list, or authorization list.
+no version, signature, nonce, access list, blob-hash list, or authorization list. Extra fields
+and trailing bytes are invalid.
 
-Version `0` has no gas-price, fee-cap, priority-fee, or payer field and charges no L2 fee. Charging
-an L2 account through transaction fee fields would require a later envelope version.
+The envelope has no gas-price, fee-cap, priority-fee, or payer field and charges no L2 fee. Adding
+a fee payer or fee fields requires a separately specified protocol change and Rollup0 hardfork.
 
 The source caller is not duplicated as an envelope-level `from` field. The source-side
 `msg.sender` and EEZ network ID are already committed as `sourceAddress` and `sourceRollup` inside
@@ -158,7 +162,7 @@ quantity `0x0`; fields marked omitted MUST be absent rather than `null`:
 | `blobVersionedHashes` | `[]` |
 | `authorizationList` | `[]` |
 | `maxFeePerGas`, `maxPriorityFeePerGas`, `maxFeePerBlobGas` | omitted |
-| `version` | `0x0` |
+| `version` | omitted |
 | `sourceHash` | the envelope's 32-byte value |
 
 The standard inclusion fields `blockHash`, `blockNumber`, and `transactionIndex` identify the
@@ -198,114 +202,112 @@ blob-only `blobGasUsed` and `blobGasPrice` fields are omitted.
 
     If an Ethereum fork later assigns incompatible meaning to `0x45`, Rollup0 cannot adopt that
     transaction type unchanged. A Rollup0 hardfork must resolve the conflict. Moving the inbound
-    type also requires incrementing the envelope version so that `sourceDomain` changes.
+    type requires an explicit new encoding and activation rule; this envelope has no version field.
 
 The `gasLimit` field must not exceed `16,777,216`. Derivation sets it to the lower of that value
 and the gas remaining in the block before the protocol transaction starts. Although this value was
-selected from Fusaka EIP-7825, it is an envelope-version-`0` constant. A later Ethereum fork that
-changes the ordinary transaction cap does not change these bytes; changing the inbound cap needs a
-new envelope version and Rollup0 hardfork.
+selected from Fusaka EIP-7825, it is fixed for this native transaction format. A later Ethereum
+fork that changes the ordinary transaction cap does not change these bytes; changing the inbound
+cap requires an explicitly specified Rollup0 hardfork.
 
-The source identifier must distinguish otherwise identical actions without relying on a system
-account nonce. It also needs enough domain information so that the same origin produces a different
-L2 transaction identity on another settlement chain, EEZ deployment, Rollup0 instance, or protocol
-version.
+### F.3.2 Source Identity
 
-Rollup0 envelope version `0` uses this construction:
+The source identifier names a complete native execution group's position without relying on a
+system-account nonce. It uses the same construction as Rollup0 PR #235 and RollupX:
 
 ```text
-sourceDomain = keccak256(abi.encode(
-    bytes32(keccak256(bytes("EEZ_ROLLUP0_INBOUND_SOURCE"))),
-    uint256(version),
-    uint256(settlementChainId),
-    address(settlementEezAddress),
-    uint256(eezRollupId),
-    uint256(rollup0ChainId)
-))
-
 sourceHash = keccak256(abi.encode(
-    bytes32(sourceDomain),
-    uint256(settlementTimestamp),
-    bytes32(settlementParentHash),
-    uint256(manifestIndex),
-    bytes32(crossChainCallHash)
+    string("SOURCE_ENTRY_V1"),
+    uint256(l2ChainId),
+    bytes32(intendedL1ParentHash),
+    uint64(groupIndex)
 ))
 ```
 
-The inner source-domain tag is:
+Use Ethereum Keccak-256 and standard Solidity ABI encoding. The tag is a literal dynamic string,
+not a prehashed or padded `bytes32`, packed bytes, RLP, or a null-terminated string. There is no
+separate `sourceDomain` hash and no envelope version. `sourceHash` is exactly 32 bytes.
+
+`l2ChainId` is the target Rollup0 EVM chain ID, equal to the envelope's `chainId`; it is not the
+EEZ registry's rollup ID. The formula ABI-encodes it as `uint256`. The compared implementations
+support configured `uint64` EVM chain IDs. `intendedL1ParentHash` is the nonzero hash of the known
+Ethereum parent for the intended settlement, not the eventual child block hash, a log's block hash,
+or an L2 state or block commitment. The target L2 chain ID must be nonzero.
+
+`groupIndex` is a zero-based `uint64` ordinal in the complete original Sync-block native execution
+sequence. Derive it before selecting an applied prefix or an unconsumed suffix; partial settlement
+and resumption must retain the original indexes. Do not reset it for a later posting of that same
+Sync candidate. Ordinary transactions, anchors and lookups that create no native transaction do
+not consume an index. Reject an index that cannot be represented as `uint64`.
+
+Under Rollup0's initial inbound-only profile, each successful action produces one native delivery
+and consumes one index. Since the only permitted failed action is terminal and emits no native
+transaction, `groupIndex = manifestIndex` for every emitted transaction. The failed action has no
+native source identity.
+
+The same encoding also identifies the broader execution groups described in the Implementations
+chapter. An outbound table load and its immediately following signed user transaction count once;
+each applying inbound delivery counts once. Nested callbacks do not create separate groups,
+and failed or static inbound lookups without a native transaction do not advance the index. Those
+implementations order outbound groups before inbound deliveries. These counting rules explain the
+shared format; Chapters 3 and 5 still define which actions Rollup0 permits.
+
+`sourceHash` and action authorization have different jobs. A source hash identifies an execution
+position, not the call contents, its result, or a globally unique occurrence. Competing candidates
+with the same L2 chain ID, intended L1 parent and group index can have the same `sourceHash` while
+containing different calls and transaction hashes. Retransmitting a candidate also preserves it.
+There is no global source-hash deduplication rule or system-account nonce replay guard.
+
+The formula deliberately omits the settlement chain ID, EEZ deployment and rollup ID, settlement
+timestamp, call hash, manager and wrapper addresses. It also omits the outer Ethereum transaction
+hash and nonce, eventual child block hash, transaction index, and log index. A different L2 chain
+ID, parent hash or group index changes `sourceHash`; changing a call or timestamp alone does not.
+Changing encoded calldata, value, gas, or another envelope field changes the transaction hash.
+
+These omissions do not remove candidate authorization. Validators and followers MUST independently
+authenticate the candidate context and original execution order, reconstruct every native field,
+and compare the exact transaction bytes. The EEZ call hash, execution results, authorized value,
+accepted commitment transitions and candidate domain remain separately checked. Chapters 7 and 8
+and Appendix D define the action and settlement-signature domains, including their timestamp and
+deployment bindings. A candidate that misses its slot must still be rebuilt and signed again.
+An equal source hash is neither permission to execute another candidate nor evidence that two
+deployments or settlement contexts are interchangeable.
+
+!!! note "UPGRADE: envelope and source rules"
+    The six-field envelope has no version selector. The `V1` suffix in `SOURCE_ENTRY_V1` is part
+    of the fixed literal tag, not a separately encoded version. Changes to the envelope, source
+    formula, or execution semantics require an explicitly specified Rollup0 hardfork and new
+    conformance vectors. A decoder MUST NOT guess the format from extra fields or accept the
+    earlier seven-field draft envelope as this format.
+
+    Replacing a manager or wrapper does not itself change this formula. Candidate authorization
+    must still bind the active settlement path. Any change to that authorization domain must be
+    specified independently of the native transaction identity.
+
+### F.3.3 Encoding Vectors
+
+These vectors check the shared source formula and envelope serialization. They do not validate an
+EEZ action, execution, or settlement. In particular, the envelope vector uses empty calldata and
+the existing PR #235 predeploy address as codec inputs; it is not an executable Rollup0 candidate
+under Chapter 3. The complete production conformance suite remains required.
 
 ```text
-keccak256(bytes("EEZ_ROLLUP0_INBOUND_SOURCE")) =
-0xa5463ebc06077538d400f54b653944302edcce2ec4d9c2675a764c6b403c567f
+l2ChainId = 1
+intendedL1ParentHash = 0x9999999999999999999999999999999999999999999999999999999999999999
+groupIndex = 7
+sourceHash = 0x67fb5da1784078579c726c542563b4577c50fb90652c54566d49b9f170784d37
+
+chainId = 1
+gasLimit = 16777216
+to = 0x4200000000000000000000000000000000000007
+value = 0
+input = 0x
+transaction = 0x45f83e01a067fb5da1784078579c726c542563b4577c50fb90652c54566d49b9f170784d3784010000009442000000000000000000000000000000000000078080
+transactionHash = 0x1cac881a63a11d3ccd475da54a7c289f55579afb3e025ae84bbef9ed6858ebb0
 ```
 
-For the initial version, `version = 0`. The ASCII domain string has no terminator. Both hashes use
-Solidity ABI encoding, not packed encoding. `sourceHash` is a 32-byte envelope field.
-
-The envelope `version` is also the version used in `sourceDomain`; there is no second derivation
-version. The transaction type byte selects the Rollup0 transaction family, while `version` selects
-the exact rules within that family. Changing either requires a Rollup0 hardfork, and changing the
-type byte requires incrementing `version`.
-
-`settlementChainId` is the Ethereum chain ID in production and the configured L1 chain ID in a
-development deployment. `settlementEezAddress` is the canonical EEZ contract on that L1, not the
-L2 `EEZL2` predeploy. `eezRollupId` identifies Rollup0 in that EEZ deployment. `rollup0ChainId` is
-the target EVM chain ID. `settlementTimestamp` and `settlementParentHash` are the intended Ethereum
-child-slot timestamp and known parent block hash from the authenticated candidate domain.
-`manifestIndex` is the zero-based ordinal of the action's top-level EEZ transaction bracket in
-decoded message order. It is not encoded separately and is not an index inside an outer Ethereum
-transaction. The `crossChainCallHash` is likewise derived rather than duplicated: it commits the
-target EEZ rollup ID, source EEZ network ID, source address, destination, value, and application
-calldata through EEZ's existing hash.
-
-The settlement chain ID is therefore required, but it is bound inside `sourceHash` rather than
-copied into another top-level envelope field. The source EEZ network ID remains in the call data
-because it selects the proxy identity during execution.
-
-`sourceHash` and `crossChainCallHash` have different jobs. `sourceHash` identifies one ordered
-action in one authenticated settlement context. Rollup0 candidate validation recomputes it and
-rejects a protocol transaction from the wrong context or manifest position. `crossChainCallHash`
-identifies only the EEZ call contents and is used by EEZ execution. It can be equal at two manifest
-positions; `manifestIndex` distinguishes their protocol transactions.
-
-This does not replace the domain separation of the EEZ settlement signature. The ECDSA validator
-signs the EEZ `publicInputsHash`, whose manager-bound candidate domain is defined in Chapter 8 and
-Appendix D.
-
-!!! note "UPGRADE: manager and wrapper identity"
-    `sourceDomain` intentionally omits the Rollup0 manager and settlement-wrapper addresses. The
-    candidate domain still binds the exact manager and active wrapper, so replacing either contract
-    invalidates signatures made for the old settlement path without unnecessarily changing the
-    identity of an otherwise identical inbound action.
-
-    A replacement that preserves the version-`0` envelope, derivation, and execution semantics MAY
-    retain envelope version `0`. If an upgrade changes the meaning or authenticated inputs of an
-    inbound transaction, it MUST increment the envelope version and define a new `sourceDomain`;
-    it MUST NOT reinterpret version `0` or retroactively add the new contract addresses to its
-    hash formula. A change confined to L1 authorization or settlement gating needs a new candidate
-    domain when applicable, but not automatically a new inbound envelope version.
-
-!!! success "DECISION: ordered-call source identity"
-    The formula above is final for envelope version `0`. The source identifier is part of the
-    derived transaction bytes and transaction root. The signed candidate authenticates every input
-    to the formula rather than carrying a second serialized transaction copy. Every validator and
-    follower must recompute it from the authenticated settlement context and action manifest.
-
-    It intentionally omits the outer Ethereum transaction hash, sender nonce, eventual child block
-    hash, transaction index, and log index. Those inclusion values are unavailable before the
-    builder constructs the block and are not Rollup0 action identity. The intended timestamp and
-    known parent hash are available before signing and bind the source to the same settlement
-    context as the candidate. A candidate that misses its slot must be rebuilt and signed again.
-
-    A different outer Ethereum transaction can perform the same action when it produces the
-    expected call hash at the expected manifest position. A different call, position, timestamp, or
-    settlement parent changes `sourceHash`. A different execution result for the same ordered call
-    changes the full protocol transaction and its transaction hash, but not `sourceHash`.
-
-    This aligns protocol-transaction identity with information enforceable by the current call path.
-    EEZ observes the call hash and assigns a successful match to the next queue position. The
-    production manager supplies the settlement context. Rollup0 does not claim to authenticate the
-    surrounding Ethereum transaction or its unrelated L1 effects.
+Run `python3 companion-docs/check-wire-vectors.py` from the repository root to check these values
+using Foundry `cast`, alongside the existing EEZ vectors.
 
 ## F.4 Difference from an OP Deposit
 
@@ -318,7 +320,7 @@ models are different. The OP column below describes a user-deposited transaction
 | Purpose | Execute an L1 deposit directly on L2 | Execute a precomputed EEZ action through `EEZL2` |
 | Sender | Explicit `from`; EVM `msg.sender` and `tx.origin` start as `from` | Implicit `SYSTEM_ADDRESS`; destination `msg.sender` is an EEZ cross-chain proxy |
 | Recipient | Arbitrary address or contract creation | Fixed `EEZL2` predeploy; application destination is inside the ABI input |
-| Source identity | Actual L1 block hash and deposit-log index | Authenticated settlement context, manifest index, and EEZ call hash |
+| Source identity | Actual L1 block hash and deposit-log index | L2 chain ID, intended L1 parent hash, and complete native execution-group index |
 | Source caller | Explicit envelope `from`, with OP address aliasing for L1 contracts | `sourceAddress` plus `sourceRollup` in EEZ calldata; no source `tx.origin` |
 | Value | Separate `mint` and call `value`; mint survives execution failure | Temporary protocol credit for the exact EEZ value; an expected-success failure invalidates the candidate |
 | Failure | The deposit remains in the block with a failed receipt | A failed EEZ action has no Rollup0 transaction; it is represented by the verified L1 lookup |

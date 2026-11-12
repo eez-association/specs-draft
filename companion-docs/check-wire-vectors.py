@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""Check published EEZ vectors 4–6 using Python and Foundry cast; no RPC required.
+"""Check EEZ vectors 4–6 and Rollup0 native encoding vectors with Foundry cast.
 
-These vectors cover the bundled EEZ digest, not the unpinned production Core version.
+No RPC is required. These cover the bundled EEZ digest and native encoding, not
+execution or settlement conformance against the unpinned production Core version.
 Run: python3 companion-docs/check-wire-vectors.py
 """
 
 from pathlib import Path
+import json
 import re
 import subprocess
 
@@ -70,6 +72,27 @@ def main():
         digest = cast("keccak", shared + accumulator[2:])
         assert digest == result(vectors[number], f"publicInputsHash[{proof_index}]")
     print("PASS: EEZ vectors 4–6 (entry ABI, entry hash, shared input, proof-system folds)")
+
+    native_doc = (root / "docs/rollup0-spec/F-system-transaction-design.md").read_text()
+    native_section = native_doc.split("### F.3.3 Encoding Vectors\n", 1)[1].split("## F.4", 1)[0]
+    native = dict(re.findall(r"^(\w+) = (\S+)$", native_section, re.MULTILINE))
+    source_hash = cast("keccak", cast(
+        "abi-encode", "f(string,uint256,bytes32,uint64)", "SOURCE_ENTRY_V1",
+        native["l2ChainId"], native["intendedL1ParentHash"], native["groupIndex"],
+    ))
+    assert source_hash == native["sourceHash"], "Native source-hash vector mismatch"
+    quantities = {}
+    for name in ("chainId", "gasLimit", "value"):
+        value = int(native[name])
+        quantities[name] = "0x" + value.to_bytes((value.bit_length() + 7) // 8, "big").hex()
+    payload = cast("to-rlp", json.dumps([
+        quantities["chainId"], source_hash, quantities["gasLimit"],
+        native["to"], quantities["value"], native["input"],
+    ]))
+    transaction = "0x45" + payload[2:]
+    assert transaction == native["transaction"], "Native six-field envelope vector mismatch"
+    assert cast("keccak", transaction) == native["transactionHash"], "Native transaction hash mismatch"
+    print("PASS: Rollup0 native vectors (SOURCE_ENTRY_V1 ABI, six-field envelope, transaction hash)")
 
 
 if __name__ == "__main__":

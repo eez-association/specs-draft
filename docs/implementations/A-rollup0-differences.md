@@ -23,7 +23,7 @@ A check mark (✓) means the implementation conforms to the specification on tha
 |---|---|---|---|
 | EEZ Core version | One pinned version (Appendix D) | `9735f53` | `855fe06`; ABI and digest incompatible with `9735f53` |
 | `EEZL2` predeploy | Fixed bytecode at `0xee50…0000`; hardfork to change (3.2) | Immutable at `0x4200…0007` | Upgradeable proxy at `0x4B27…402C` |
-| Inbound transaction | Unsigned type `0x45` with `version`, `sourceHash`, `gasLimit`; no nonce (3.3, F) | Unsigned type `0x76`, nonce, no `sourceHash` | Same as `eez-rollup0` |
+| Inbound transaction | Unsigned six-field type `0x45` with `sourceHash` and `gasLimit`; no version or nonce (3.3, F) | Unsigned type `0x76`, nonce, no `sourceHash` | Same as `eez-rollup0` |
 | `SYSTEM_ADDRESS` | `0xffff…fffe` | `0xeeee…0076` | `0xeeee…0076` |
 | Inbound gas limit | `min(remaining, 16,777,216)` | Fixed 2,000,000 | ✓ (implicit, not encoded) |
 | Inbound value credit, zero fee | Required | ✓ | ✓ (sum over the whole table) |
@@ -160,10 +160,11 @@ non-zero-gas ordinary transaction.
 ## A.6 Inbound Protocol Transactions
 
 **Specification.** Section 3.3 and Appendix F define an unsigned type-`0x45` transaction with
-payload `rlp([version, chainId, sourceHash, gasLimit, to, value, input])`, sent from
-`SYSTEM_ADDRESS` to `EEZL2`. It has no nonce, no fee, and a `sourceHash` that binds the settlement
-context and manifest index. A failed outer call invalidates the candidate. `EEZL2`'s balance must be
-unchanged by each protocol transaction.
+payload `rlp([chainId, sourceHash, gasLimit, to, value, input])`, sent from `SYSTEM_ADDRESS`
+to `EEZL2`. It has no version, nonce or fee. Its `SOURCE_ENTRY_V1` source hash binds the L2 chain
+ID, intended L1 parent hash and original native execution-group index; candidate authorization
+separately binds the remaining settlement context and call contents. A failed outer call invalidates
+the candidate. `EEZL2`'s balance must be unchanged by each protocol transaction.
 
 Both implementations replaced the signed development-key transaction described in Rollup0
 Appendix E.3 with a native unsigned transaction (`docs/native-system-transactions.md` in
@@ -180,7 +181,7 @@ Appendix E.3 with a native unsigned transaction (`docs/native-system-transaction
 | Status-0 receipt | Block execution accepts it; only the signer and composer reject it | Same |
 | `EEZL2` balance neutrality | Not checked | Not checked; `855fe06` treats `msg.value` as pooled funding |
 | EIP-4788 call before execution | Runs | ✓ Skipped |
-| RPC object | No `version`, `sourceHash`, or `yParity`; real nonce; `gas` = 2M | Same, but `gas` reports the cap, not the applied budget |
+| RPC object | No `sourceHash` or `yParity`; real nonce; `gas` = 2M | Same, but `gas` reports the cap, not the applied budget |
 | Pool and gossip | ✓ Type cannot enter the pool | ✓ Same, plus rejected by the payload builder and by the EVM for non-native senders |
 
 **`rollupX` block-start burn.** `rollupX` zeroes the balances of `EEZL2` and `SYSTEM_ADDRESS` as a
@@ -200,6 +201,37 @@ only `entries[0]`. Both signers narrow this to one entry and no static entries
 (`crates/eez-proof-signer/src/settlement/inbound.rs:95-104` in `eez-rollup0`, `:122-131` in
 `rollupX`). `eez-rollup0` also requires a flat entry. `rollupX` allows nested
 `expectedOutgoingCalls`, which are Ethereum-to-Rollup0-to-Ethereum callbacks beyond V1.
+
+### A.6.1 Native Format Alignment
+
+The shared envelope and source-identity rules were checked on 2026-11-10 against:
+
+- Rollup0 [PR #235](https://github.com/eez-association/eez-rollup0/pull/235), head
+  [`d2b6359d`](https://github.com/eez-association/eez-rollup0/blob/d2b6359d5a325bcb505334c89dd613031be485a7/docs/native-system-transactions.md),
+  open and unmerged at the time of comparison; and
+- RollupX
+  [`ff7a5cdc`](https://github.com/eez-association/eez-rollupX/blob/ff7a5cdc81ce02ad30c6c267c4554de77cecb753/docs/proposals/native-system-transactions.md).
+
+Both use Appendix F's versionless six-field type-`0x45` envelope and `SOURCE_ENTRY_V1` formula.
+They use the reserved sender, no native nonce increment, zero fees, an encoded remaining-block-gas
+budget capped at `16,777,216`, and Ethereum RPC placeholders without a `version` field. The old
+signed-legacy description in Rollup0 Appendix E.3 does not describe these revisions.
+
+This alignment selects the common transaction representation and identity only. The following
+execution and deployment differences remain; shared bytes do not establish full conformance:
+
+| Rule | Rollup0 specification | PR #235 | RollupX |
+|---|---|---|---|
+| EEZL2 predeploy | `0xee50000000000000000000000000000000000000` | `0x4200000000000000000000000000000000000007` | `0x4B2760F84B83d6b3829E30A7573B0172B6d6402C` |
+| Action profile | One successful inbound action per trigger | Inbound and outbound `[load, user]` groups; single-call profile | Broader grouped roots, nested callbacks and static lookups |
+| Native value | Exact inbound action value | Exact inbound value; outbound loads have zero value | Checked incoming-value sum across the complete table, including callbacks |
+| Protocol balances | Per-inbound EEZL2 balance neutrality; residual SYSTEM funds retained | Residual SYSTEM and EEZL2 funds retained | Both balances cleared after complete groups and at block finalization |
+| Failed inbound action | Verified terminal L1 failed lookup, no L2 transaction | Unsupported by the settlement profile | Nonapplying inbound roots emit no standalone delivery within the broader group profile |
+| Additional native type | No HistoryUpdate transaction | No HistoryUpdate transaction | Optional history type `0x46` |
+
+The candidate, DA and settlement-authorization rules remain separate from `sourceHash`. Neither
+the common source formula nor its conformance vector establishes those wider rules. Rollup0
+PR #236's balance-clearing changes are not part of the #235 baseline compared here.
 
 ## A.7 Action Profile and Failed Actions
 

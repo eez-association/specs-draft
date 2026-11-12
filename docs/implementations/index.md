@@ -24,6 +24,11 @@ domain, the validator threshold, and the unsafe-block announcement. `rollupX` is
 specification in block production, headers, fees, and data availability. However, it adds
 consensus rules and actions that Rollup0 does not have.
 
+The [native-format update](A-rollup0-differences.md#a61-native-format-alignment) separately
+compares Rollup0 PR #235 and a later RollupX revision, checked on 2026-11-10. Their shared
+transaction encoding and source identity now match Appendix F; their execution and deployment
+differences remain explicit. The other implementation findings retain the October baselines above.
+
 ## Appendices
 
 - [Appendix A: Rollup0 Specification Differences](A-rollup0-differences.md) lists every material

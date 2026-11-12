@@ -283,7 +283,7 @@ operations = 0x00 || native_block_span_v0
 
 The field MUST contain at least that byte. `0x00` selects the format described below. Every other
 first byte is invalid under the current rules and MUST NOT fall back to version `0`. This namespace
-is independent of the EEZ blob-stream version and the type-`0x45` transaction-envelope version.
+is independent of the EEZ blob-stream version. Type-`0x45` transactions have no version field.
 The V0 body is the direct, uncompressed `native_block_span_v0` encoding. A decoder MUST NOT sniff
 for or apply zlib, Brotli, or any other decompressor and MUST NOT accept a compression selector.
 A later compressed format requires a different payload-version byte.
@@ -534,11 +534,10 @@ transaction list. Its typed receipt occupies the matching receipt index. The rec
 contains the standard status, cumulative gas used, log bloom, and logs fields. A failed action has
 an L1 EEZ failed lookup but no Rollup0 transaction or receipt.
 
-Envelope version `0` is:
+The canonical, versionless envelope is:
 
 ```text
 0x45 || rlp([
-    version,
     chainId,
     sourceHash,
     gasLimit,
@@ -549,12 +548,12 @@ Envelope version `0` is:
 ```
 
 The transaction hash is `keccak256` of these complete bytes. Appendix F defines every field and its
-canonical RLP encoding.
+canonical RLP encoding. The list has exactly six fields, with no version or trailing data.
 
 The transaction is derived rather than signed. Its sender is `SYSTEM_ADDRESS`, its recipient is
 `EEZL2`, and its calldata follows the selected `EEZL2` inbound delivery ABI. Its access list,
 blob-hash list, and authorization list are empty. Its gas limit is the lower of the block gas
-remaining before it starts and `16,777,216`. That numeric cap is fixed for envelope version `0`;
+remaining before it starts and `16,777,216`. That numeric cap is fixed for this native format;
 it does not increase automatically if a later Ethereum fork raises the ordinary-transaction cap.
 
 Type-`0x45` pays no L2 fee. Its EVM gas price is zero, clients bypass ordinary fee-cap and
@@ -565,22 +564,24 @@ respectively. Gas consumption still contributes to the receipt and block `gasUse
 
 For JSON-RPC compatibility, a transaction object reports `nonce`, `v`, `r`, `s`, and `yParity` as
 `0x0`; reports `accessList`, `blobVersionedHashes`, and `authorizationList` as empty arrays; and
-omits `maxFeePerGas`, `maxPriorityFeePerGas`, and `maxFeePerBlobGas`. It additionally reports
-`version = 0x0` and the 32-byte `sourceHash`. These zero nonce and signature values are RPC
-placeholders, not serialized transaction fields or state transitions. Appendix F defines the
+omits `version`, `maxFeePerGas`, `maxPriorityFeePerGas`, and `maxFeePerBlobGas`. It additionally
+reports the 32-byte `sourceHash`. These zero nonce and signature values are RPC placeholders,
+not serialized transaction fields or state transitions. Appendix F defines the
 complete transaction and receipt schema.
 
 The calldata carries `sourceAddress` and `sourceRollup`. `sourceAddress` is the source-side
 `msg.sender`, while `sourceRollup` is its EEZ network ID. The settlement L1 uses EEZ rollup ID `0`.
-Its chain ID is instead bound by the transaction's source identifier. It is fixed by the Rollup0
-chain configuration and is not duplicated as an execution field. During execution, the outer frame
-has `SYSTEM_ADDRESS` as `msg.sender` and `tx.origin`; the application frame has the deterministic
-proxy for `(sourceAddress, sourceRollup)` as `msg.sender`.
+Its chain ID is authenticated by the candidate domain, not by `sourceHash`. It is fixed by the
+Rollup0 chain configuration and is not duplicated as an execution field. During execution, the
+outer frame has `SYSTEM_ADDRESS` as `msg.sender` and `tx.origin`; the application frame has the
+deterministic proxy for `(sourceAddress, sourceRollup)` as `msg.sender`.
 
-`sourceHash` uses the version `0` calculation in Appendix F. Candidate validation recomputes it
-from the authenticated settlement context, action-manifest index, and EEZ call hash. The outer
-Ethereum transaction hash, nonce, eventual child block hash, transaction index, and log index are
-not inputs.
+`sourceHash` uses Appendix F's `SOURCE_ENTRY_V1` calculation over the target L2 EVM chain ID,
+intended L1 parent hash and original native execution-group index. For this inbound-only profile,
+the index equals the successful action's manifest index; the terminal failed action has no native
+transaction or source index. Settlement timestamp, deployment and call hash are not inputs to this
+formula. Candidate validation must separately authenticate them, reconstruct every native field,
+and compare the exact bytes. The source hash is not a global replay or deduplication key.
 
 The transaction root commits the exact input and order. The receipt root commits status, gas use,
 and logs. The state root commits persistent execution effects. Exact return data is checked against

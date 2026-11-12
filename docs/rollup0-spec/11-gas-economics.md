@@ -16,8 +16,8 @@ gas limit; it is not an additional limit. A block can use up to `30,000,000` gas
 
 Ordinary and protocol-derived transactions share this limit. Fusaka caps every individual
 transaction gas limit at `16,777,216` (`2^24`). An inbound protocol transaction encodes the lower
-of that value and the gas remaining when it starts. The value is frozen for inbound envelope
-version `0`; ordinary signed transactions follow the active fork if a later Ethereum fork changes
+of that value and the gas remaining when it starts. The value is fixed for this native transaction
+format; ordinary signed transactions follow the active fork if a later Ethereum fork changes
 its cap. Rollup0 charges the active fork's standard non-creation intrinsic gas and calldata floor
 over the inbound calldata. Intrinsic, calldata-floor, and EVM execution gas contribute to its typed
 receipt and the block's `gasUsed`.

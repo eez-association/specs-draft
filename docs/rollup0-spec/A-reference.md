@@ -24,9 +24,9 @@ This appendix summarizes values defined in the main chapters. The chapter text t
 | Later EVM forks | Ethereum execution forks at their Ethereum mainnet activation timestamps |
 | Osaka Engine API | `engine_forkchoiceUpdatedV3`, `engine_getPayloadV5`, `engine_newPayloadV4`; zero beacon root, empty blob hashes and execution requests |
 | Inbound transaction type | unsigned EIP-2718 type `0x45` |
-| Inbound transaction encoding | `0x45 || rlp([version, chainId, sourceHash, gasLimit, to, value, input])` |
-| Inbound `sourceHash` version | `0`; settlement-context, manifest-index, and call-hash formula in Appendix F |
-| Maximum inbound transaction gas limit | `16,777,216` (`2^24`), frozen for envelope version `0` |
+| Inbound transaction encoding | `0x45 || rlp([chainId, sourceHash, gasLimit, to, value, input])`; no version field |
+| Inbound `sourceHash` | `SOURCE_ENTRY_V1`; L2 chain ID, intended L1 parent hash, and native execution-group index; exact ABI formula in Appendix F |
+| Maximum inbound transaction gas limit | `16,777,216` (`2^24`), fixed for this native transaction format |
 | Inbound transaction gas limit | `min(remaining block gas, 16,777,216)` |
 | Inbound transaction gas accounting | active fork's ordinary EVM execution gas plus standard non-creation intrinsic gas and calldata floor; displayed formulas are Osaka values |
 | Inbound transaction fee | none; `GASPRICE`, RPC `gasPrice`, and receipt `effectiveGasPrice` are `0` |
@@ -157,6 +157,10 @@ the same strict-two-thirds formula.
   EEZ transaction brackets. Each bracket's zero-based ordinal is its `manifestIndex`; its call hash
   and expected outcome come from its call and return messages. Its initiating `tx_data` is empty,
   and it does not identify an exact outer Ethereum transaction.
+- **Native execution-group index (`groupIndex`):** zero-based position in the complete original
+  Sync-block native sequence, retained across partial settlement. In this inbound-only profile it
+  equals the manifest index for each successful action; a terminal failed lookup consumes none.
+  It is an input to `sourceHash`, not an action-authorization or global replay key.
 - **Trigger:** a signed, non-blob Ethereum transaction whose execution produces the candidate's
   next expected EEZ call. A composer proposes exact triggers for bundle delivery. Within the same
   authenticated settlement context and manifest position, another permitted carrier transaction

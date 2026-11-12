@@ -47,8 +47,8 @@ A decoder consumes this byte before decoding any span field. An empty `operation
 other first byte is invalid under the current rules; a decoder MUST NOT guess a format, fall back
 to version `0`, or treat an unknown version as an empty span.
 
-This is a Rollup0-local namespace. It is independent of the EEZ blob-stream version and of the
-version inside a type-`0x45` protocol transaction. The complete `operations` value, including this
+This is a Rollup0-local namespace, independent of the EEZ blob-stream version. Type-`0x45`
+protocol transactions have no version field. The complete `operations` value, including this
 byte, is already authenticated through the EEZ blob commitment. Supporting another value requires
 an explicit Rollup0 protocol activation.
 
@@ -355,8 +355,9 @@ For successful manifest action `i`, derivation first executes the pure-L2 prefix
 successful protocol transaction. It then computes the gas remaining before action `i` and
 constructs the exact envelope from:
 
-- envelope version `0` and the configured Rollup0 chain ID;
-- the `sourceHash` derived from the authenticated settlement context, manifest index, and call hash;
+- the configured Rollup0 EVM chain ID;
+- the `sourceHash` derived by `SOURCE_ENTRY_V1` from that chain ID, the intended L1 parent hash,
+  and the original native execution-group index;
 - the lower of the remaining block gas and the protocol-transaction gas cap;
 - the fixed `EEZL2` recipient;
 - the action value; and
@@ -364,7 +365,12 @@ constructs the exact envelope from:
 
 The resulting bytes determine the transaction hash and transaction-trie value. They MUST decode as
 the Appendix F envelope and produce the terminal variant hash committed by the corresponding EEZ
-state delta. A failed action produces no type-`0x45` transaction and therefore no envelope bytes.
+state delta. In this inbound-only profile, each successful manifest action has one native group
+with `groupIndex = manifestIndex`. Derive indexes from the complete candidate before selecting any
+applied prefix or unconsumed suffix; resumption does not renumber them. A failed action produces no
+type-`0x45` transaction and therefore no envelope bytes or native source index. Call contents,
+results and the remaining settlement context are separately authenticated, even though they are
+not inputs to `sourceHash`.
 
 !!! success "DECISION: derive type-0x45 transaction bytes"
     Rollup0 reconstructs every type-`0x45` transaction from authenticated action data and consensus
@@ -438,6 +444,10 @@ The action is identified instead by:
 The settlement context comes from the Rollup0 manager, `manifestIndex` is the bracket ordinal, and
 the call hash is derived from the bracket's `Call`. Together they bind the source and target EEZ
 networks, source address, destination, value, calldata, candidate slot, and ordered occurrence.
+This authorization identity is distinct from the narrower native `sourceHash`, which names an
+execution-group position using the L2 chain ID, intended L1 parent and original group index.
+The DA and proof checks must bind the complete action even when competing candidates have equal
+source hashes.
 
 The signed Ethereum transaction proposed for delivery is not part of that identity. The composer
 constructs a candidate before Ethereum inclusion, and canonical execution may use a different
